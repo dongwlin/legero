@@ -1,5 +1,5 @@
 import { useUserStore } from "@/store/users";
-import React, { FormEvent, useEffect } from "react";
+import React, { FormEvent } from "react";
 import { useNavigate } from "react-router";
 
 const Login: React.FC = () => {
@@ -21,10 +21,6 @@ const Login: React.FC = () => {
         })
     }
 
-
-    useEffect(() => {
-        useUserStore.getState().setFormType('login')
-    }, [])
 
     const handleSumbit = async (e: FormEvent) => {
         e.preventDefault()
