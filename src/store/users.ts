@@ -12,14 +12,12 @@ interface UserState {
     password: string,
     error:ErrorForm ,
     isSubmitting: boolean,
-    formType: 'login'
     userToken: string | null,
     isAuthenticated:boolean
 
 
     setAccount: (account: string) => void
     setPassword: (password: string) => void
-    setFormType: (type: 'login') => void
     validateForm: () => boolean
     resetForm: () => void
     loginSuccess:(token:string)=>void
@@ -34,17 +32,13 @@ export const useUserStore = create<UserState>()(
             password: '',
             error: {},
             isSubmitting: false,
-            formType: 'login',
             isAuthenticated:false,
             userToken:null,
 
 
             setAccount: (account) => set({ account }),
             setPassword: (password) => set({ password }),
-            setFormType: (formType) => {
-                set({ formType })
-                get().resetForm()
-            },
+ 
             validateForm: () => {
                 const { account, password} = get()
                 const newErrors: UserState['error'] = {}
