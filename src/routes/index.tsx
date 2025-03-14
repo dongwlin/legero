@@ -1,26 +1,32 @@
 import Home from "@/views/Home";
+import Login from "@/views/Login";
 import NotFound from "@/views/NotFound";
 import Order from "@/views/Order";
 import Settings from "@/views/Settings";
 import Statistic from "@/views/Statistics";
 import { createBrowserRouter } from "react-router";
+import { AuthRouter, ProtectedRouter } from "./Routes";
 
 const router = createBrowserRouter([
   {
+    path: "/login",
+    element: <AuthRouter><Login /></AuthRouter>
+  },
+  {
     path: "/",
-    element: <Home />
+    element: <ProtectedRouter><Home /></ProtectedRouter>
   },
   {
     path: "/order",
-    element: <Order />
+    element: <ProtectedRouter><Order /></ProtectedRouter>
   },
   {
     path: "/statistics",
-    element: <Statistic />
+    element: <ProtectedRouter><Statistic /></ProtectedRouter>
   },
   {
     path: "/settings",
-    element: <Settings />
+    element: <ProtectedRouter><Settings /></ProtectedRouter>
   },
   {
     path: "*",
