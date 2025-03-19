@@ -1,12 +1,10 @@
 import { CarbonArrowLeft } from "@/components/Icon";
 import { useOrderStore } from "@/store/order";
-import { useUserStore } from "@/store/users";
 import React from "react";
 import { useNavigate } from "react-router";
 
 const Settings: React.FC = () => {
   const navigate = useNavigate()
-  const {loginout} = useUserStore()
 
   const NavToHomeView = () => {
     navigate("/", {
@@ -26,8 +24,6 @@ const Settings: React.FC = () => {
       <div className="mt-20 pt-2 flex flex-col items-center justify-center gap-y-6">
         <div>设置</div>
         <button className="btn btn-error" onClick={clear}>清空</button>
-        <button className="px-4 py-2 bg-red-500 text-white rounded font-semibold hover:bg-red-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
-         onClick={loginout}>退出登录</button>
       </div>
     </div>
   )
