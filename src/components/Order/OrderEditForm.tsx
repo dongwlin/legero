@@ -268,12 +268,10 @@ const OrderEditForm: React.FC = () => {
             <label className="fieldset-label text-xl mr-4">规格</label>
 
             <div className="flex flex-row gap-3 mr-2 my-2">
-              {/* <button className="btn btn-square text-xl transition-all duration-700" hidden={item.size === '无'} onClick={() => setItem({ ...item, size: '无' })}>×</button> */}
               <button
                 className={
                   item.size === "小" ? "btn text-xl btn-primary" : "btn text-xl"
                 }
-                // hidden={item.size !== '无' && item.size !== '小'}
                 onClick={() => setItem({ ...item, size: "小" })}
               >
                 {!item.includeNoodles || item.noodleType === "无"
@@ -287,7 +285,6 @@ const OrderEditForm: React.FC = () => {
                 className={
                   item.size === "中" ? "btn text-xl btn-primary" : "btn text-xl"
                 }
-                // hidden={item.size !== '无' && item.size !== '中'}
                 onClick={() => setItem({ ...item, size: "中" })}
               >
                 {!item.includeNoodles || item.noodleType === "无"
@@ -301,7 +298,6 @@ const OrderEditForm: React.FC = () => {
                 className={
                   item.size === "大" ? "btn text-xl btn-primary" : "btn text-xl"
                 }
-                // hidden={item.size !== '无' && item.size !== '大'}
                 onClick={() => setItem({ ...item, size: "大" })}
               >
                 {!item.includeNoodles || item.noodleType === "无"
@@ -317,7 +313,6 @@ const OrderEditForm: React.FC = () => {
                     ? "btn text-xl btn-primary"
                     : "btn text-xl"
                 }
-                // hidden={item.size !== '无' && item.size !== '自定义'}
                 onClick={() => setItem({ ...item, size: "自定义" })}
               >
                 自定义
