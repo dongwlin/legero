@@ -331,7 +331,6 @@ const OrderEditForm: React.FC = () => {
                   className="input"
                   value={item.customSizePrice}
                   onChange={handleCustomSizePriceChange}
-                  disabled={!item.includeNoodles}
                 />
               )}
             </label>
