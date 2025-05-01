@@ -24,7 +24,7 @@ const Login: React.FC = () => {
 
     const handleSumbit = async (e: FormEvent) => {
         e.preventDefault()
-        if(await submitUserForm()){
+        if (await submitUserForm()) {
             NavToHome()
         }
 
@@ -32,11 +32,14 @@ const Login: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-            <form className="bg-white p-8 rounded-lg shadow-md w-full max-w-md space-y-6" onSubmit={handleSumbit}>
-                <h1 className="text-2xl font-bold text-center text-gray-800">用户登录</h1>
-                <div className="space-y-4">
-                    <div className="flex flex-col justify-center">
-                        <label htmlFor="account" className="block text-2xl font-medium text-gray-700 mb-1">账号</label>
+            <form className="card bg-base-100 w-full max-w-md shadow-xl" onSubmit={handleSumbit}>
+                <div className="card-body p-8 space-y-4">
+                    <h1 className="card-title text-3xl justify-center text-gray-800 mb-4">用户登录</h1>
+
+                    <div className="form-control">
+                        <label htmlFor="account" className="label">
+                            <span className="label-text text-xl text-gray-700">账号</span>
+                        </label>
                         <input
                             id="account"
                             value={account}
@@ -44,14 +47,16 @@ const Login: React.FC = () => {
                             type="text"
                             disabled={isSubmitting}
                             placeholder="请输入账号"
-                            className="w-full h-16 px-6 text-2xl rounded-md border-2 border-gray-300 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                            className="input input-bordered w-full input-lg !text-black"
                         />
                         {error.account && (
-                            <span className="text-red-500 text-xl mt-1 block">{error.account}</span>
+                            <span className="text-error text-lg mt-1">{error.account}</span>
                         )}
                     </div>
-                    <div className="flex flex-col justify-center">
-                        <label htmlFor="password" className="block text-2xl font-medium text-gray-700 mb-1">密码</label>
+                    <div className="form-control">
+                        <label className="label" htmlFor="password">
+                            <span className="label-text text-xl text-gray-700">密码</span>
+                        </label>
                         <input
                             id="password"
                             value={password}
@@ -59,10 +64,10 @@ const Login: React.FC = () => {
                             type="password"
                             disabled={isSubmitting}
                             placeholder="请输入密码"
-                            className="w-full h-16 px-6 text-2xl rounded-md border-2 border-gray-300 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                            className="input input-bordered w-full input-lg !text-black"
                         />
                         {error.password && (
-                            <span className="text-red-500 text-xl mt-1 block">{error.password}</span>
+                            <span className="text-error text-lg mt-1">{error.password}</span>
                         )}
                     </div>
                     <button
