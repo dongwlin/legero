@@ -72,7 +72,7 @@ const OrderItem: React.FC<OI> = (item) => {
 
   const handleUpdateNoodleStep = () => {
     let newStatus: StepStatus = "not-started"
-    switch (item.progess.noodles) {
+    switch (item.progress.noodles) {
       case "not-started":
         newStatus = "completed"
         break
@@ -85,8 +85,8 @@ const OrderItem: React.FC<OI> = (item) => {
     }
     updateOrder(item.id, {
       ...item,
-      progess: {
-        ...item.progess,
+      progress: {
+        ...item.progress,
         noodles: newStatus,
       },
       completedAt: newStatus !== "completed" ? "" : item.completedAt,
@@ -95,7 +95,7 @@ const OrderItem: React.FC<OI> = (item) => {
 
   const handleUpdateMeatStep = () => {
     let newStatus: StepStatus = "not-started"
-    switch (item.progess.meat) {
+    switch (item.progress.meat) {
       case "not-started":
         newStatus = "completed"
         break
@@ -108,8 +108,8 @@ const OrderItem: React.FC<OI> = (item) => {
     }
     updateOrder(item.id, {
       ...item,
-      progess: {
-        ...item.progess,
+      progress: {
+        ...item.progress,
         meat: newStatus,
       },
       completedAt: newStatus !== "completed" ? "" : item.completedAt,
@@ -153,17 +153,17 @@ const OrderItem: React.FC<OI> = (item) => {
         <div>{req}</div>
         <div className="italic">{item.note}</div>
         <div className="flex flex-row my-2">
-          {item.progess.noodles != "unrequired" && (
+          {item.progress.noodles != "unrequired" && (
             <button
-              className={getStepBtnClass(item.progess.noodles)}
+              className={getStepBtnClass(item.progress.noodles)}
               onClick={handleUpdateNoodleStep}
             >
               粉
             </button>
           )}
-          {item.progess.meat != "unrequired" && (
+          {item.progress.meat != "unrequired" && (
             <button
-              className={getStepBtnClass(item.progess.meat)}
+              className={getStepBtnClass(item.progress.meat)}
               onClick={handleUpdateMeatStep}
             >
               肉
@@ -174,8 +174,8 @@ const OrderItem: React.FC<OI> = (item) => {
             className={serveMealBtnClass}
             disabled={
               (needsNoodlesStep(item) &&
-                item.progess.noodles !== "completed") ||
-              (needsMeatStep(item) && item.progess.meat !== "completed")
+                item.progress.noodles !== "completed") ||
+              (needsMeatStep(item) && item.progress.meat !== "completed")
             }
             onClick={handleServeMeal}
           >

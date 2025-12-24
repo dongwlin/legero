@@ -46,7 +46,7 @@ export type OrderItem = {
   note: string
   price: number
   createdAt: string
-  progess: {
+  progress: {
     noodles: StepStatus
     meat: StepStatus
   }
@@ -62,47 +62,13 @@ export function isCustomSize(order: OrderItem): order is OrderItem & { size: '�
 }
 
 export function needsNoodlesStep(order: OrderItem): order is OrderItem & {
-  porcess: {noodles: StepStatus}
+  progress: {noodles: StepStatus}
 } {
   return order.includeNoodles
 }
 
 export function needsMeatStep(order: OrderItem): order is OrderItem & {
-  porcess: {meat: StepStatus}
+  progress: {meat: StepStatus}
 } {
   return order.meats.available.length > 0
-}
-
-export function validateOrderItem(item: OrderItem): boolean {
-  if (item.includeNoodles) {
-    if (!item.noodleType) {
-      return false
-    }
-
-    if (item.noodleType === '伊面') {
-      return false
-    }
-  } else {
-    if (item.noodleType !== undefined) {
-      return false
-    }
-  }
-
-  if (item.dining.diningMethod === '外带' && !('packaging' in item.dining)) {
-    return false
-  }
-
-  if (item.includeNoodles && !item.progess.noodles) {
-    return false
-  }
-
-  if (item.meats.available.length > 0 && !item.progess.meat) {
-    return false
-  }
-
-  if (!item.progess.noodles && !item.progess.meat) { 
-    return false
-  }
-
-  return true
 }

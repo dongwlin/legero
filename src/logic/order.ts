@@ -26,7 +26,7 @@ export const newDefaultOrderItem = (): OrderItem => {
     note: "",
     price: 0,
     createdAt: "",
-    progess: {
+    progress: {
       noodles: 'unrequired',
       meat: 'unrequired',
     },
@@ -158,10 +158,10 @@ export const getOtherRequest = (item: OrderItem): string => {
 export const updateCompletion = (item: OrderItem): void => {
   const requiredSteps = []
   if (needsNoodlesStep(item)) {
-    requiredSteps.push(item.progess.noodles === 'completed')
+    requiredSteps.push(item.progress.noodles === 'completed')
   }
   if (needsMeatStep(item)) {
-    requiredSteps.push(item.progess.meat === 'completed')
+    requiredSteps.push(item.progress.meat === 'completed')
   }
 
   if (requiredSteps.length > 0 && requiredSteps.every(Boolean)) {

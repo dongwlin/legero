@@ -186,14 +186,14 @@ const OrderEditForm: React.FC = () => {
       )
     }
     if (newItem.includeNoodles) {
-      newItem.progess.noodles = "not-started"
+      newItem.progress.noodles = "not-started"
     } else {
-      newItem.progess.noodles = "unrequired"
+      newItem.progress.noodles = "unrequired"
     }
     if (newItem.meats.available.length > 0) {
-      newItem.progess.meat = "not-started"
+      newItem.progress.meat = "not-started"
     } else {
-      newItem.progess.meat = "unrequired"
+      newItem.progress.meat = "unrequired"
     }
     if (!newItem.includeNoodles) {
       newItem.noodleType = "无"
