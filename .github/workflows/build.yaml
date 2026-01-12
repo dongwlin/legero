@@ -83,10 +83,10 @@ jobs:
       - name: Rename APK
         run: |
           cd android/app/build/outputs/apk/release
-          mv app-release-unsigned-signed.apk legero.apk
+          mv app-release-unsigned-signed.apk legero-${{ env.VERSION_NAME }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: legero
-          path: "android/app/build/outputs/apk/release/legero.apk"
+          name: legero-${{ env.VERSION_NAME }}
+          path: "android/app/build/outputs/apk/release/legero-${{ env.VERSION_NAME }}.apk"
       
