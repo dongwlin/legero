@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.github.dongwlin.legero.beta"
+    namespace = "com.github.dongwlin.legero"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.github.dongwlin.legero.beta"
+        applicationId "com.github.dongwlin.legero"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode System.getenv("VERSION_CODE") ? Integer.parseInt(System.getenv("VERSION_CODE")) : 0

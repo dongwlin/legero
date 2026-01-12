@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">legero-beta</string>
-    <string name="title_activity_main">legero-beta</string>
-    <string name="package_name">com.github.dongwlin.legero.beta</string>
-    <string name="custom_url_scheme">com.github.dongwlin.legero.beta</string>
+    <string name="app_name">legero</string>
+    <string name="title_activity_main">legero</string>
+    <string name="package_name">com.github.dongwlin.legero</string>
+    <string name="custom_url_scheme">com.github.dongwlin.legero</string>
 </resources>
