@@ -34,7 +34,7 @@ const Settings: React.FC = () => {
       <Header />
 
       {/* 主内容区 */}
-      <div className="mt-20 px-4 md:px-8 max-w-4xl mx-auto">
+      <div className="pt-[calc(5rem+env(safe-area-inset-top))] px-4 md:px-8 max-w-4xl mx-auto">
         {/* 主题设置部分 */}
         <ThemeSettings />
 
