@@ -1,84 +1,27 @@
-import { CarbonArrowLeft } from "@/components/Icon"
-import { OrderCreateForm, OrderList, OrderEditForm } from "@/components/Order"
-import { useOrderStore } from "@/store/order"
-import { Filter } from "@/types"
-import dayjs from "dayjs"
-import React, { useMemo } from "react"
-import { useNavigate } from "react-router"
+import { OrderEditForm, OrderList } from "@/components/Order"
+import React from "react"
+import Header from "./components/Header"
+import OrderControls from "./components/OrderControls"
 
 const Order: React.FC = () => {
-  const navigate = useNavigate()
-
-  const orders = useOrderStore(state => state.orders)
-  const filter = useOrderStore(state => state.filter)
-  const setFilter = useOrderStore(state => state.setFilter)
-
-  const NavToHomeView = () => {
-    navigate("/", {
-      replace: true,
-    })
-  }
-
-  const handleFilterChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = event.target.value as Filter
-    setFilter(selected)
-  }
-
-  const { todayCompletedCount, uncompletedCount } = useMemo(() => {
-    const now = dayjs()
-    const todayDate = now.date()
-    
-    let todayCompleted = 0
-    let uncompleted = 0
-
-    orders.forEach(item => {
-      // Check for uncompleted
-      if (item.completedAt === '') {
-        uncompleted++
-      }
-
-      // Check for today completed
-      if (item.completedAt !== '') {
-        const itemDate = dayjs(item.createdAt).date()
-        if (itemDate === todayDate) {
-          todayCompleted++
-        }
-      }
-    })
-
-    return {
-      todayCompletedCount: todayCompleted,
-      uncompletedCount: uncompleted
-    }
-  }, [orders])
-
   return (
-    <div>
-      <div className="fixed top-0 left-0 right-0 z-10 h-16 mt-4 bg-base-200 flex justify-between items-center px-4">
-        <button className="btn btn-ghost" onClick={NavToHomeView}>
-          <CarbonArrowLeft className="size-10" />
-        </button>
+    <div className="h-screen bg-base-100 flex flex-col">
+      {/* 顶部导航栏 */}
+      <Header />
 
-        <div>
-          <span className="text-2xl">{dayjs().date()}日已完成 {todayCompletedCount}</span>
+      {/* 主内容区 - 使用 flex-1 占据剩余空间 */}
+      <div className="flex-1 flex flex-col pt-[calc(5rem+env(safe-area-inset-top))] px-4 md:px-8 max-w-4xl mx-auto w-full h-full overflow-hidden">
+        {/* 控制面板部分 (统计、筛选、创建) */}
+        <div className="flex-none">
+          <OrderControls />
         </div>
 
-        <div>
-          <span className="text-2xl">未完成 </span>
-          <span className="text-2xl">{uncompletedCount}</span>
+        {/* 订单列表部分 - 占据剩余垂直空间 */}
+        <div className="flex-1 min-h-0 pb-4">
+          <OrderList />
         </div>
-
-        <select className="select w-32" value={filter} onChange={handleFilterChange}>
-          <option value="all">全部</option>
-          <option value="uncompleted">未完成</option>
-          <option value="completed">已完成</option>
-        </select>
-
-        <OrderCreateForm />
       </div>
-      <div className="mt-20 h-[calc(100vh-6rem)]">
-        <OrderList />
-      </div>
+      
       <OrderEditForm />
     </div>
   )
