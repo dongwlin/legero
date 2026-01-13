@@ -7,7 +7,7 @@ android {
         applicationId "com.github.dongwlin.legero"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode System.getenv("VERSION_CODE") ? Integer.parseInt(System.getenv("VERSION_CODE")) : 0
+        versionCode System.getenv("VERSION_CODE") ? Integer.parseInt(System.getenv("VERSION_CODE")) : 1
         versionName System.getenv("VERSION_NAME") ?: "dev"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
