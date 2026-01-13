@@ -219,4 +219,4 @@ const OrderItem: React.FC<OI> = (item) => {
   )
 }
 
-export default OrderItem
+export default React.memo(OrderItem)

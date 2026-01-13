@@ -3,10 +3,10 @@ import { OrderCreateForm, OrderList, OrderEditForm } from "@/components/Order"
 import { useOrderStore } from "@/store/order"
 import { Filter } from "@/types"
 import dayjs from "dayjs"
-import React from "react"
+import React, { useMemo } from "react"
 import { useNavigate } from "react-router"
 
-const Order: React.FC = ({ }) => {
+const Order: React.FC = () => {
   const navigate = useNavigate()
 
   const orders = useOrderStore(state => state.orders)
@@ -24,25 +24,48 @@ const Order: React.FC = ({ }) => {
     setFilter(selected)
   }
 
+  const { todayCompletedCount, uncompletedCount } = useMemo(() => {
+    const now = dayjs()
+    const todayDate = now.date()
+    
+    let todayCompleted = 0
+    let uncompleted = 0
+
+    orders.forEach(item => {
+      // Check for uncompleted
+      if (item.completedAt === '') {
+        uncompleted++
+      }
+
+      // Check for today completed
+      if (item.completedAt !== '') {
+        const itemDate = dayjs(item.createdAt).date()
+        if (itemDate === todayDate) {
+          todayCompleted++
+        }
+      }
+    })
+
+    return {
+      todayCompletedCount: todayCompleted,
+      uncompletedCount: uncompleted
+    }
+  }, [orders])
+
   return (
     <div>
-      <div className="fixed top-0 left-0 right-0 z-10 h-16 mt-4 bg-base-200 flex justify-between items-center">
+      <div className="fixed top-0 left-0 right-0 z-10 h-16 mt-4 bg-base-200 flex justify-between items-center px-4">
         <button className="btn btn-ghost" onClick={NavToHomeView}>
           <CarbonArrowLeft className="size-10" />
         </button>
 
         <div>
-          <span className="text-2xl">{dayjs().date()}日已完成 {orders.filter(item => {
-            if (dayjs(item.createdAt).date() === dayjs().date() && item.completedAt !== '') {
-              return true
-            }
-            return false
-          }).length}</span>
+          <span className="text-2xl">{dayjs().date()}日已完成 {todayCompletedCount}</span>
         </div>
 
         <div>
           <span className="text-2xl">未完成 </span>
-          <span className="text-2xl">{orders.filter(item => item.completedAt === '').length}</span>
+          <span className="text-2xl">{uncompletedCount}</span>
         </div>
 
         <select className="select w-32" value={filter} onChange={handleFilterChange}>
@@ -53,7 +76,7 @@ const Order: React.FC = ({ }) => {
 
         <OrderCreateForm />
       </div>
-      <div className="mt-20">
+      <div className="mt-20 h-[calc(100vh-6rem)]">
         <OrderList />
       </div>
       <OrderEditForm />
