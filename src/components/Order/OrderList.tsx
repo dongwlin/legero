@@ -1,11 +1,17 @@
-import React, { useMemo, useRef, useEffect } from "react"
+import React, { useMemo } from "react"
 import OrderItem from "./OrderItem"
 import { useOrderStore } from "@/store/order"
-import { VariableSizeList as List, ListChildComponentProps } from "react-window"
-import AutoSizer from "react-virtualized-auto-sizer"
+import { List, RowComponentProps } from "react-window";
+import { AutoSizer } from "react-virtualized-auto-sizer"
 import { getMeatsRequest, getOtherRequest } from "@/logic/order"
+import { OrderItem as OrderItemType } from "@/types"
 
-const Row = ({ index, style, data }: ListChildComponentProps) => {
+type RowProps = {
+  data: OrderItemType[]
+}
+
+const Row = ({ index, style, data }: RowComponentProps<RowProps>) => {
+  // Fix for RowComponentProps
   const order = data[index]
   return (
     <div style={style} className="list-row border-b border-base-300 px-4 items-start py-4">
@@ -17,7 +23,6 @@ const Row = ({ index, style, data }: ListChildComponentProps) => {
 const OrderList: React.FC = () => {
   const orders = useOrderStore((state) => state.orders)
   const filter = useOrderStore((state) => state.filter)
-  const listRef = useRef<List>(null)
 
   const filteredOrders = useMemo(() => {
     switch (filter) {
@@ -31,13 +36,6 @@ const OrderList: React.FC = () => {
         return orders
     }
   }, [orders, filter])
-
-  // Reset cache when orders change to recalculate row heights
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.resetAfterIndex(0)
-    }
-  }, [filteredOrders])
 
   const getItemSize = (index: number) => {
     const item = filteredOrders[index]
@@ -56,21 +54,16 @@ const OrderList: React.FC = () => {
 
   return (
     <div className="list rounded-box shadow-md w-full h-full bg-base-100">
-      <AutoSizer>
-        {({ height, width }: { height: number; width: number }) => (
-          <List
-            ref={listRef}
-            height={height}
-            width={width}
-            itemCount={filteredOrders.length}
-            itemSize={getItemSize}
-            itemData={filteredOrders}
-            overscanCount={5}
-          >
-            {Row}
-          </List>
-        )}
-      </AutoSizer>
+      <AutoSizer renderProp={({ height, width }) => (
+        <List
+          style={{ height: height ?? 0, width: width ?? 0 }}
+          rowCount={filteredOrders.length}
+          rowHeight={getItemSize}
+          rowProps={{ data: filteredOrders }}
+          rowComponent={Row}
+          overscanCount={5}
+        />
+      )} />
     </div>
   )
 }

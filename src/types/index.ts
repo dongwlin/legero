@@ -6,7 +6,7 @@ export type Packaging = '塑料盒' | '塑料袋' | '无'
 export type PackagingMethod = '装在一起' | '汤粉分开' | '无'
 export type Filter = 'all' | 'uncompleted' | 'completed'
 
-const meats = [
+export const meats = [
   '瘦肉',
   '猪肝',
   '猪血',

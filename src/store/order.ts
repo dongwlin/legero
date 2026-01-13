@@ -41,7 +41,7 @@ export const useOrderStore = create<OrderState>()(
           return { lastIDNum: idNum }
         })
 
-        let idNumStr = idNum!.toString().padStart(4, "0")
+        const idNumStr = idNum!.toString().padStart(4, "0")
         const id = `${now.format("YYYYMMDD")}${idNumStr}`
         return id
       },

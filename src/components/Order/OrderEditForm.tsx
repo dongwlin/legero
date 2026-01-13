@@ -39,10 +39,14 @@ const OrderEditForm: React.FC = () => {
   useEffect(() => {
     if (updateTargetID) {
       const targetItem = findOrder(updateTargetID)
-      setItem(targetItem)
-      openDialog()
+      if (targetItem) {
+        setTimeout(() => {
+          setItem(targetItem)
+          openDialog()
+        }, 0)
+      }
     }
-  }, [updateTargetID])
+  }, [updateTargetID, findOrder])
 
   const handleIncludeNoodlesChange = (
     event: React.ChangeEvent<HTMLInputElement>

@@ -49,7 +49,7 @@ const getStepBtnClass = (stepStatus: StepStatus): string => {
 }
 
 const getServeMealBtnClass = (createdAt: string): string => {
-  let base = "btn text-xl"
+const base = "btn text-xl"
   if (!createdAt) {
     return base + " " + "btn-outline"
   }
@@ -68,7 +68,7 @@ const OrderItem: React.FC<OI> = (item) => {
   const sizePrice = getSizePrice(item)
   const meatReq = getMeatsRequest(item)
   const req = getOtherRequest(item)
-  const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
+const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
 
   const handleUpdateNoodleStep = () => {
     let newStatus: StepStatus = "not-started"
