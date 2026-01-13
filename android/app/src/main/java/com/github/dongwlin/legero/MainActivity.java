@@ -1,4 +1,4 @@
-package com.github.dongwlin.legero.beta;
+package com.github.dongwlin.legero;
 
 import com.getcapacitor.BridgeActivity;
 
