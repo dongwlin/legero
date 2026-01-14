@@ -8,7 +8,7 @@ import {
   Packaging,
   PackagingMethod,
 } from "@/types"
-import { calcPrice, newDefaultOrderItem } from "@/logic/order"
+import { calcPrice, newDefaultOrderItem } from "@/service/order"
 import { useOrderStore } from "@/store/order"
 import dayjs from "dayjs"
 

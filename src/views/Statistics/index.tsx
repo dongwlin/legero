@@ -1,4 +1,4 @@
-import { calculateDailyStats, DailyStats } from '@/logic/statistics'
+import { calculateDailyStats, DailyStats } from '@/service/statistics'
 import { useOrderStore } from '@/store/order'
 import React, { useState } from 'react'
 import DailyStatsCard from './components/DailyStatsCard'

@@ -3,7 +3,7 @@ import OrderItem from "./OrderItem"
 import { useOrderStore } from "@/store/order"
 import { List, RowComponentProps } from "react-window";
 import { AutoSizer } from "react-virtualized-auto-sizer"
-import { getMeatsRequest, getOtherRequest } from "@/logic/order"
+import { getMeatsRequest, getOtherRequest } from "@/service/order"
 import { OrderItem as OrderItemType } from "@/types"
 
 type RowProps = {

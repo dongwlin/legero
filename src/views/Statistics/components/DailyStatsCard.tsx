@@ -1,4 +1,4 @@
-import { DailyStats } from '@/logic/statistics'
+import { DailyStats } from '@/service/statistics'
 import React from 'react'
 
 interface DailyStatsCardProps {
