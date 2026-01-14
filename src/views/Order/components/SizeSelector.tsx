@@ -2,7 +2,7 @@ import React, { useMemo } from "react"
 import { ToggleButtonGroup } from "@/components/ToggleButtonGroup"
 import { SIZES } from "./constants"
 import { NoodleType, Size } from "@/types"
-import { getSizeDisplayValue } from "./constants"
+import { getSizeDisplayValue } from "./utils"
 
 interface SizeSelectorProps {
   size: Size
