@@ -122,7 +122,7 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({ onUnlock, onCan
                   disabled={success}
                   className={`btn btn-lg btn-circle btn-ghost text-2xl font-semibold
                     hover:bg-base-200 active:bg-base-300 active:scale-95
-                    transition-all duration-150 min-h-[56px] min-w-[56px]
+                    transition-all duration-150 min-h-14 min-w-14
                     ${success ? 'opacity-50 cursor-not-allowed' : ''}`}
                   aria-label={`数字 ${num}`}
                   tabIndex={0}
@@ -138,7 +138,7 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({ onUnlock, onCan
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="btn btn-outline flex-1 h-12 min-h-[48px]"
+                className="btn btn-outline flex-1 h-12 min-h-12"
                 disabled={success}
               >
                 取消
@@ -146,14 +146,14 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({ onUnlock, onCan
             )}
             <button
               onClick={handleDelete}
-              className="btn btn-outline flex-1 h-12 min-h-[48px]"
+              className="btn btn-outline flex-1 h-12 min-h-12"
               disabled={password.length === 0 || success}
             >
               删除
             </button>
             <button
               onClick={handleConfirm}
-              className="btn btn-primary flex-1 h-12 min-h-[48px]"
+              className="btn btn-primary flex-1 h-12 min-h-12"
               disabled={password.length === 0 || success}
             >
               确认
