@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react"
 import { CarbonAdd } from "@/components/Icon"
 import { OrderItem, Adjustment, DiningMethod, Packaging, PackagingMethod } from "@/types"
-import { calcPrice, newDefaultOrderItem } from "@/services/order"
+import { calcPrice } from "@/services/order"
 import { useOrderStore } from "@/store/order"
 import dayjs from "dayjs"
 import { useOrderForm, FormMode } from "./useOrderForm"
