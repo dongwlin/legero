@@ -1,4 +1,4 @@
-import OrderCreateForm from "../OrderCreateForm"
+import OrderForm from "../forms/OrderForm"
 import { useOrderStore } from "@/store/order"
 import { Filter } from "@/types"
 import dayjs from "dayjs"
@@ -68,7 +68,7 @@ const OrderControls: React.FC = () => {
           </select>
           
           <div className="flex-none">
-            <OrderCreateForm />
+            <OrderForm mode="create" />
           </div>
         </div>
       </div>

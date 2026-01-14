@@ -1,7 +1,7 @@
 import React from 'react'
 import Header from '@/components/Header'
 import OrderControls from './components/list/OrderControls'
-import OrderEditForm from './components/OrderEditForm'
+import OrderForm from './components/forms/OrderForm'
 import OrderList from './components/list/OrderList'
 
 const Order: React.FC = () => {
@@ -23,7 +23,7 @@ const Order: React.FC = () => {
         </div>
       </div>
 
-      <OrderEditForm />
+      <OrderForm mode="edit" />
     </div>
   )
 }

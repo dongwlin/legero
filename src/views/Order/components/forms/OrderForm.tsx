@@ -1,26 +1,38 @@
-import React, { useRef } from "react"
+import React, { useEffect, useRef } from "react"
 import { CarbonAdd } from "@/components/Icon"
 import { OrderItem, Adjustment, DiningMethod, Packaging, PackagingMethod } from "@/types"
-import { calcPrice } from "@/services/order"
+import { calcPrice, newDefaultOrderItem } from "@/services/order"
 import { useOrderStore } from "@/store/order"
 import dayjs from "dayjs"
-import { useOrderForm } from "./useOrderForm"
-import { QuantitySelector } from "./selectors/QuantitySelector"
-import { NoodleSelector } from "./selectors/NoodleSelector"
-import { SizeSelector } from "./selectors/SizeSelector"
-import { NoodleAmountSelector } from "./selectors/NoodleAmountSelector"
-import { MeatSelector } from "./selectors/MeatSelector"
-import { IngredientSelector } from "./selectors/IngredientSelector"
-import { DiningSelector } from "./selectors/DiningSelector"
+import { useOrderForm, FormMode } from "./useOrderForm"
+import { QuantitySelector } from "../selectors/QuantitySelector"
+import { NoodleSelector } from "../selectors/NoodleSelector"
+import { SizeSelector } from "../selectors/SizeSelector"
+import { NoodleAmountSelector } from "../selectors/NoodleAmountSelector"
+import { MeatSelector } from "../selectors/MeatSelector"
+import { IngredientSelector } from "../selectors/IngredientSelector"
+import { DiningSelector } from "../selectors/DiningSelector"
 
-const OrderCreateForm: React.FC = () => {
+interface OrderFormProps {
+  mode: FormMode
+  initialItem?: OrderItem
+}
+
+const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const genID = useOrderStore((state) => state.genID)
   const addOrder = useOrderStore((state) => state.addOrder)
+  const updateOrder = useOrderStore((state) => state.updateOrder)
+  const updateTargetID = useOrderStore((state) => state.updateTargetID)
+  const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
+  const findOrder = useOrderStore((state) => state.findOrder)
+
+  const dialogRef = useRef<HTMLDialogElement>(null)
 
   const {
     num,
     setNum,
     item,
+    setItem,
     updateItem,
     updateNestedItem,
     updateMeats,
@@ -29,12 +41,27 @@ const OrderCreateForm: React.FC = () => {
     showPorkKidney,
     showCustomPrice,
     showTakeoutOptions
-  } = useOrderForm(undefined, 'create')
+  } = useOrderForm(initialItem, mode)
 
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  // 编辑模式下，监听 updateTargetID 变化并打开对话框
+  useEffect(() => {
+    if (mode === 'edit' && updateTargetID) {
+      const targetItem = findOrder(updateTargetID)
+      if (targetItem) {
+        setTimeout(() => {
+          setItem(targetItem)
+          openDialog()
+        }, 0)
+      }
+    }
+  }, [updateTargetID, findOrder, setItem, mode])
 
   const handleDialogClose = () => {
-    resetForm?.()
+    if (mode === 'create') {
+      resetForm?.()
+    } else {
+      setUpdateTargetID("")
+    }
   }
 
   const openDialog = () => {
@@ -97,14 +124,13 @@ const OrderCreateForm: React.FC = () => {
     updateItem('note', event.target.value)
   }
 
-  const handleCreateOrder = () => {
+  const handleSubmit = () => {
     const now = dayjs().tz()
     const price = calcPrice(item)
 
     const newItem: OrderItem = {
       ...item,
       price: price,
-      createdAt: now.toISOString(),
     }
 
     // 小份不包含猪腰
@@ -138,23 +164,39 @@ const OrderCreateForm: React.FC = () => {
       newItem.customSizePrice = 0
     }
 
-    // 创建多个订单
-    for (let i = 0; i < (num || 1); i++) {
-      const id = genID()
-      const saveItem = {
-        ...newItem,
-        id: id,
+    if (mode === 'create') {
+      // 创建订单模式
+      newItem.createdAt = now.toISOString()
+      
+      // 创建多个订单
+      for (let i = 0; i < (num || 1); i++) {
+        const id = genID()
+        const saveItem = {
+          ...newItem,
+          id: id,
+        }
+        addOrder(saveItem)
       }
-      addOrder(saveItem)
+    } else {
+      // 编辑订单模式
+      setItem(newItem)
+      updateOrder(updateTargetID, newItem)
     }
+    
     closeDialog()
   }
 
+  const isCreateMode = mode === 'create'
+  const formTitle = isCreateMode ? "创建订单" : "修改订单"
+  const submitButtonText = isCreateMode ? "创建" : "修改"
+
   return (
     <>
-      <button className="btn" onClick={openDialog}>
-        <CarbonAdd className="size-10 btn-ghost" />
-      </button>
+      {isCreateMode && (
+        <button className="btn" onClick={openDialog}>
+          <CarbonAdd className="size-10 btn-ghost" />
+        </button>
+      )}
       <dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
         <div className="modal-box w-11/12 max-w-5xl">
           <form method="dialog">
@@ -165,10 +207,12 @@ const OrderCreateForm: React.FC = () => {
 
           <fieldset className="fieldset rounded-box">
             <legend className="fieldset-legend text-2xl font-bold mb-2">
-              创建订单
+              {formTitle}
             </legend>
 
-            <QuantitySelector num={num || 1} setNum={setNum || (() => {})} />
+            {isCreateMode && (
+              <QuantitySelector num={num || 1} setNum={setNum || (() => {})} />
+            )}
 
             <NoodleSelector
               includeNoodles={item.includeNoodles}
@@ -232,10 +276,10 @@ const OrderCreateForm: React.FC = () => {
 
             <button
               className="btn btn-primary text-xl"
-              onClick={handleCreateOrder}
+              onClick={handleSubmit}
               disabled={!isValid}
             >
-              创建
+              {submitButtonText}
             </button>
           </fieldset>
         </div>
@@ -247,4 +291,4 @@ const OrderCreateForm: React.FC = () => {
   )
 }
 
-export default OrderCreateForm
+export default OrderForm
