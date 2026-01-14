@@ -5,7 +5,7 @@ import {
   OrderItem as OI,
   StepStatus,
 } from '@/types'
-import React, { useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import {
   getMeatsRequest,
@@ -66,6 +66,34 @@ const OrderItem: React.FC<OI> = (item) => {
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
 
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const [currentTime, setCurrentTime] = useState(Date.now())
+
+  // 每秒更新当前时间以实现实时等待时间显示
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // 计算等待时间（秒）
+  const waitTime = item.completedAt ? 0 : Math.floor((currentTime - new Date(item.createdAt).getTime()) / 1000)
+
+  // 格式化等待时间显示
+  const formatWaitTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+
+    if (hours > 0) {
+      return `${hours}小时${minutes}分${secs}秒`
+    } else if (minutes > 0) {
+      return `${minutes}分${secs}秒`
+    } else {
+      return `${secs}秒`
+    }
+  }
 
   const id = item.id.length === 12 ? Number(item.id.substring(8, 12)) : item.id
   const noodleTypeClass = getNoodleTypeClass(item.noodleType)
@@ -188,6 +216,11 @@ const OrderItem: React.FC<OI> = (item) => {
         </div>
         <div className='text-base opacity-60'>
           {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
+          {!item.completedAt && (
+            <span className='ml-2 text-warning font-semibold'>
+              ({formatWaitTime(waitTime)})
+            </span>
+          )}
         </div>
       </div>
       <button
