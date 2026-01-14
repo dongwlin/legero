@@ -135,7 +135,7 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({ onUnlock, onCan
 
           {/* 操作按钮 */}
           <div className="flex gap-3">
-            {onCancel && (
+            {password.length === 0 && onCancel && (
               <button
                 onClick={onCancel}
                 className="btn btn-outline flex-1 h-12 min-h-12"
@@ -144,13 +144,15 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({ onUnlock, onCan
                 取消
               </button>
             )}
-            <button
-              onClick={handleDelete}
-              className="btn btn-error flex-1 h-12 min-h-12"
-              disabled={password.length === 0 || success}
-            >
-              删除
-            </button>
+            {password.length > 0 && (
+              <button
+                onClick={handleDelete}
+                className="btn btn-ghost flex-1 h-12 min-h-12"
+                disabled={success}
+              >
+                删除
+              </button>
+            )}
             <button
               onClick={handleConfirm}
               className="btn btn-primary flex-1 h-12 min-h-12"
