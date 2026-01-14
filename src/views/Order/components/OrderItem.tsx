@@ -4,43 +4,47 @@ import {
   NoodleType,
   OrderItem as OI,
   StepStatus,
-} from "@/types"
-import React, { useRef } from "react"
-import { CarbonEdit, CarbonTrashCan } from "@/components/Icon"
-import { getMeatsRequest, getOtherRequest, getSizePrice } from "@/services/order"
-import { useOrderStore } from "@/store/order"
-import dayjs from "dayjs"
+} from '@/types'
+import React, { useRef } from 'react'
+import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
+import {
+  getMeatsRequest,
+  getOtherRequest,
+  getSizePrice,
+} from '@/services/order'
+import { useOrderStore } from '@/store/order'
+import dayjs from 'dayjs'
 
 const getNoodleTypeClass = (noodleType: NoodleType | undefined): string => {
-  let noodleColor = ""
+  let noodleColor = ''
 
   switch (noodleType) {
-    case "河粉":
-      noodleColor = "bg-blue-500"
+    case '河粉':
+      noodleColor = 'bg-blue-500'
       break
-    case "米粉":
-      noodleColor = "bg-green-500"
+    case '米粉':
+      noodleColor = 'bg-green-500'
       break
-    case "伊面":
-      noodleColor = "bg-yellow-500"
+    case '伊面':
+      noodleColor = 'bg-yellow-500'
       break
     default:
-      noodleColor = "bg-gray-500" // TODO
+      noodleColor = 'bg-gray-500' // TODO
   }
 
   return `text-2xl mr-4 ${noodleColor}`
 }
 
 const getStepBtnClass = (stepStatus: StepStatus): string => {
-  let btnState = "btn-outline"
+  let btnState = 'btn-outline'
   switch (stepStatus) {
-    case "not-started":
+    case 'not-started':
       break
-    case "in-progress":
-      btnState = "btn-info"
+    case 'in-progress':
+      btnState = 'btn-info'
       break
-    case "completed":
-      btnState = "btn-success"
+    case 'completed':
+      btnState = 'btn-success'
       break
     default:
     // do nothing
@@ -49,11 +53,11 @@ const getStepBtnClass = (stepStatus: StepStatus): string => {
 }
 
 const getServeMealBtnClass = (createdAt: string): string => {
-const base = "btn text-xl"
+  const base = 'btn text-xl'
   if (!createdAt) {
-    return base + " " + "btn-outline"
+    return base + ' ' + 'btn-outline'
   }
-  return base + " " + "btn-success"
+  return base + ' ' + 'btn-success'
 }
 
 const OrderItem: React.FC<OI> = (item) => {
@@ -68,19 +72,19 @@ const OrderItem: React.FC<OI> = (item) => {
   const sizePrice = getSizePrice(item)
   const meatReq = getMeatsRequest(item)
   const req = getOtherRequest(item)
-const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
+  const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
 
   const handleUpdateNoodleStep = () => {
-    let newStatus: StepStatus = "not-started"
+    let newStatus: StepStatus = 'not-started'
     switch (item.progress.noodles) {
-      case "not-started":
-        newStatus = "completed"
+      case 'not-started':
+        newStatus = 'completed'
         break
       // case 'in-progress':
       //   newStatus = 'completed'
       //   break
-      case "completed":
-        newStatus = "not-started"
+      case 'completed':
+        newStatus = 'not-started'
         break
     }
     updateOrder(item.id, {
@@ -89,21 +93,21 @@ const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
         ...item.progress,
         noodles: newStatus,
       },
-      completedAt: newStatus !== "completed" ? "" : item.completedAt,
+      completedAt: newStatus !== 'completed' ? '' : item.completedAt,
     })
   }
 
   const handleUpdateMeatStep = () => {
-    let newStatus: StepStatus = "not-started"
+    let newStatus: StepStatus = 'not-started'
     switch (item.progress.meat) {
-      case "not-started":
-        newStatus = "completed"
+      case 'not-started':
+        newStatus = 'completed'
         break
       // case 'in-progress':
       //   newStatus = 'completed'
       //   break
-      case "completed":
-        newStatus = "not-started"
+      case 'completed':
+        newStatus = 'not-started'
         break
     }
     updateOrder(item.id, {
@@ -112,7 +116,7 @@ const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
         ...item.progress,
         meat: newStatus,
       },
-      completedAt: newStatus !== "completed" ? "" : item.completedAt,
+      completedAt: newStatus !== 'completed' ? '' : item.completedAt,
     })
   }
 
@@ -128,7 +132,7 @@ const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
 
     updateOrder(item.id, {
       ...item,
-      completedAt: "",
+      completedAt: '',
     })
   }
 
@@ -140,20 +144,20 @@ const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
 
   return (
     <>
-      <div className="text-3xl opacity-80 tabular-nums text-center">{id}</div>
-      <div className="list-col-grow flex flex-row">
-        {item.noodleType !== "无" && (
+      <div className='text-3xl opacity-80 tabular-nums text-center'>{id}</div>
+      <div className='list-col-grow flex flex-row'>
+        {item.noodleType !== '无' && (
           <div className={noodleTypeClass}>{item.noodleType}</div>
         )}
-        <div className="text-3xl mr-2">{sizePrice}元</div>
-        <div className="text-3xl">{item.dining.diningMethod}</div>
+        <div className='text-3xl mr-2'>{sizePrice}元</div>
+        <div className='text-3xl'>{item.dining.diningMethod}</div>
       </div>
-      <div className="list-col-wrap text-2xl">
-        {meatReq !== "" && <div>{meatReq}</div>}
+      <div className='list-col-wrap text-2xl'>
+        {meatReq !== '' && <div>{meatReq}</div>}
         <div>{req}</div>
-        <div className="italic">{item.note}</div>
-        <div className="flex flex-row my-2">
-          {item.progress.noodles != "unrequired" && (
+        <div className='italic'>{item.note}</div>
+        <div className='flex flex-row my-2'>
+          {item.progress.noodles != 'unrequired' && (
             <button
               className={getStepBtnClass(item.progress.noodles)}
               onClick={handleUpdateNoodleStep}
@@ -161,7 +165,7 @@ const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
               粉
             </button>
           )}
-          {item.progress.meat != "unrequired" && (
+          {item.progress.meat != 'unrequired' && (
             <button
               className={getStepBtnClass(item.progress.meat)}
               onClick={handleUpdateMeatStep}
@@ -174,44 +178,46 @@ const serveMealBtnClass = getServeMealBtnClass(item.completedAt)
             className={serveMealBtnClass}
             disabled={
               (needsNoodlesStep(item) &&
-                item.progress.noodles !== "completed") ||
-              (needsMeatStep(item) && item.progress.meat !== "completed")
+                item.progress.noodles !== 'completed') ||
+              (needsMeatStep(item) && item.progress.meat !== 'completed')
             }
             onClick={handleServeMeal}
           >
             出餐
           </button>
         </div>
-        <div className="text-base opacity-60">
+        <div className='text-base opacity-60'>
           {dayjs(item.createdAt).toDate().toString()}
         </div>
       </div>
       <button
-        className="btn btn-square btn-primary"
+        className='btn btn-square btn-primary'
         onClick={() => setUpdateTargetID(item.id)}
       >
-        <CarbonEdit className="size-8" />
+        <CarbonEdit className='size-8' />
       </button>
       <button
-        className="btn btn-square btn-error"
+        className='btn btn-square btn-error'
         onClick={() => openDeleteDialog()}
       >
-        <CarbonTrashCan className="size-8" />
+        <CarbonTrashCan className='size-8' />
       </button>
-      <dialog ref={dialogRef} className="modal">
-        <div className="modal-box">
-          <div className="text-2xl">确认删除该订单？</div>
-          <div className="modal-action">
+      <dialog ref={dialogRef} className='modal'>
+        <div className='modal-box'>
+          <div className='text-2xl'>确认删除该订单？</div>
+          <div className='modal-action'>
             <button
-              className="btn btn-xl btn-error"
+              className='btn btn-xl btn-error'
               onClick={() => removeOrder(item.id)}
-            >确认</button>
-            <form method="dialog">
-              <button className="btn btn-xl">取消</button>
+            >
+              确认
+            </button>
+            <form method='dialog'>
+              <button className='btn btn-xl'>取消</button>
             </form>
           </div>
         </div>
-        <form method="dialog" className="modal-backdrop">
+        <form method='dialog' className='modal-backdrop'>
           <button>Cancel</button>
         </form>
       </dialog>

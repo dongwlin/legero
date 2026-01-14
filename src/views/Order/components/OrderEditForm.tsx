@@ -9,12 +9,12 @@ import {
 } from "@/types"
 import React, { useEffect, useRef } from "react"
 import { useOrderEditForm } from "./useOrderEditForm"
-import { NoodleSelector } from "./NoodleSelector"
-import { SizeSelector } from "./SizeSelector"
-import { NoodleAmountSelector } from "./NoodleAmountSelector"
-import { MeatSelector } from "./MeatSelector"
-import { IngredientSelector } from "./IngredientSelector"
-import { DiningSelector } from "./DiningSelector"
+import { NoodleSelector } from "./selectors/NoodleSelector"
+import { SizeSelector } from "./selectors/SizeSelector"
+import { NoodleAmountSelector } from "./selectors/NoodleAmountSelector"
+import { MeatSelector } from "./selectors/MeatSelector"
+import { IngredientSelector } from "./selectors/IngredientSelector"
+import { DiningSelector } from "./selectors/DiningSelector"
 
 const OrderEditForm: React.FC = () => {
   const updateTargetID = useOrderStore((state) => state.updateTargetID)

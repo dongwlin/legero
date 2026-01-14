@@ -1,5 +1,5 @@
 import React from "react"
-import { ADJUSTMENT_OPTIONS } from "./constants"
+import { ADJUSTMENT_OPTIONS } from "../constants"
 import { Adjustment, NoodleType } from "@/types"
 
 interface NoodleAmountSelectorProps {

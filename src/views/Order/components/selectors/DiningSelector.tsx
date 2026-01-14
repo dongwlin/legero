@@ -1,5 +1,5 @@
 import React from "react"
-import { DINING_METHODS, PACKAGING_OPTIONS, PACKAGING_METHODS } from "./constants"
+import { DINING_METHODS, PACKAGING_OPTIONS, PACKAGING_METHODS } from "../constants"
 import { DiningMethod, Packaging, PackagingMethod } from "@/types"
 
 interface DiningSelectorProps {

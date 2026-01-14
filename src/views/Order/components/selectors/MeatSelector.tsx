@@ -1,5 +1,5 @@
 import React from "react"
-import { MEAT_OPTIONS } from "./constants"
+import { MEAT_OPTIONS } from "../constants"
 import { MeatType } from "@/types"
 
 interface MeatSelectorProps {

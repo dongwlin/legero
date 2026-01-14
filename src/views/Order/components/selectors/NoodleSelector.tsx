@@ -1,6 +1,6 @@
 import React from "react"
 import { ToggleButtonGroup } from "@/components/ToggleButtonGroup"
-import { NOODLE_TYPES } from "./constants"
+import { NOODLE_TYPES } from "../constants"
 import { NoodleType } from "@/types"
 
 interface NoodleSelectorProps {
