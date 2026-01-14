@@ -2,6 +2,7 @@ import { calculateDailyStats, DailyStats } from '@/services/statistics'
 import { useOrderStore } from '@/store/order'
 import { usePasswordAuthStore } from '@/store/passwordAuth'
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import DailyStatsCard from './components/DailyStatsCard'
 import Header from '@/components/Header'
 import StatisticsControls from './components/StatisticsControls'
@@ -10,6 +11,7 @@ import PasswordLockScreen from '@/components/PasswordLockScreen'
 const Statistic: React.FC = () => {
   const orders = useOrderStore((state) => state.orders)
   const { enabled, isAuthenticated, authenticate, reset } = usePasswordAuthStore()
+  const navigate = useNavigate()
   const [stats, setStats] = useState<Map<string, DailyStats>>(
     new Map<string, DailyStats>()
   )
@@ -26,6 +28,13 @@ const Statistic: React.FC = () => {
 
   const handleUnlock = () => {
     authenticate()
+  }
+
+  const handleCancel = () => {
+    // 返回首页
+    navigate('/', {
+      replace: true,
+    })
   }
 
   // 如果认证功能未启用，直接显示统计内容
@@ -49,7 +58,7 @@ const Statistic: React.FC = () => {
 
   // 未认证时显示密码输入界面
   if (!isAuthenticated) {
-    return <PasswordLockScreen onUnlock={handleUnlock} />
+    return <PasswordLockScreen onUnlock={handleUnlock} onCancel={handleCancel} />
   }
 
   return (
