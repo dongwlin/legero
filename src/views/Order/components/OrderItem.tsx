@@ -208,7 +208,12 @@ const OrderItem: React.FC<OI> = (item) => {
           <div className='modal-action'>
             <button
               className='btn btn-xl btn-error'
-              onClick={() => removeOrder(item.id)}
+              onClick={() => {
+                if (dialogRef.current) {
+                  dialogRef.current.close()
+                }
+                removeOrder(item.id)
+              }}
             >
               确认
             </button>
