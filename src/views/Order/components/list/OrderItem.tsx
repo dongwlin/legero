@@ -187,7 +187,7 @@ const OrderItem: React.FC<OI> = (item) => {
           </button>
         </div>
         <div className='text-base opacity-60'>
-          {dayjs(item.createdAt).toDate().toString()}
+          {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
         </div>
       </div>
       <button
