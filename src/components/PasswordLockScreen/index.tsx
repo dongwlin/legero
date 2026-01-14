@@ -146,7 +146,7 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({ onUnlock, onCan
             )}
             <button
               onClick={handleDelete}
-              className="btn btn-outline flex-1 h-12 min-h-12"
+              className="btn btn-error flex-1 h-12 min-h-12"
               disabled={password.length === 0 || success}
             >
               删除
