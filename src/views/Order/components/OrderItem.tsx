@@ -7,7 +7,7 @@ import {
 } from "@/types"
 import React, { useRef } from "react"
 import { CarbonEdit, CarbonTrashCan } from "@/components/Icon"
-import { getMeatsRequest, getOtherRequest, getSizePrice } from "@/service/order"
+import { getMeatsRequest, getOtherRequest, getSizePrice } from "@/services/order"
 import { useOrderStore } from "@/store/order"
 import dayjs from "dayjs"
 
