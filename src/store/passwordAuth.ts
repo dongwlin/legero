@@ -21,6 +21,7 @@ export const usePasswordAuthStore = create<PasswordAuthState>()(
     {
       name: 'password-auth-storage',
       storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ enabled: state.enabled }),
     }
   )
 );

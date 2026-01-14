@@ -1,7 +1,7 @@
 import { calculateDailyStats, DailyStats } from '@/services/statistics'
 import { useOrderStore } from '@/store/order'
 import { usePasswordAuthStore } from '@/store/passwordAuth'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import DailyStatsCard from './components/DailyStatsCard'
 import Header from '@/components/Header'
 import StatisticsControls from './components/StatisticsControls'
@@ -14,17 +14,18 @@ const Statistic: React.FC = () => {
     new Map<string, DailyStats>()
   )
 
+  // 每次进入统计页面时重置认证状态
+  useEffect(() => {
+    reset()
+    setStats(new Map<string, DailyStats>())
+  }, [])
+
   const handleStatistics = () => {
     setStats(calculateDailyStats(orders))
   }
 
   const handleUnlock = () => {
     authenticate()
-  }
-
-  const handleLock = () => {
-    reset()
-    setStats(new Map<string, DailyStats>())
   }
 
   // 如果认证功能未启用，直接显示统计内容
@@ -54,18 +55,7 @@ const Statistic: React.FC = () => {
   return (
     <div className='min-h-screen bg-base-100 pb-20'>
       {/* 顶部导航栏 */}
-      <Header
-        title='统计'
-        rightAction={
-          <button
-            onClick={handleLock}
-            className='btn btn-sm btn-ghost'
-            aria-label='锁定页面'
-          >
-            退出
-          </button>
-        }
-      />
+      <Header title='统计' />
 
       {/* 主内容区 */}
       <div className='pt-[calc(5rem+env(safe-area-inset-top))] px-4 md:px-8 max-w-4xl mx-auto'>
