@@ -29,12 +29,12 @@ const OrderCreateForm: React.FC = () => {
     showPorkKidney,
     showCustomPrice,
     showTakeoutOptions
-  } = useOrderForm()
+  } = useOrderForm(undefined, 'create')
 
   const dialogRef = useRef<HTMLDialogElement>(null)
 
   const handleDialogClose = () => {
-    resetForm()
+    resetForm?.()
   }
 
   const openDialog = () => {
@@ -139,7 +139,7 @@ const OrderCreateForm: React.FC = () => {
     }
 
     // 创建多个订单
-    for (let i = 0; i < num; i++) {
+    for (let i = 0; i < (num || 1); i++) {
       const id = genID()
       const saveItem = {
         ...newItem,
@@ -168,7 +168,7 @@ const OrderCreateForm: React.FC = () => {
               创建订单
             </legend>
 
-            <QuantitySelector num={num} setNum={setNum} />
+            <QuantitySelector num={num || 1} setNum={setNum || (() => {})} />
 
             <NoodleSelector
               includeNoodles={item.includeNoodles}

@@ -8,7 +8,7 @@ import {
   PackagingMethod,
 } from "@/types"
 import React, { useEffect, useRef } from "react"
-import { useOrderEditForm } from "./useOrderEditForm"
+import { useOrderForm } from "./useOrderForm"
 import { NoodleSelector } from "./selectors/NoodleSelector"
 import { SizeSelector } from "./selectors/SizeSelector"
 import { NoodleAmountSelector } from "./selectors/NoodleAmountSelector"
@@ -50,7 +50,7 @@ const OrderEditForm: React.FC = () => {
     showPorkKidney,
     showCustomPrice,
     showTakeoutOptions
-  } = useOrderEditForm(newDefaultOrderItem())
+  } = useOrderForm(newDefaultOrderItem(), 'edit')
 
   useEffect(() => {
     if (updateTargetID) {

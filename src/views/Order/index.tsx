@@ -1,8 +1,8 @@
 import React from 'react'
 import Header from '@/components/Header'
-import OrderControls from './components/OrderControls'
+import OrderControls from './components/list/OrderControls'
 import OrderEditForm from './components/OrderEditForm'
-import OrderList from './components/OrderList'
+import OrderList from './components/list/OrderList'
 
 const Order: React.FC = () => {
   return (

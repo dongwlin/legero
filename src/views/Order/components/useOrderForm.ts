@@ -2,13 +2,17 @@ import { useState, useCallback, useMemo } from "react"
 import { OrderItem, MeatType } from "@/types"
 import { newDefaultOrderItem } from "@/services/order"
 
+export type FormMode = 'create' | 'edit'
+
 /**
  * 订单表单自定义 Hook
  * 封装表单状态管理和通用操作
+ * @param initialItem - 初始订单项（编辑模式时传入）
+ * @param mode - 表单模式：'create' 或 'edit'
  */
-export const useOrderForm = () => {
+export const useOrderForm = (initialItem?: OrderItem, mode: FormMode = 'create') => {
   const [num, setNum] = useState<number>(1)
-  const [item, setItem] = useState<OrderItem>(newDefaultOrderItem())
+  const [item, setItem] = useState<OrderItem>(initialItem || newDefaultOrderItem())
 
   /**
    * 更新订单项的顶层属性
@@ -117,9 +121,8 @@ export const useOrderForm = () => {
   }, [item.noodleType])
 
   return {
-    num,
-    setNum,
     item,
+    setItem,
     updateItem,
     updateNestedItem,
     updateMeats,
@@ -128,6 +131,9 @@ export const useOrderForm = () => {
     showPorkKidney,
     showCustomPrice,
     showTakeoutOptions,
-    showYiNoodleBlocks
+    showYiNoodleBlocks,
+    // 创建模式专用属性
+    num: mode === 'create' ? num : undefined,
+    setNum: mode === 'create' ? setNum : undefined,
   }
 }
