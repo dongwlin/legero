@@ -2,6 +2,7 @@ import React from 'react'
 import Header from '@/components/Header'
 import ThemeSettings from './components/ThemeSettings'
 import DataManagement from './components/DataManagement'
+import AuthSettings from './components/AuthSettings'
 
 const Settings: React.FC = () => {
   return (
@@ -11,6 +12,9 @@ const Settings: React.FC = () => {
 
       {/* 主内容区 */}
       <div className='pt-[calc(5rem+env(safe-area-inset-top))] px-4 md:px-8 max-w-4xl mx-auto'>
+        {/* 安全设置部分 */}
+        <AuthSettings />
+
         {/* 主题设置部分 */}
         <ThemeSettings />
 
