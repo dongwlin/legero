@@ -1,7 +1,8 @@
-import { OrderEditForm, OrderList } from "@/components/Order"
 import React from "react"
 import Header from "./components/Header"
 import OrderControls from "./components/OrderControls"
+import OrderEditForm from "./components/OrderEditForm"
+import OrderList from "./components/OrderList"
 
 const Order: React.FC = () => {
   return (

@@ -1,4 +1,4 @@
-import { OrderCreateForm } from "@/components/Order"
+import OrderCreateForm from "./OrderCreateForm"
 import { useOrderStore } from "@/store/order"
 import { Filter } from "@/types"
 import dayjs from "dayjs"

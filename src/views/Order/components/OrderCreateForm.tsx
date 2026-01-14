@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react"
-import { CarbonAdd } from "../Icon"
+import { CarbonAdd } from "@/components/Icon"
 import {
   Adjustment,
   DiningMethod,
