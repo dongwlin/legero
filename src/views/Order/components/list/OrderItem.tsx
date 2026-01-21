@@ -227,13 +227,13 @@ const OrderItem: React.FC<OI> = (item) => {
         className='btn btn-square btn-primary'
         onClick={() => setUpdateTargetID(item.id)}
       >
-        <CarbonEdit className='size-8' />
+        <CarbonEdit className='size-6' />
       </button>
       <button
         className='btn btn-square btn-error'
         onClick={() => openDeleteDialog()}
       >
-        <CarbonTrashCan className='size-8' />
+        <CarbonTrashCan className='size-6' />
       </button>
       <dialog ref={dialogRef} className='modal'>
         <div className='modal-box'>
