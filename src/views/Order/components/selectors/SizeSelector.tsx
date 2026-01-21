@@ -28,7 +28,7 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
 }) => {
   const getDisplayValue = useMemo(() => {
     return (s: Size) => getSizeDisplayValue(s, includeNoodles, noodleType)
-  }, [includeNoodles, noodleType, size])
+  }, [includeNoodles, noodleType])
 
   return (
     <div className="flex flex-row">
