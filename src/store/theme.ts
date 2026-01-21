@@ -7,6 +7,8 @@ interface ThemeState {
   theme: Theme
   setTheme: (theme: Theme) => void
   getEffectiveTheme: () => "light" | "dark"
+  overtimeThreshold: number // 超时阈值(分钟),默认10分钟
+  setOvertimeThreshold: (threshold: number) => void
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -25,6 +27,8 @@ export const useThemeStore = create<ThemeState>()(
         }
         return "light"
       },
+      overtimeThreshold: 10, // 默认10分钟
+      setOvertimeThreshold: (threshold) => set({ overtimeThreshold: threshold }),
     }),
     {
       name: "theme-storage",

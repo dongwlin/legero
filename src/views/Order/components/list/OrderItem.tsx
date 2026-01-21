@@ -13,6 +13,7 @@ import {
   getSizePrice,
 } from '@/services/order'
 import { useOrderStore } from '@/store/order'
+import { useOrderSettingsStore } from '@/store/orderSettings'
 import dayjs from 'dayjs'
 
 const getNoodleTypeClass = (noodleType: NoodleType | undefined): string => {
@@ -64,6 +65,7 @@ const OrderItem: React.FC<OI> = (item) => {
   const removeOrder = useOrderStore((state) => state.removeOrder)
   const updateOrder = useOrderStore((state) => state.updateOrder)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
+  const { waitTimeThresholdMinutes } = useOrderSettingsStore()
 
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
@@ -79,6 +81,9 @@ const OrderItem: React.FC<OI> = (item) => {
 
   // 计算等待时间（秒）
   const waitTime = item.completedAt ? 0 : Math.floor((currentTime - new Date(item.createdAt).getTime()) / 1000)
+
+  // 判断等待时间是否超时（分钟）
+  const isWaitTimeOverThreshold = waitTime > 0 && waitTimeThresholdMinutes > 0 && (waitTime / 60) >= waitTimeThresholdMinutes
 
   // 格式化等待时间显示
   const formatWaitTime = (seconds: number): string => {
@@ -217,7 +222,7 @@ const OrderItem: React.FC<OI> = (item) => {
         <div className='text-base opacity-60'>
           {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
           {!item.completedAt && (
-            <span className='ml-2 text-warning font-semibold'>
+            <span className={`ml-2 font-semibold ${isWaitTimeOverThreshold ? 'text-error' : 'text-warning'}`}>
               ({formatWaitTime(waitTime)})
             </span>
           )}

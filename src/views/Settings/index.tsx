@@ -1,6 +1,7 @@
 import React from 'react'
 import Header from '@/components/Header'
 import ThemeSettings from './components/ThemeSettings'
+import OrderSettings from './components/OrderSettings'
 import DataManagement from './components/DataManagement'
 import AuthSettings from './components/AuthSettings'
 
@@ -17,6 +18,9 @@ const Settings: React.FC = () => {
 
         {/* 主题设置部分 */}
         <ThemeSettings />
+
+        {/* 订单设置部分 */}
+        <OrderSettings />
 
         {/* 数据管理部分 */}
         <DataManagement />
