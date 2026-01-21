@@ -43,19 +43,6 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
     showTakeoutOptions
   } = useOrderForm(initialItem, mode)
 
-  // 编辑模式下，监听 updateTargetID 变化并打开对话框
-  useEffect(() => {
-    if (mode === 'edit' && updateTargetID) {
-      const targetItem = findOrder(updateTargetID)
-      if (targetItem) {
-        setTimeout(() => {
-          setItem(targetItem)
-          openDialog()
-        }, 0)
-      }
-    }
-  }, [updateTargetID, findOrder, setItem, mode])
-
   const handleDialogClose = () => {
     if (mode === 'create') {
       resetForm?.()
@@ -75,6 +62,19 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
       dialogRef.current.close()
     }
   }
+
+  // 编辑模式下，监听 updateTargetID 变化并打开对话框
+  useEffect(() => {
+    if (mode === 'edit' && updateTargetID) {
+      const targetItem = findOrder(updateTargetID)
+      if (targetItem) {
+        setTimeout(() => {
+          setItem(targetItem)
+          openDialog()
+        }, 0)
+      }
+    }
+  }, [updateTargetID, findOrder, setItem, mode])
 
   const handleIncludeNoodlesChange = (checked: boolean) => {
     updateItem('includeNoodles', checked)
@@ -167,7 +167,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
     if (mode === 'create') {
       // 创建订单模式
       newItem.createdAt = now.toISOString()
-      
+
       // 创建多个订单
       for (let i = 0; i < (num || 1); i++) {
         const id = genID()
@@ -182,7 +182,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
       setItem(newItem)
       updateOrder(updateTargetID, newItem)
     }
-    
+
     closeDialog()
   }
 
@@ -211,7 +211,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
             </legend>
 
             {isCreateMode && (
-              <QuantitySelector num={num || 1} setNum={setNum || (() => {})} />
+              <QuantitySelector num={num || 1} setNum={setNum || (() => { })} />
             )}
 
             <NoodleSelector
