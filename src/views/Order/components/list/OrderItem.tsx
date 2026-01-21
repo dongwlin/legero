@@ -92,11 +92,11 @@ const OrderItem: React.FC<OI> = (item) => {
     const secs = seconds % 60
 
     if (hours > 0) {
-      return `${hours}小时${minutes}分${secs}秒`
+      return `${hours} 小时 ${minutes} 分 ${secs} 秒`
     } else if (minutes > 0) {
-      return `${minutes}分${secs}秒`
+      return `${minutes} 分 ${secs} 秒`
     } else {
-      return `${secs}秒`
+      return `${secs} 秒`
     }
   }
 
