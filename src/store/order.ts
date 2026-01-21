@@ -1,10 +1,11 @@
-import { create } from "zustand"
-import { Filter, OrderItem } from "@/types"
-import dayjs from "dayjs"
-import { persist, createJSONStorage } from "zustand/middleware"
+import { create } from 'zustand'
+import { Filter, OrderItem } from '@/types'
+import dayjs from 'dayjs'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 interface OrderState {
   lastIDNum: number
+  lastGenDate: string | null
   genID: () => string
   updatedAt: string | null
   orders: OrderItem[]
@@ -23,30 +24,33 @@ interface OrderState {
 
 export const useOrderStore = create<OrderState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       lastIDNum: 0,
+      lastGenDate: null,
       updatedAt: null,
       genID: (): string => {
         const now = dayjs()
-        let idNum: number
+        const state = get()
 
-        set((state) => {
-          const updatedAt = state.updatedAt ? dayjs(state.updatedAt) : null
-          const isSameDay = updatedAt ? updatedAt?.isSame(now, "date") : false
+        const lastGenDate = state.lastGenDate ? dayjs(state.lastGenDate) : null
+        const isSameDay = lastGenDate ? lastGenDate.isSame(now, 'date') : false
 
-          const shouldReset = !state.updatedAt || !isSameDay
-          const baseNum = shouldReset ? 0 : state.lastIDNum
+        const shouldReset = !state.lastGenDate || !isSameDay
+        const baseNum = shouldReset ? 0 : state.lastIDNum
 
-          idNum = baseNum + 1
-          return { lastIDNum: idNum }
+        const idNum = baseNum + 1
+        const idNumStr = idNum.toString().padStart(4, '0')
+        const id = `${now.format('YYYYMMDD')}${idNumStr}`
+
+        set({
+          lastIDNum: idNum,
+          lastGenDate: now.toISOString(),
         })
 
-        const idNumStr = idNum!.toString().padStart(4, "0")
-        const id = `${now.format("YYYYMMDD")}${idNumStr}`
         return id
       },
       orders: [],
-      filter: "all",
+      filter: 'all',
       addOrder: (item) =>
         set((state) => ({
           orders: [...state.orders, item],
@@ -83,21 +87,21 @@ export const useOrderStore = create<OrderState>()(
           updatedAt: dayjs().toISOString(),
         }),
       setFilter: (filter) => set({ filter }),
-      updateTargetID: "",
+      updateTargetID: '',
       setUpdateTargetID: (id) => set({ updateTargetID: id }),
       findOrder: (id: string): OrderItem => {
         const order = useOrderStore
           .getState()
           .orders.find((item) => item.id === id)
         if (!order) {
-          throw new Error("Order not found")
+          throw new Error('Order not found')
         }
         return order
       },
     }),
     {
-      name: "order-store",
+      name: 'order-store',
       storage: createJSONStorage(() => localStorage),
-    }
-  )
+    },
+  ),
 )
