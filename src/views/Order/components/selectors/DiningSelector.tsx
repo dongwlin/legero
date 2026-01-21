@@ -43,7 +43,7 @@ export const DiningSelector: React.FC<DiningSelectorProps> = ({
       {showTakeoutOptions && (
         <>
           <label className="fieldset-label text-xl">
-            <span>打包包装</span>
+            <span className="mr-2">打包包装</span>
             <select
               name="打包包装"
               className="select text-xl"
