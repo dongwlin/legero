@@ -66,7 +66,7 @@ const OrderItem: React.FC<OI> = (item) => {
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
 
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const [currentTime, setCurrentTime] = useState(Date.now())
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
 
   // 每秒更新当前时间以实现实时等待时间显示
   useEffect(() => {
