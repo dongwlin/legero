@@ -85,6 +85,8 @@ export const useOrderStore = create<OrderState>()(
         set({
           orders: [],
           updatedAt: dayjs().toISOString(),
+          lastIDNum: 0,
+          lastGenDate: null,
         }),
       setFilter: (filter) => set({ filter }),
       updateTargetID: '',
