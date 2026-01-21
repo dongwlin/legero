@@ -29,7 +29,7 @@ const Home: React.FC = () => {
           <div className='card-body flex flex-row md:flex-col items-center justify-center gap-4 py-8 md:py-12'>
             <CarbonDocument className='w-8 h-8 md:w-12 md:h-12 text-primary group-hover:scale-110 transition-transform duration-300' />
             <span className='text-xl md:text-2xl font-medium text-base-content/90'>
-              订单管理
+              订单
             </span>
           </div>
         </div>
