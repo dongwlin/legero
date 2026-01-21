@@ -11,9 +11,15 @@ const Home: React.FC = () => {
 
   return (
     <div className='min-h-screen bg-base-200 p-6 flex flex-col items-center pt-20 md:justify-center md:pt-0 transition-all duration-300'>
-      <h1 className='text-4xl md:text-6xl font-bold mb-12 md:mb-16 text-base-content/80 tracking-wide transition-all'>
-        Legero
+      <h1 className='relative flex items-center justify-center mb-10 md:mb-16 transition-all'>
+        <span className='text-4xl sm:text-5xl md:text-7xl font-medium tracking-[0.2em] md:tracking-[0.35em] text-base-content bg-gradient-to-r from-base-content to-base-content/70 bg-clip-text select-none'>
+          Legero
+        </span>
+        <span className='absolute -right-1 md:-right-2 top-0 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-primary animate-pulse'></span>
       </h1>
+      <p className='text-xs sm:text-sm md:text-base tracking-[0.3em] md:tracking-[0.5em] text-base-content/50 mb-6 md:mb-8 uppercase select-none text-center'>
+        Order Management System
+      </p>
 
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 w-full max-w-sm md:max-w-4xl transition-all'>
         <div
