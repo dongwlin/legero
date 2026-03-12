@@ -10,10 +10,11 @@ import PasswordLockScreen from '@/components/PasswordLockScreen'
 
 const Statistic: React.FC = () => {
   const orders = useOrderStore((state) => state.orders)
-  const { enabled, isAuthenticated, authenticate, reset } = usePasswordAuthStore()
+  const { enabled, isAuthenticated, authenticate, reset } =
+    usePasswordAuthStore()
   const navigate = useNavigate()
   const [stats, setStats] = useState<Map<string, DailyStats>>(
-    new Map<string, DailyStats>()
+    new Map<string, DailyStats>(),
   )
 
   // 每次进入统计页面时重置认证状态
@@ -58,7 +59,9 @@ const Statistic: React.FC = () => {
 
   // 未认证时显示密码输入界面
   if (!isAuthenticated) {
-    return <PasswordLockScreen onUnlock={handleUnlock} onCancel={handleCancel} />
+    return (
+      <PasswordLockScreen onUnlock={handleUnlock} onCancel={handleCancel} />
+    )
   }
 
   return (

@@ -6,15 +6,8 @@ export type Packaging = '塑料盒' | '塑料袋' | '无'
 export type PackagingMethod = '装在一起' | '汤粉分开' | '无'
 export type Filter = 'all' | 'uncompleted' | 'completed'
 
-export const meats = [
-  '瘦肉',
-  '猪肝',
-  '猪血',
-  '大肠',
-  '小肠',
-  '猪腰',
-] as const
-export type MeatType = typeof meats[number]
+export const meats = ['瘦肉', '猪肝', '猪血', '大肠', '小肠', '猪腰'] as const
+export type MeatType = (typeof meats)[number]
 
 // 配料调整
 type IngredientAdjustment = {
@@ -23,7 +16,11 @@ type IngredientAdjustment = {
   pepper: Adjustment
 }
 
-export type StepStatus = 'unrequired' | 'not-started' | 'in-progress' | 'completed'
+export type StepStatus =
+  | 'unrequired'
+  | 'not-started'
+  | 'in-progress'
+  | 'completed'
 
 export type OrderItem = {
   id: string
@@ -42,7 +39,7 @@ export type OrderItem = {
     diningMethod: DiningMethod
     packaging: Packaging
     packagingMethod: PackagingMethod
-  },
+  }
   note: string
   price: number
   createdAt: string
@@ -53,22 +50,26 @@ export type OrderItem = {
   completedAt: string
 }
 
-export function isYiNoodle(order: OrderItem): order is OrderItem & { noodleType: '伊面' } {
+export function isYiNoodle(
+  order: OrderItem,
+): order is OrderItem & { noodleType: '伊面' } {
   return order.includeNoodles && order.noodleType === '伊面'
 }
 
-export function isCustomSize(order: OrderItem): order is OrderItem & { size: '自定义'} {
+export function isCustomSize(
+  order: OrderItem,
+): order is OrderItem & { size: '自定义' } {
   return order.customSizePrice !== undefined && order.size === '自定义'
 }
 
 export function needsNoodlesStep(order: OrderItem): order is OrderItem & {
-  progress: {noodles: StepStatus}
+  progress: { noodles: StepStatus }
 } {
   return order.includeNoodles
 }
 
 export function needsMeatStep(order: OrderItem): order is OrderItem & {
-  progress: {meat: StepStatus}
+  progress: { meat: StepStatus }
 } {
   return order.meats.available.length > 0
 }

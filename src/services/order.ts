@@ -1,4 +1,11 @@
-import { isYiNoodle, needsMeatStep, needsNoodlesStep, OrderItem, NoodleType, Size } from "@/types"
+import {
+  isYiNoodle,
+  needsMeatStep,
+  needsNoodlesStep,
+  OrderItem,
+  NoodleType,
+  Size,
+} from '@/types'
 
 /**
  * 创建新的默认订单项
@@ -6,7 +13,7 @@ import { isYiNoodle, needsMeatStep, needsNoodlesStep, OrderItem, NoodleType, Siz
  */
 export const newDefaultOrderItem = (): OrderItem => {
   return {
-    id: "",
+    id: '',
     includeNoodles: true,
     noodleType: '河粉',
     size: '小',
@@ -20,21 +27,21 @@ export const newDefaultOrderItem = (): OrderItem => {
     ingredients: {
       greens: '正常',
       scallion: '正常',
-      pepper: '正常'
+      pepper: '正常',
     },
     dining: {
       diningMethod: '堂食',
       packaging: '无',
-      packagingMethod: '无'
+      packagingMethod: '无',
     },
-    note: "",
+    note: '',
     price: 0,
-    createdAt: "",
+    createdAt: '',
     progress: {
       noodles: 'unrequired',
       meat: 'unrequired',
     },
-    completedAt: ""
+    completedAt: '',
   }
 }
 
@@ -43,11 +50,11 @@ export const newDefaultOrderItem = (): OrderItem => {
  * 注意：'自定义' 尺寸使用 customSizePrice，不在此表中
  */
 const priceMap: Record<NoodleType | '默认', Partial<Record<Size, number>>> = {
-  '无': { '小': 0, '中': 0, '大': 0, '无': 0 },
-  '默认': { '小': 10, '中': 12, '大': 15, '无': 0 },
-  '河粉': { '小': 10, '中': 12, '大': 15, '无': 0 },
-  '米粉': { '小': 10, '中': 12, '大': 15, '无': 0 },
-  '伊面': { '小': 11, '中': 13, '大': 16, '无': 0 },
+  无: { 小: 0, 中: 0, 大: 0, 无: 0 },
+  默认: { 小: 10, 中: 12, 大: 15, 无: 0 },
+  河粉: { 小: 10, 中: 12, 大: 15, 无: 0 },
+  米粉: { 小: 10, 中: 12, 大: 15, 无: 0 },
+  伊面: { 小: 11, 中: 13, 大: 16, 无: 0 },
 }
 
 /** 每块伊面面饼价格 */
@@ -69,10 +76,13 @@ export const calcPrice = (item: OrderItem): number => {
   let price = getSizePrice(item)
 
   if (item.noodleType === '伊面') {
-    price += (item.extraNoodleBlocks * YI_NOODLE_BLOCK_PRICE)
+    price += item.extraNoodleBlocks * YI_NOODLE_BLOCK_PRICE
   }
 
-  if (item.dining.diningMethod === '外带' && item.dining.packaging === '塑料盒') {
+  if (
+    item.dining.diningMethod === '外带' &&
+    item.dining.packaging === '塑料盒'
+  ) {
     price += PLASTIC_CONTAINER_PRICE
   }
 
@@ -95,7 +105,9 @@ export const getSizePrice = (item: OrderItem): number => {
     }
 
     if (!(item.noodleType in priceMap)) {
-      console.warn(`Unknown noodle type: ${item.noodleType}, using default price`)
+      console.warn(
+        `Unknown noodle type: ${item.noodleType}, using default price`,
+      )
       return priceMap['默认'][item.size] ?? 0
     }
 
@@ -123,7 +135,7 @@ export const getMeatsRequest = (item: OrderItem): string => {
     return '不要肉'
   }
 
-  let req = ""
+  let req = ''
 
   if (item.meats.available.length <= item.meats.excluded.length) {
     req = `只要${item.meats.available[0]}`
@@ -131,7 +143,10 @@ export const getMeatsRequest = (item: OrderItem): string => {
     for (let i = 1; i < item.meats.available.length; i++) {
       req += `、${item.meats.available[i]}`
     }
-  } else if (item.meats.available.length > item.meats.excluded.length && item.meats.excluded.length > 0) {
+  } else if (
+    item.meats.available.length > item.meats.excluded.length &&
+    item.meats.excluded.length > 0
+  ) {
     req = `不要${item.meats.excluded[0]}`
 
     for (let i = 1; i < item.meats.excluded.length; i++) {
@@ -156,7 +171,11 @@ export const getOtherRequest = (item: OrderItem): string => {
 
   if (isYiNoodle(item) && item.extraNoodleBlocks > 0) {
     parts.push(`加${item.extraNoodleBlocks}块面饼`)
-  } else if (item.includeNoodles && item.noodleType !== '伊面' && item.noodleAmount !== '正常') {
+  } else if (
+    item.includeNoodles &&
+    item.noodleType !== '伊面' &&
+    item.noodleAmount !== '正常'
+  ) {
     parts.push(`${item.noodleAmount}粉`)
   }
 

@@ -1,17 +1,23 @@
-import React, { useEffect, useRef } from "react"
-import { CarbonAdd } from "@/components/Icon"
-import { OrderItem, Adjustment, DiningMethod, Packaging, PackagingMethod } from "@/types"
-import { calcPrice } from "@/services/order"
-import { useOrderStore } from "@/store/order"
-import dayjs from "dayjs"
-import { useOrderForm, FormMode } from "./useOrderForm"
-import { QuantitySelector } from "../selectors/QuantitySelector"
-import { NoodleSelector } from "../selectors/NoodleSelector"
-import { SizeSelector } from "../selectors/SizeSelector"
-import { NoodleAmountSelector } from "../selectors/NoodleAmountSelector"
-import { MeatSelector } from "../selectors/MeatSelector"
-import { IngredientSelector } from "../selectors/IngredientSelector"
-import { DiningSelector } from "../selectors/DiningSelector"
+import React, { useEffect, useRef } from 'react'
+import { CarbonAdd } from '@/components/Icon'
+import {
+  OrderItem,
+  Adjustment,
+  DiningMethod,
+  Packaging,
+  PackagingMethod,
+} from '@/types'
+import { calcPrice } from '@/services/order'
+import { useOrderStore } from '@/store/order'
+import dayjs from 'dayjs'
+import { useOrderForm, FormMode } from './useOrderForm'
+import { QuantitySelector } from '../selectors/QuantitySelector'
+import { NoodleSelector } from '../selectors/NoodleSelector'
+import { SizeSelector } from '../selectors/SizeSelector'
+import { NoodleAmountSelector } from '../selectors/NoodleAmountSelector'
+import { MeatSelector } from '../selectors/MeatSelector'
+import { IngredientSelector } from '../selectors/IngredientSelector'
+import { DiningSelector } from '../selectors/DiningSelector'
 
 interface OrderFormProps {
   mode: FormMode
@@ -40,14 +46,14 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
     isValid,
     showPorkKidney,
     showCustomPrice,
-    showTakeoutOptions
+    showTakeoutOptions,
   } = useOrderForm(initialItem, mode)
 
   const handleDialogClose = () => {
     if (mode === 'create') {
       resetForm?.()
     } else {
-      setUpdateTargetID("")
+      setUpdateTargetID('')
     }
   }
 
@@ -107,8 +113,8 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const handleDiningMethodChange = (diningMethod: DiningMethod) => {
     updateItem('dining', {
       diningMethod: diningMethod,
-      packaging: diningMethod === "外带" ? "塑料盒" : "无",
-      packagingMethod: diningMethod === "外带" ? "装在一起" : "无",
+      packaging: diningMethod === '外带' ? '塑料盒' : '无',
+      packagingMethod: diningMethod === '外带' ? '装在一起' : '无',
     })
   }
 
@@ -134,33 +140,33 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
     }
 
     // 小份不包含猪腰
-    if (newItem.size === "小" && item.meats.available.includes("猪腰")) {
+    if (newItem.size === '小' && item.meats.available.includes('猪腰')) {
       newItem.meats.available = newItem.meats.available.filter(
-        (meat) => meat !== "猪腰"
+        (meat) => meat !== '猪腰',
       )
     }
 
     // 设置面条进度
     if (newItem.includeNoodles) {
-      newItem.progress.noodles = "not-started"
+      newItem.progress.noodles = 'not-started'
     } else {
-      newItem.progress.noodles = "unrequired"
+      newItem.progress.noodles = 'unrequired'
     }
 
     // 设置肉类进度
     if (newItem.meats.available.length > 0) {
-      newItem.progress.meat = "not-started"
+      newItem.progress.meat = 'not-started'
     } else {
-      newItem.progress.meat = "unrequired"
+      newItem.progress.meat = 'unrequired'
     }
 
     // 不包含面条时，面条类型设为无
     if (!newItem.includeNoodles) {
-      newItem.noodleType = "无"
+      newItem.noodleType = '无'
     }
 
     // 非自定义规格时，自定义价格设为0
-    if (newItem.size !== "自定义") {
+    if (newItem.size !== '自定义') {
       newItem.customSizePrice = 0
     }
 
@@ -187,31 +193,31 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   }
 
   const isCreateMode = mode === 'create'
-  const formTitle = isCreateMode ? "创建订单" : "修改订单"
-  const submitButtonText = isCreateMode ? "创建" : "修改"
+  const formTitle = isCreateMode ? '创建订单' : '修改订单'
+  const submitButtonText = isCreateMode ? '创建' : '修改'
 
   return (
     <>
       {isCreateMode && (
-        <button className="btn" onClick={openDialog}>
-          <CarbonAdd className="size-10 btn-ghost" />
+        <button className='btn' onClick={openDialog}>
+          <CarbonAdd className='size-10 btn-ghost' />
         </button>
       )}
-      <dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
-        <div className="modal-box w-11/12 max-w-5xl">
-          <form method="dialog">
-            <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">
+      <dialog ref={dialogRef} className='modal' onClose={handleDialogClose}>
+        <div className='modal-box w-11/12 max-w-5xl'>
+          <form method='dialog'>
+            <button className='btn btn-sm btn-circle btn-ghost absolute right-2 top-2'>
               ✕
             </button>
           </form>
 
-          <fieldset className="fieldset rounded-box">
-            <legend className="fieldset-legend text-2xl font-bold mb-2">
+          <fieldset className='fieldset rounded-box'>
+            <legend className='fieldset-legend text-2xl font-bold mb-2'>
               {formTitle}
             </legend>
 
             {isCreateMode && (
-              <QuantitySelector num={num || 1} setNum={setNum || (() => { })} />
+              <QuantitySelector num={num || 1} setNum={setNum || (() => {})} />
             )}
 
             <NoodleSelector
@@ -265,17 +271,17 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
               showTakeoutOptions={showTakeoutOptions}
             />
 
-            <label className="fieldset-label text-xl">
-              <span className="mr-2">备注</span>
+            <label className='fieldset-label text-xl'>
+              <span className='mr-2'>备注</span>
               <textarea
-                className="textarea text-xl"
+                className='textarea text-xl'
                 value={item.note}
                 onChange={handleNoteChange}
               />
             </label>
 
             <button
-              className="btn btn-primary text-xl"
+              className='btn btn-primary text-xl'
               onClick={handleSubmit}
               disabled={!isValid}
             >
@@ -283,7 +289,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
             </button>
           </fieldset>
         </div>
-        <form method="dialog" className="modal-backdrop">
+        <form method='dialog' className='modal-backdrop'>
           <button>Cancel</button>
         </form>
       </dialog>

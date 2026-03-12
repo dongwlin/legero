@@ -23,7 +23,7 @@ const Order: React.FC = () => {
         </div>
       </div>
 
-      <OrderForm mode="edit" />
+      <OrderForm mode='edit' />
     </div>
   )
 }

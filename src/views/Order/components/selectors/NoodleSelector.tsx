@@ -1,7 +1,7 @@
-import React from "react"
-import { ToggleButtonGroup } from "@/components/ToggleButtonGroup"
-import { NOODLE_TYPES } from "../constants"
-import { NoodleType } from "@/types"
+import React from 'react'
+import { ToggleButtonGroup } from '@/components/ToggleButtonGroup'
+import { NOODLE_TYPES } from '../constants'
+import { NoodleType } from '@/types'
 
 interface NoodleSelectorProps {
   includeNoodles: boolean
@@ -17,16 +17,16 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
   includeNoodles,
   noodleType,
   onIncludeNoodlesChange,
-  onNoodleTypeChange
+  onNoodleTypeChange,
 }) => {
   return (
-    <div className="flex flex-row">
-      <label className="fieldset-label text-xl mr-4">
-        <span className="mr-2">粉</span>
+    <div className='flex flex-row'>
+      <label className='fieldset-label text-xl mr-4'>
+        <span className='mr-2'>粉</span>
         <input
-          type="checkbox"
+          type='checkbox'
           checked={includeNoodles}
-          className="toggle toggle-success"
+          className='toggle toggle-success'
           onChange={(e) => onIncludeNoodlesChange(e.target.checked)}
         />
       </label>

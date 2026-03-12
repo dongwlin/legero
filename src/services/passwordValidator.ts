@@ -9,11 +9,11 @@
  * @returns 6位数字密码
  */
 export const generatePassword = (): string => {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${month}${day}88`;
-};
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${month}${day}88`
+}
 
 /**
  * 验证输入的密码是否正确
@@ -21,5 +21,5 @@ export const generatePassword = (): string => {
  * @returns 密码是否正确
  */
 export const validatePassword = (input: string): boolean => {
-  return input === generatePassword();
-};
+  return input === generatePassword()
+}

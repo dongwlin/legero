@@ -1,6 +1,6 @@
-import React from "react"
-import { ADJUSTMENT_OPTIONS } from "../constants"
-import { Adjustment, NoodleType } from "@/types"
+import React from 'react'
+import { ADJUSTMENT_OPTIONS } from '../constants'
+import { Adjustment, NoodleType } from '@/types'
 
 interface NoodleAmountSelectorProps {
   noodleType: NoodleType
@@ -21,25 +21,27 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
   extraNoodleBlocks,
   includeNoodles,
   onNoodleAmountChange,
-  onExtraNoodleBlocksChange
+  onExtraNoodleBlocksChange,
 }) => {
   if (noodleType === '伊面') {
     return (
-      <label className="fieldset-label text-xl">
-        <span className="mr-2">面饼</span>
-        <div className="flex gap-2 items-center">
+      <label className='fieldset-label text-xl'>
+        <span className='mr-2'>面饼</span>
+        <div className='flex gap-2 items-center'>
           <button
-            className="btn text-xl"
-            onClick={() => onExtraNoodleBlocksChange(Math.max(extraNoodleBlocks - 1, 0))}
-            aria-label="减少面饼"
+            className='btn text-xl'
+            onClick={() =>
+              onExtraNoodleBlocksChange(Math.max(extraNoodleBlocks - 1, 0))
+            }
+            aria-label='减少面饼'
           >
             -
           </button>
-          <span className="text-xl">{extraNoodleBlocks + 1}</span>
+          <span className='text-xl'>{extraNoodleBlocks + 1}</span>
           <button
-            className="btn text-xl"
+            className='btn text-xl'
             onClick={() => onExtraNoodleBlocksChange(extraNoodleBlocks + 1)}
-            aria-label="增加面饼"
+            aria-label='增加面饼'
           >
             +
           </button>
@@ -49,16 +51,16 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
   }
 
   return (
-    <label className="fieldset-label text-xl">
-      <span className="mr-2">粉量</span>
+    <label className='fieldset-label text-xl'>
+      <span className='mr-2'>粉量</span>
       <select
-        name="noodleAmount"
-        className="select text-xl"
+        name='noodleAmount'
+        className='select text-xl'
         value={noodleAmount}
         onChange={(e) => onNoodleAmountChange(e.target.value as Adjustment)}
         disabled={!includeNoodles}
       >
-        {ADJUSTMENT_OPTIONS.slice(0, 3).map(option => (
+        {ADJUSTMENT_OPTIONS.slice(0, 3).map((option) => (
           <option key={option}>{option}</option>
         ))}
       </select>

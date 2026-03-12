@@ -1,8 +1,8 @@
-import React, { useMemo } from "react"
-import { ToggleButtonGroup } from "@/components/ToggleButtonGroup"
-import { SIZES } from "../constants"
-import { NoodleType, Size } from "@/types"
-import { getSizeDisplayValue } from "../utils"
+import React, { useMemo } from 'react'
+import { ToggleButtonGroup } from '@/components/ToggleButtonGroup'
+import { SIZES } from '../constants'
+import { NoodleType, Size } from '@/types'
+import { getSizeDisplayValue } from '../utils'
 
 interface SizeSelectorProps {
   size: Size
@@ -24,17 +24,17 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
   customSizePrice,
   onSizeChange,
   onCustomSizePriceChange,
-  showCustomPrice
+  showCustomPrice,
 }) => {
   const getDisplayValue = useMemo(() => {
     return (s: Size) => getSizeDisplayValue(s, includeNoodles, noodleType)
   }, [includeNoodles, noodleType])
 
   return (
-    <div className="flex flex-row">
-      <label className="fieldset-label text-xl mr-4">规格</label>
+    <div className='flex flex-row'>
+      <label className='fieldset-label text-xl mr-4'>规格</label>
 
-      <div className="flex flex-row gap-3 mr-2 my-2">
+      <div className='flex flex-row gap-3 mr-2 my-2'>
         <ToggleButtonGroup
           options={SIZES}
           value={size}
@@ -43,11 +43,11 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
         />
       </div>
 
-      <label className="fieldset-label text-xl">
+      <label className='fieldset-label text-xl'>
         {showCustomPrice && (
           <input
-            type="text"
-            className="input"
+            type='text'
+            className='input'
             value={customSizePrice}
             onChange={(e) => onCustomSizePriceChange(Number(e.target.value))}
           />

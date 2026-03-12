@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo } from "react"
-import { OrderItem, MeatType } from "@/types"
-import { newDefaultOrderItem } from "@/services/order"
+import { useState, useCallback, useMemo } from 'react'
+import { OrderItem, MeatType } from '@/types'
+import { newDefaultOrderItem } from '@/services/order'
 
 export type FormMode = 'create' | 'edit'
 
@@ -10,19 +10,24 @@ export type FormMode = 'create' | 'edit'
  * @param initialItem - 初始订单项（编辑模式时传入）
  * @param mode - 表单模式：'create' 或 'edit'
  */
-export const useOrderForm = (initialItem?: OrderItem, mode: FormMode = 'create') => {
+export const useOrderForm = (
+  initialItem?: OrderItem,
+  mode: FormMode = 'create',
+) => {
   const [num, setNum] = useState<number>(1)
-  const [item, setItem] = useState<OrderItem>(initialItem || newDefaultOrderItem())
+  const [item, setItem] = useState<OrderItem>(
+    initialItem || newDefaultOrderItem(),
+  )
 
   /**
    * 更新订单项的顶层属性
    */
-  const updateItem = useCallback(<K extends keyof OrderItem>(
-    key: K,
-    value: OrderItem[K]
-  ) => {
-    setItem(prev => ({ ...prev, [key]: value }))
-  }, [])
+  const updateItem = useCallback(
+    <K extends keyof OrderItem>(key: K, value: OrderItem[K]) => {
+      setItem((prev) => ({ ...prev, [key]: value }))
+    },
+    [],
+  )
 
   /**
    * 更新订单项的嵌套属性
@@ -31,15 +36,15 @@ export const useOrderForm = (initialItem?: OrderItem, mode: FormMode = 'create')
     <T extends keyof OrderItem, K extends keyof OrderItem[T]>(
       parentKey: T,
       childKey: K,
-      value: OrderItem[T][K]
+      value: OrderItem[T][K],
     ) => void
   >((parentKey, childKey, value) => {
-    setItem(prev => {
+    setItem((prev) => {
       const parentValue = prev[parentKey]
       if (typeof parentValue === 'object' && parentValue !== null) {
         return {
           ...prev,
-          [parentKey]: { ...parentValue, [childKey]: value }
+          [parentKey]: { ...parentValue, [childKey]: value },
         }
       }
       return prev
@@ -50,7 +55,7 @@ export const useOrderForm = (initialItem?: OrderItem, mode: FormMode = 'create')
    * 更新肉类选择
    */
   const updateMeats = useCallback((meat: MeatType, checked: boolean) => {
-    setItem(prev => {
+    setItem((prev) => {
       const { available, excluded } = prev.meats
 
       if (checked) {
@@ -58,17 +63,17 @@ export const useOrderForm = (initialItem?: OrderItem, mode: FormMode = 'create')
           ...prev,
           meats: {
             available: [...available, meat],
-            excluded: excluded.filter(m => m !== meat)
-          }
+            excluded: excluded.filter((m) => m !== meat),
+          },
         }
       }
 
       return {
         ...prev,
         meats: {
-          available: available.filter(m => m !== meat),
-          excluded: [...excluded, meat]
-        }
+          available: available.filter((m) => m !== meat),
+          excluded: [...excluded, meat],
+        },
       }
     })
   }, [])
@@ -90,7 +95,12 @@ export const useOrderForm = (initialItem?: OrderItem, mode: FormMode = 'create')
       item.size === '无' ||
       (item.meats.available.length === 0 && !item.includeNoodles)
     )
-  }, [item.includeNoodles, item.noodleType, item.size, item.meats.available.length])
+  }, [
+    item.includeNoodles,
+    item.noodleType,
+    item.size,
+    item.meats.available.length,
+  ])
 
   /**
    * 是否显示猪腰选项（小份不显示）
