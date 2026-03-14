@@ -63,6 +63,34 @@ const YI_NOODLE_BLOCK_PRICE = 3
 /** 每个塑料盒价格 */
 const PLASTIC_CONTAINER_PRICE = 0.5
 
+const normalizeExcludedMeatsDisplay = (
+  excluded: OrderItem['meats']['excluded'],
+): string[] => {
+  const hasLargeIntestine = excluded.includes('大肠')
+  const hasSmallIntestine = excluded.includes('小肠')
+
+  if (!hasLargeIntestine || !hasSmallIntestine) {
+    return excluded
+  }
+
+  const normalized: string[] = []
+  let mergedIntestine = false
+
+  for (const meat of excluded) {
+    if (meat === '大肠' || meat === '小肠') {
+      if (!mergedIntestine) {
+        normalized.push('肠')
+        mergedIntestine = true
+      }
+      continue
+    }
+
+    normalized.push(meat)
+  }
+
+  return normalized
+}
+
 /**
  * 计算订单项目的总价格
  * @param item 订单项目
@@ -147,10 +175,14 @@ export const getMeatsRequest = (item: OrderItem): string => {
     item.meats.available.length > item.meats.excluded.length &&
     item.meats.excluded.length > 0
   ) {
-    req = `不要${item.meats.excluded[0]}`
+    const excludedMeatsDisplay = normalizeExcludedMeatsDisplay(
+      item.meats.excluded,
+    )
 
-    for (let i = 1; i < item.meats.excluded.length; i++) {
-      req += `、${item.meats.excluded[i]}`
+    req = `不要${excludedMeatsDisplay[0]}`
+
+    for (let i = 1; i < excludedMeatsDisplay.length; i++) {
+      req += `、${excludedMeatsDisplay[i]}`
     }
   }
 
