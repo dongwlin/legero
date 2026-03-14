@@ -14,6 +14,12 @@ type RowProps = {
   listWidth: number
 }
 
+type VirtualOrderListProps = {
+  filteredOrders: OrderItemType[]
+  now: number
+  rowHeightCacheKey: string
+}
+
 const Row = ({ index, style, orders, now, listWidth }: RowComponentProps<RowProps>) => {
   // Fix for RowComponentProps
   const order = orders[index]
@@ -27,57 +33,17 @@ const Row = ({ index, style, orders, now, listWidth }: RowComponentProps<RowProp
   )
 }
 
-const OrderList: React.FC = () => {
-  const orders = useOrderStore((state) => state.orders)
-  const filter = useOrderStore((state) => state.filter)
-  const [now, setNow] = useState(() => Date.now())
+const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
+  filteredOrders,
+  now,
+  rowHeightCacheKey,
+}) => {
   const [showBackToTop, setShowBackToTop] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-
-  const filteredOrders = useMemo(() => {
-    switch (filter) {
-      case 'all':
-        return orders
-      case 'uncompleted':
-        return orders.filter((order) => !order.completedAt)
-      case 'completed':
-        return orders.filter((order) => !!order.completedAt)
-      default:
-        return orders
-    }
-  }, [orders, filter])
-
-  const filteredOrderIdsKey = useMemo(
-    () => filteredOrders.map((order) => order.id).join('|'),
-    [filteredOrders],
-  )
   const dynamicRowHeight = useDynamicRowHeight({
     defaultRowHeight: DEFAULT_ORDER_ROW_HEIGHT,
-    key: filteredOrderIdsKey,
+    key: rowHeightCacheKey,
   })
-  const hasActiveOrders = useMemo(
-    () => filteredOrders.some((order) => !order.completedAt),
-    [filteredOrders],
-  )
-
-  useEffect(() => {
-    if (!hasActiveOrders) {
-      return
-    }
-
-    const frameId = window.requestAnimationFrame(() => {
-      setNow(Date.now())
-    })
-
-    const interval = setInterval(() => {
-      setNow(Date.now())
-    }, 1000)
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      clearInterval(interval)
-    }
-  }, [hasActiveOrders])
 
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     scrollContainerRef.current = event.currentTarget
@@ -118,6 +84,62 @@ const OrderList: React.FC = () => {
         </button>
       ) : null}
     </div>
+  )
+}
+
+const OrderList: React.FC = () => {
+  const orders = useOrderStore((state) => state.orders)
+  const filter = useOrderStore((state) => state.filter)
+  const [now, setNow] = useState(() => Date.now())
+
+  const filteredOrders = useMemo(() => {
+    switch (filter) {
+      case 'all':
+        return orders
+      case 'uncompleted':
+        return orders.filter((order) => !order.completedAt)
+      case 'completed':
+        return orders.filter((order) => !!order.completedAt)
+      default:
+        return orders
+    }
+  }, [orders, filter])
+
+  const filteredOrderIdsKey = useMemo(
+    () => filteredOrders.map((order) => order.id).join('|'),
+    [filteredOrders],
+  )
+  const hasActiveOrders = useMemo(
+    () => filteredOrders.some((order) => !order.completedAt),
+    [filteredOrders],
+  )
+
+  useEffect(() => {
+    if (!hasActiveOrders) {
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      setNow(Date.now())
+    })
+
+    const interval = setInterval(() => {
+      setNow(Date.now())
+    }, 1000)
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      clearInterval(interval)
+    }
+  }, [hasActiveOrders])
+
+  return (
+    <VirtualOrderList
+      key={filter}
+      filteredOrders={filteredOrders}
+      now={now}
+      rowHeightCacheKey={filteredOrderIdsKey}
+    />
   )
 }
 
