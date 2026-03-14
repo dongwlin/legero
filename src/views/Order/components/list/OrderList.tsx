@@ -1,11 +1,12 @@
-import React, { useCallback, useMemo, useState, useRef } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import OrderItem from './OrderItem'
 import { useOrderStore } from '@/store/order'
-import { List, RowComponentProps } from 'react-window'
+import { List, RowComponentProps, useDynamicRowHeight } from 'react-window'
 import { AutoSizer } from 'react-virtualized-auto-sizer'
-import { getMeatsRequest, getOtherRequest } from '@/services/order'
 import { OrderItem as OrderItemType } from '@/types'
 import { CarbonArrowUp } from '@/components/Icon'
+
+const DEFAULT_ORDER_ROW_HEIGHT = 230
 
 type RowProps = {
   data: OrderItemType[]
@@ -43,20 +44,14 @@ const OrderList: React.FC = () => {
     }
   }, [orders, filter])
 
-  const getItemSize = (index: number) => {
-    const item = filteredOrders[index]
-    let height = 150 // Base height increased for safety
-
-    const meatReq = getMeatsRequest(item)
-    const otherReq = getOtherRequest(item)
-
-    // Add height for each line of text, increased to account for text-2xl and margins
-    if (meatReq !== '') height += 40
-    if (otherReq !== '') height += 40
-    if (item.note !== '') height += 40
-
-    return height
-  }
+  const filteredOrderIdsKey = useMemo(
+    () => filteredOrders.map((order) => order.id).join('|'),
+    [filteredOrders],
+  )
+  const dynamicRowHeight = useDynamicRowHeight({
+    defaultRowHeight: DEFAULT_ORDER_ROW_HEIGHT,
+    key: filteredOrderIdsKey,
+  })
 
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     scrollContainerRef.current = event.currentTarget
@@ -74,7 +69,7 @@ const OrderList: React.FC = () => {
           <List
             style={{ height: height ?? 0, width: width ?? 0 }}
             rowCount={filteredOrders.length}
-            rowHeight={getItemSize}
+            rowHeight={dynamicRowHeight}
             rowProps={{ data: filteredOrders }}
             rowComponent={Row}
             overscanCount={5}
