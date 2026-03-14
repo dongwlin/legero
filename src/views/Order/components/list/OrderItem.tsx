@@ -61,6 +61,23 @@ const getServeMealBtnClass = (createdAt: string): string => {
   return base + ' ' + 'btn-success'
 }
 
+const renderHighlightedForbiddenText = (text: string): React.ReactNode => {
+  if (!text.includes('不要')) {
+    return text
+  }
+
+  return text.split('不要').map((part, index) => (
+    <React.Fragment key={`${part}-${index}`}>
+      {index > 0 && (
+        <span className='mx-0.5 inline-block rounded bg-red-100 px-1 text-red-700'>
+          不要
+        </span>
+      )}
+      {part}
+    </React.Fragment>
+  ))
+}
+
 const OrderItem: React.FC<OI> = (item) => {
   const removeOrder = useOrderStore((state) => state.removeOrder)
   const updateOrder = useOrderStore((state) => state.updateOrder)
@@ -191,8 +208,8 @@ const OrderItem: React.FC<OI> = (item) => {
         <div className='text-3xl'>{item.dining.diningMethod}</div>
       </div>
       <div className='list-col-wrap text-2xl'>
-        {meatReq !== '' && <div>{meatReq}</div>}
-        <div>{req}</div>
+        {meatReq !== '' && <div>{renderHighlightedForbiddenText(meatReq)}</div>}
+        <div>{renderHighlightedForbiddenText(req)}</div>
         <div className='italic'>{item.note}</div>
         <div className='flex flex-row my-2'>
           {item.progress.noodles != 'unrequired' && (
