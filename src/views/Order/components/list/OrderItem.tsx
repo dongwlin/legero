@@ -85,7 +85,20 @@ const OrderItem: React.FC<OI> = (item) => {
   const { waitTimeThresholdMinutes } = useOrderSettingsStore()
 
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const createdAtRef = useRef<HTMLSpanElement>(null)
+  const waitTimeRef = useRef<HTMLSpanElement>(null)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
+  const [showWaitTimeSeparator, setShowWaitTimeSeparator] = useState(true)
+
+  const syncWaitTimeSeparator = () => {
+    if (!createdAtRef.current || !waitTimeRef.current) {
+      return
+    }
+
+    setShowWaitTimeSeparator(
+      waitTimeRef.current.offsetTop === createdAtRef.current.offsetTop
+    )
+  }
 
   // 每秒更新当前时间以实现实时等待时间显示
   useEffect(() => {
@@ -95,6 +108,30 @@ const OrderItem: React.FC<OI> = (item) => {
 
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (item.completedAt) {
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(syncWaitTimeSeparator)
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [item.completedAt, currentTime])
+
+  useEffect(() => {
+    if (item.completedAt) {
+      return
+    }
+
+    const updateWaitTimeLayout = () => {
+      window.requestAnimationFrame(syncWaitTimeSeparator)
+    }
+
+    window.addEventListener('resize', updateWaitTimeLayout)
+
+    return () => window.removeEventListener('resize', updateWaitTimeLayout)
+  }, [item.completedAt])
 
   // 计算等待时间（秒）
   const waitTime = item.completedAt
@@ -241,13 +278,18 @@ const OrderItem: React.FC<OI> = (item) => {
             出餐
           </button>
         </div>
-        <div className='text-base opacity-60'>
-          {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
+        <div className='flex flex-wrap items-center gap-x-2 text-base opacity-60'>
+          <span ref={createdAtRef}>
+            {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
+          </span>
           {!item.completedAt && (
-            <span
-              className={`ml-2 font-semibold ${isWaitTimeOverThreshold ? 'text-error' : 'text-warning'}`}
-            >
-              ({formatWaitTime(waitTime)})
+            <span ref={waitTimeRef} className='inline-flex items-center gap-2'>
+              {showWaitTimeSeparator && <span aria-hidden='true'>|</span>}
+              <span
+                className={`font-semibold ${isWaitTimeOverThreshold ? 'text-error' : 'text-warning'}`}
+              >
+                {formatWaitTime(waitTime)}
+              </span>
             </span>
           )}
         </div>
