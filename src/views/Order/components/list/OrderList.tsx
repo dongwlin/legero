@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import OrderItem from './OrderItem'
 import { useOrderStore } from '@/store/order'
 import { List, RowComponentProps, useDynamicRowHeight } from 'react-window'
@@ -9,18 +9,20 @@ import { CarbonArrowUp } from '@/components/Icon'
 const DEFAULT_ORDER_ROW_HEIGHT = 230
 
 type RowProps = {
-  data: OrderItemType[]
+  orders: OrderItemType[]
+  now: number
+  listWidth: number
 }
 
-const Row = ({ index, style, data }: RowComponentProps<RowProps>) => {
+const Row = ({ index, style, orders, now, listWidth }: RowComponentProps<RowProps>) => {
   // Fix for RowComponentProps
-  const order = data[index]
+  const order = orders[index]
   return (
     <div
       style={style}
       className='list-row border-b border-base-300 px-4 items-start py-4'
     >
-      <OrderItem {...order} />
+      <OrderItem order={order} now={now} layoutWidth={listWidth} />
     </div>
   )
 }
@@ -28,6 +30,7 @@ const Row = ({ index, style, data }: RowComponentProps<RowProps>) => {
 const OrderList: React.FC = () => {
   const orders = useOrderStore((state) => state.orders)
   const filter = useOrderStore((state) => state.filter)
+  const [now, setNow] = useState(() => Date.now())
   const [showBackToTop, setShowBackToTop] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
@@ -52,6 +55,29 @@ const OrderList: React.FC = () => {
     defaultRowHeight: DEFAULT_ORDER_ROW_HEIGHT,
     key: filteredOrderIdsKey,
   })
+  const hasActiveOrders = useMemo(
+    () => filteredOrders.some((order) => !order.completedAt),
+    [filteredOrders],
+  )
+
+  useEffect(() => {
+    if (!hasActiveOrders) {
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      setNow(Date.now())
+    })
+
+    const interval = setInterval(() => {
+      setNow(Date.now())
+    }, 1000)
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      clearInterval(interval)
+    }
+  }, [hasActiveOrders])
 
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     scrollContainerRef.current = event.currentTarget
@@ -70,7 +96,11 @@ const OrderList: React.FC = () => {
             style={{ height: height ?? 0, width: width ?? 0 }}
             rowCount={filteredOrders.length}
             rowHeight={dynamicRowHeight}
-            rowProps={{ data: filteredOrders }}
+            rowProps={{
+              orders: filteredOrders,
+              now,
+              listWidth: width ?? 0,
+            }}
             rowComponent={Row}
             overscanCount={5}
             onScroll={handleScroll}

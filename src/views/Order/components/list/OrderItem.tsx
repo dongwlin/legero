@@ -16,6 +16,12 @@ import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
 import dayjs from 'dayjs'
 
+type OrderItemProps = {
+  order: OI
+  now: number
+  layoutWidth: number
+}
+
 const getNoodleTypeClass = (noodleType: NoodleType | undefined): string => {
   let noodleColor = ''
 
@@ -78,7 +84,8 @@ const renderHighlightedForbiddenText = (text: string): React.ReactNode => {
   ))
 }
 
-const OrderItem: React.FC<OI> = (item) => {
+const OrderItem: React.FC<OrderItemProps> = ({ order, now, layoutWidth }) => {
+  const item = order
   const removeOrder = useOrderStore((state) => state.removeOrder)
   const updateOrder = useOrderStore((state) => state.updateOrder)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
@@ -87,56 +94,31 @@ const OrderItem: React.FC<OI> = (item) => {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const createdAtRef = useRef<HTMLSpanElement>(null)
   const waitTimeRef = useRef<HTMLSpanElement>(null)
-  const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [showWaitTimeSeparator, setShowWaitTimeSeparator] = useState(true)
 
-  const syncWaitTimeSeparator = () => {
-    if (!createdAtRef.current || !waitTimeRef.current) {
-      return
-    }
-
-    setShowWaitTimeSeparator(
-      waitTimeRef.current.offsetTop === createdAtRef.current.offsetTop
-    )
-  }
 
   // 每秒更新当前时间以实现实时等待时间显示
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(Date.now())
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
 
   useEffect(() => {
-    if (item.completedAt) {
-      return
-    }
+    const frameId = window.requestAnimationFrame(() => {
+      if (item.completedAt || !createdAtRef.current || !waitTimeRef.current) {
+        setShowWaitTimeSeparator(false)
+        return
+      }
 
-    const frameId = window.requestAnimationFrame(syncWaitTimeSeparator)
+      setShowWaitTimeSeparator(
+        waitTimeRef.current.offsetTop === createdAtRef.current.offsetTop
+      )
+    })
 
     return () => window.cancelAnimationFrame(frameId)
-  }, [item.completedAt, currentTime])
+  }, [item.id, item.createdAt, item.completedAt, now, layoutWidth])
 
-  useEffect(() => {
-    if (item.completedAt) {
-      return
-    }
-
-    const updateWaitTimeLayout = () => {
-      window.requestAnimationFrame(syncWaitTimeSeparator)
-    }
-
-    window.addEventListener('resize', updateWaitTimeLayout)
-
-    return () => window.removeEventListener('resize', updateWaitTimeLayout)
-  }, [item.completedAt])
 
   // 计算等待时间（秒）
   const waitTime = item.completedAt
     ? 0
-    : Math.floor((currentTime - new Date(item.createdAt).getTime()) / 1000)
+    : Math.floor((now - new Date(item.createdAt).getTime()) / 1000)
 
   // 判断等待时间是否超时（分钟）
   const isWaitTimeOverThreshold =
@@ -334,4 +316,23 @@ const OrderItem: React.FC<OI> = (item) => {
   )
 }
 
-export default React.memo(OrderItem)
+const areOrderItemPropsEqual = (
+  prevProps: OrderItemProps,
+  nextProps: OrderItemProps,
+) => {
+  if (prevProps.order !== nextProps.order) {
+    return false
+  }
+
+  if (prevProps.layoutWidth !== nextProps.layoutWidth) {
+    return false
+  }
+
+  if (!prevProps.order.completedAt && prevProps.now !== nextProps.now) {
+    return false
+  }
+
+  return true
+}
+
+export default React.memo(OrderItem, areOrderItemPropsEqual)
