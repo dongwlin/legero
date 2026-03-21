@@ -24,9 +24,8 @@ export const ToggleButtonGroup = <T extends string>({
       {options.map((option) => (
         <button
           key={option}
-          className={`${buttonClassName} ${
-            value === option ? 'btn-primary' : ''
-          }`}
+          className={`${buttonClassName} ${value === option ? 'btn-primary' : ''
+            }`}
           onClick={() => onChange(option)}
         >
           {getDisplayValue ? getDisplayValue(option) : option}
