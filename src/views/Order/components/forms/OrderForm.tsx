@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import { CarbonAdd } from '@/components/Icon'
+import { Button, CloseButton, Modal, TextArea } from '@heroui/react'
 import {
   OrderItem,
   Adjustment,
@@ -18,6 +19,7 @@ import { NoodleAmountSelector } from '../selectors/NoodleAmountSelector'
 import { MeatSelector } from '../selectors/MeatSelector'
 import { IngredientSelector } from '../selectors/IngredientSelector'
 import { DiningSelector } from '../selectors/DiningSelector'
+import OrderField from '../OrderField'
 
 interface OrderFormProps {
   mode: FormMode
@@ -31,8 +33,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const updateTargetID = useOrderStore((state) => state.updateTargetID)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
   const findOrder = useOrderStore((state) => state.findOrder)
-
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  const [isOpen, setIsOpen] = useState(false)
 
   const {
     num,
@@ -57,30 +58,23 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
     }
   }
 
-  const openDialog = () => {
-    if (dialogRef.current) {
-      dialogRef.current.showModal()
-    }
-  }
-
-  const closeDialog = () => {
-    if (dialogRef.current) {
-      dialogRef.current.close()
-    }
-  }
-
   // 编辑模式下，监听 updateTargetID 变化并打开对话框
   useEffect(() => {
     if (mode === 'edit' && updateTargetID) {
       const targetItem = findOrder(updateTargetID)
       if (targetItem) {
-        setTimeout(() => {
-          setItem(targetItem)
-          openDialog()
-        }, 0)
+        setItem(targetItem)
+        setIsOpen(true)
       }
     }
   }, [updateTargetID, findOrder, setItem, mode])
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setIsOpen(nextOpen)
+    if (!nextOpen) {
+      handleDialogClose()
+    }
+  }
 
   const handleIncludeNoodlesChange = (checked: boolean) => {
     updateItem('includeNoodles', checked)
@@ -130,7 +124,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
     updateItem('note', event.target.value)
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = (close: () => void) => {
     const now = dayjs().tz()
     const price = calcPrice(item)
 
@@ -189,110 +183,193 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
       updateOrder(updateTargetID, newItem)
     }
 
-    closeDialog()
+    close()
   }
 
   const isCreateMode = mode === 'create'
   const formTitle = isCreateMode ? '创建订单' : '修改订单'
   const submitButtonText = isCreateMode ? '创建' : '修改'
+  const shouldRenderModal = isCreateMode || isOpen
 
   return (
     <>
-      {isCreateMode && (
-        <button className='btn' onClick={openDialog}>
-          <CarbonAdd className='size-10 btn-ghost' />
-        </button>
-      )}
-      <dialog ref={dialogRef} className='modal' onClose={handleDialogClose}>
-        <div className='modal-box w-11/12 max-w-5xl'>
-          <form method='dialog'>
-            <button className='btn btn-sm btn-circle btn-ghost absolute right-2 top-2'>
-              ✕
-            </button>
-          </form>
-
-          <fieldset className='fieldset rounded-box'>
-            <legend className='fieldset-legend text-2xl font-bold mb-2'>
-              {formTitle}
-            </legend>
-
-            {isCreateMode && (
-              <QuantitySelector num={num || 1} setNum={setNum || (() => {})} />
-            )}
-
-            <NoodleSelector
-              includeNoodles={item.includeNoodles}
-              noodleType={item.noodleType}
-              onIncludeNoodlesChange={handleIncludeNoodlesChange}
-              onNoodleTypeChange={(type) => updateItem('noodleType', type)}
-            />
-
-            <SizeSelector
-              size={item.size}
-              includeNoodles={item.includeNoodles}
-              noodleType={item.noodleType}
-              customSizePrice={item.customSizePrice}
-              onSizeChange={(size) => updateItem('size', size)}
-              onCustomSizePriceChange={handleCustomSizePriceChange}
-              showCustomPrice={showCustomPrice}
-            />
-
-            <NoodleAmountSelector
-              noodleType={item.noodleType}
-              noodleAmount={item.noodleAmount}
-              extraNoodleBlocks={item.extraNoodleBlocks}
-              includeNoodles={item.includeNoodles}
-              onNoodleAmountChange={handleNoodleAmountChange}
-              onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
-            />
-
-            <MeatSelector
-              availableMeats={item.meats.available}
-              onMeatChange={updateMeats}
-              showPorkKidney={showPorkKidney}
-            />
-
-            <IngredientSelector
-              greens={item.ingredients.greens}
-              scallion={item.ingredients.scallion}
-              pepper={item.ingredients.pepper}
-              onGreensChange={handleGreensChange}
-              onScallionChange={handleScallionChange}
-              onPepperChange={handlePepperChange}
-            />
-
-            <DiningSelector
-              diningMethod={item.dining.diningMethod}
-              packaging={item.dining.packaging}
-              packagingMethod={item.dining.packagingMethod}
-              onDiningMethodChange={handleDiningMethodChange}
-              onPackagingChange={handlePackingChange}
-              onPackagingMethodChange={handlePackingMethodChange}
-              showTakeoutOptions={showTakeoutOptions}
-            />
-
-            <label className='fieldset-label text-xl'>
-              <span className='mr-2'>备注</span>
-              <textarea
-                className='textarea text-xl'
-                value={item.note}
-                onChange={handleNoteChange}
-              />
-            </label>
-
-            <button
-              className='btn btn-primary text-xl'
-              onClick={handleSubmit}
-              disabled={!isValid}
+      {shouldRenderModal ? (
+        <Modal.Root isOpen={isOpen} onOpenChange={handleOpenChange}>
+          {isCreateMode ? (
+            <Button.Root
+              isIconOnly
+              className='size-14 rounded-2xl shadow-lg'
+              aria-label='创建订单'
             >
-              {submitButtonText}
-            </button>
-          </fieldset>
-        </div>
-        <form method='dialog' className='modal-backdrop'>
-          <button>Cancel</button>
-        </form>
-      </dialog>
+              <CarbonAdd className='size-6 md:size-7' />
+            </Button.Root>
+          ) : null}
+          <Modal.Backdrop variant='blur'>
+            <Modal.Container
+              size='cover'
+              scroll='inside'
+              className='items-end p-2 sm:items-center sm:p-4'
+            >
+              <Modal.Dialog className='relative max-h-[calc(100dvh-1rem)] border border-border/70 bg-background shadow-2xl sm:max-w-[1100px]'>
+                {({ close }) => (
+                  <>
+                    <CloseButton
+                      className='absolute right-4 top-3 z-10 rounded-full md:right-5'
+                      onPress={close}
+                    />
+
+                    <Modal.Header className='border-b border-border/60 px-4 py-3 pr-14 md:px-5 md:pr-16'>
+                      <div className='flex items-center gap-3'>
+                        <h2 className='text-xl font-semibold text-foreground md:text-2xl'>
+                          {formTitle}
+                        </h2>
+                      </div>
+                    </Modal.Header>
+
+                    <Modal.Body className='space-y-3 px-4 py-3 md:px-5'>
+                      {isCreateMode ? (
+                        <div className='grid items-stretch gap-3 md:grid-cols-[minmax(0,1fr)_12rem_11rem]'>
+                          <div className='h-full'>
+                            <NoodleSelector
+                              includeNoodles={item.includeNoodles}
+                              noodleType={item.noodleType}
+                              onIncludeNoodlesChange={handleIncludeNoodlesChange}
+                              onNoodleTypeChange={(type) => updateItem('noodleType', type)}
+                            />
+                          </div>
+                          <div className='h-full'>
+                            <NoodleAmountSelector
+                              noodleType={item.noodleType}
+                              noodleAmount={item.noodleAmount}
+                              extraNoodleBlocks={item.extraNoodleBlocks}
+                              includeNoodles={item.includeNoodles}
+                              onNoodleAmountChange={handleNoodleAmountChange}
+                              onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
+                            />
+                          </div>
+                          <div className='h-full'>
+                            <QuantitySelector
+                              num={num || 1}
+                              setNum={setNum || (() => { })}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <NoodleSelector
+                            includeNoodles={item.includeNoodles}
+                            noodleType={item.noodleType}
+                            onIncludeNoodlesChange={handleIncludeNoodlesChange}
+                            onNoodleTypeChange={(type) => updateItem('noodleType', type)}
+                          />
+                        </div>
+                      )}
+
+                      {isCreateMode ? (
+                        <div>
+                          <SizeSelector
+                            size={item.size}
+                            includeNoodles={item.includeNoodles}
+                            noodleType={item.noodleType}
+                            customSizePrice={item.customSizePrice}
+                            onSizeChange={(size) => updateItem('size', size)}
+                            onCustomSizePriceChange={handleCustomSizePriceChange}
+                            showCustomPrice={showCustomPrice}
+                          />
+                        </div>
+                      ) : (
+                        <div className='grid items-stretch gap-3 md:grid-cols-2'>
+                          <div className='h-full'>
+                            <SizeSelector
+                              size={item.size}
+                              includeNoodles={item.includeNoodles}
+                              noodleType={item.noodleType}
+                              customSizePrice={item.customSizePrice}
+                              onSizeChange={(size) => updateItem('size', size)}
+                              onCustomSizePriceChange={handleCustomSizePriceChange}
+                              showCustomPrice={showCustomPrice}
+                            />
+                          </div>
+
+                          <div className='h-full'>
+                            <NoodleAmountSelector
+                              noodleType={item.noodleType}
+                              noodleAmount={item.noodleAmount}
+                              extraNoodleBlocks={item.extraNoodleBlocks}
+                              includeNoodles={item.includeNoodles}
+                              onNoodleAmountChange={handleNoodleAmountChange}
+                              onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <MeatSelector
+                          availableMeats={item.meats.available}
+                          onMeatChange={updateMeats}
+                          showPorkKidney={showPorkKidney}
+                        />
+                      </div>
+
+                      <div>
+                        <IngredientSelector
+                          greens={item.ingredients.greens}
+                          scallion={item.ingredients.scallion}
+                          pepper={item.ingredients.pepper}
+                          onGreensChange={handleGreensChange}
+                          onScallionChange={handleScallionChange}
+                          onPepperChange={handlePepperChange}
+                        />
+                      </div>
+
+                      <div>
+                        <DiningSelector
+                          diningMethod={item.dining.diningMethod}
+                          packaging={item.dining.packaging}
+                          packagingMethod={item.dining.packagingMethod}
+                          onDiningMethodChange={handleDiningMethodChange}
+                          onPackagingChange={handlePackingChange}
+                          onPackagingMethodChange={handlePackingMethodChange}
+                          showTakeoutOptions={showTakeoutOptions}
+                        />
+                      </div>
+
+                      <div>
+                        <OrderField label='备注'>
+                          <TextArea
+                            fullWidth
+                            rows={3}
+                            variant='secondary'
+                            className='min-h-20 rounded-xl'
+                            value={item.note}
+                            onChange={handleNoteChange}
+                          />
+                        </OrderField>
+                      </div>
+                    </Modal.Body>
+
+                    <Modal.Footer className='border-t border-border/60 px-4 py-3 md:px-5'>
+                      <div className='flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
+                        <Button.Root variant='outline' onPress={close}>
+                          取消
+                        </Button.Root>
+                        <Button.Root
+                          isDisabled={!isValid}
+                          variant='primary'
+                          onPress={() => handleSubmit(close)}
+                        >
+                          {submitButtonText}
+                        </Button.Root>
+                      </div>
+                    </Modal.Footer>
+                  </>
+                )}
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal.Root>
+      ) : null}
     </>
   )
 }

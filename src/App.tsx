@@ -11,7 +11,11 @@ function App() {
     // 更新有效主题
     const updateTheme = () => {
       const effective = getEffectiveTheme()
-      document.documentElement.setAttribute('data-theme', effective)
+      const root = document.documentElement
+
+      root.setAttribute('data-theme', effective)
+      root.classList.remove('light', 'dark')
+      root.classList.add(effective)
     }
 
     // 初始化主题

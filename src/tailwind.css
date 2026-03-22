@@ -1,5 +1,2 @@
 @import 'tailwindcss';
-
-@plugin "daisyui" {
-  exclude: properties;
-}
+@import '@heroui/styles';

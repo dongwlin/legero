@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react'
 import { ToggleButtonGroup } from '@/components/ToggleButtonGroup'
+import { Input } from '@heroui/react'
 import { SIZES } from '../constants'
 import { NoodleType, Size } from '@/types'
 import { getSizeDisplayValue } from '../utils'
+import OrderField from '../OrderField'
 
 interface SizeSelectorProps {
   size: Size
@@ -31,28 +33,41 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
   }, [includeNoodles, noodleType])
 
   return (
-    <div className='flex flex-row'>
-      <label className='fieldset-label text-xl mr-4'>规格</label>
-
-      <div className='flex flex-row gap-3 mr-2 my-2'>
+    <OrderField>
+      <div className='space-y-3'>
         <ToggleButtonGroup
           options={SIZES}
           value={size}
           onChange={onSizeChange}
           getDisplayValue={getDisplayValue}
         />
-      </div>
 
-      <label className='fieldset-label text-xl'>
-        {showCustomPrice && (
-          <input
-            type='text'
-            className='input'
-            value={customSizePrice}
-            onChange={(e) => onCustomSizePriceChange(Number(e.target.value))}
-          />
-        )}
-      </label>
-    </div>
+        {showCustomPrice ? (
+          <div className='space-y-1.5 md:max-w-44'>
+            <label
+              htmlFor='custom-size-price'
+              className='text-xs font-medium text-muted md:text-sm'
+            >
+              自定义价格
+            </label>
+            <Input.Root
+              fullWidth
+              id='custom-size-price'
+              inputMode='numeric'
+              min='0'
+              step='1'
+              type='number'
+              value={customSizePrice}
+              variant='secondary'
+              className='min-h-11 rounded-xl md:min-h-12'
+              onChange={(e) => {
+                const nextPrice = Number(e.target.value)
+                onCustomSizePriceChange(Number.isNaN(nextPrice) ? 0 : nextPrice)
+              }}
+            />
+          </div>
+        ) : null}
+      </div>
+    </OrderField>
   )
 }

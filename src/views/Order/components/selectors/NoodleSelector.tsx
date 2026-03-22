@@ -1,7 +1,9 @@
 import React from 'react'
 import { ToggleButtonGroup } from '@/components/ToggleButtonGroup'
+import { Switch } from '@heroui/react'
 import { NOODLE_TYPES } from '../constants'
 import { NoodleType } from '@/types'
+import OrderField from '../OrderField'
 
 interface NoodleSelectorProps {
   includeNoodles: boolean
@@ -20,21 +22,27 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
   onNoodleTypeChange,
 }) => {
   return (
-    <div className='flex flex-row'>
-      <label className='fieldset-label text-xl mr-4'>
-        <span className='mr-2'>粉</span>
-        <input
-          type='checkbox'
-          checked={includeNoodles}
-          className='toggle toggle-success'
-          onChange={(e) => onIncludeNoodlesChange(e.target.checked)}
+    <OrderField>
+      <div className='space-y-3'>
+        <div className='flex items-center justify-between rounded-xl border border-border/60 bg-background px-3 py-2.5'>
+          <div className='text-sm font-medium text-foreground md:text-base'>带粉</div>
+          <Switch.Root
+            aria-label='是否带粉'
+            className='shrink-0'
+            isSelected={includeNoodles}
+            onChange={onIncludeNoodlesChange}
+          >
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch.Root>
+        </div>
+        <ToggleButtonGroup
+          options={NOODLE_TYPES}
+          value={noodleType}
+          onChange={onNoodleTypeChange}
         />
-      </label>
-      <ToggleButtonGroup
-        options={NOODLE_TYPES}
-        value={noodleType}
-        onChange={onNoodleTypeChange}
-      />
-    </div>
+      </div>
+    </OrderField>
   )
 }

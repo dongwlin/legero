@@ -5,6 +5,8 @@ import {
   PACKAGING_METHODS,
 } from '../constants'
 import { DiningMethod, Packaging, PackagingMethod } from '@/types'
+import OrderField from '../OrderField'
+import { OrderCompactSelect } from '../OrderCompactSelect'
 
 interface DiningSelectorProps {
   diningMethod: DiningMethod
@@ -29,56 +31,35 @@ export const DiningSelector: React.FC<DiningSelectorProps> = ({
   showTakeoutOptions,
 }) => {
   return (
-    <>
-      <label className='fieldset-label text-xl'>
-        <span className='mr-2'>就餐方式</span>
-        <select
-          name='就餐方式'
-          className='select text-xl'
+    <OrderField>
+      <div
+        className={showTakeoutOptions ? 'grid gap-3 sm:grid-cols-3' : 'sm:max-w-56'}
+      >
+        <OrderCompactSelect
+          label='方式'
           value={diningMethod}
-          onChange={(e) => onDiningMethodChange(e.target.value as DiningMethod)}
-        >
-          {DINING_METHODS.map((method) => (
-            <option key={method}>{method}</option>
-          ))}
-        </select>
-      </label>
+          options={DINING_METHODS}
+          onChange={onDiningMethodChange}
+        />
 
-      {showTakeoutOptions && (
-        <>
-          <label className='fieldset-label text-xl'>
-            <span className='mr-2'>打包包装</span>
-            <select
-              name='打包包装'
-              className='select text-xl'
+        {showTakeoutOptions ? (
+          <>
+            <OrderCompactSelect
+              label='包装'
               value={packaging}
-              onChange={(e) => onPackagingChange(e.target.value as Packaging)}
-            >
-              {PACKAGING_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+              options={PACKAGING_OPTIONS}
+              onChange={onPackagingChange}
+            />
 
-          <label className='fieldset-label text-xl'>
-            <span className='mr-2'>打包方式</span>
-            <select
-              name='打包方式'
-              className='select text-xl'
+            <OrderCompactSelect
+              label='打包'
               value={packagingMethod}
-              onChange={(e) =>
-                onPackagingMethodChange(e.target.value as PackagingMethod)
-              }
-            >
-              {PACKAGING_METHODS.map((method) => (
-                <option key={method}>{method}</option>
-              ))}
-            </select>
-          </label>
-        </>
-      )}
-    </>
+              options={PACKAGING_METHODS}
+              onChange={onPackagingMethodChange}
+            />
+          </>
+        ) : null}
+      </div>
+    </OrderField>
   )
 }

@@ -1,3 +1,5 @@
+import { Button } from '@heroui/react'
+
 interface ToggleButtonGroupProps<T extends string> {
   options: readonly T[]
   value: T
@@ -5,6 +7,7 @@ interface ToggleButtonGroupProps<T extends string> {
   getDisplayValue?: (value: T) => string
   className?: string
   buttonClassName?: string
+  isDisabled?: boolean
 }
 
 /**
@@ -16,20 +19,23 @@ export const ToggleButtonGroup = <T extends string>({
   value,
   onChange,
   getDisplayValue,
-  className = 'flex flex-row gap-3',
-  buttonClassName = 'btn text-xl',
+  className = 'flex flex-wrap gap-3',
+  buttonClassName = 'h-11 min-w-20 rounded-xl px-4 text-sm font-semibold touch-manipulation md:h-12 md:text-base',
+  isDisabled = false,
 }: ToggleButtonGroupProps<T>) => {
   return (
-    <div className={className}>
+    <div className={className} role='group'>
       {options.map((option) => (
-        <button
+        <Button.Root
           key={option}
-          className={`${buttonClassName} ${value === option ? 'btn-primary' : ''
-            }`}
-          onClick={() => onChange(option)}
+          aria-pressed={value === option}
+          className={buttonClassName}
+          isDisabled={isDisabled}
+          variant={value === option ? 'primary' : 'secondary'}
+          onPress={() => onChange(option)}
         >
           {getDisplayValue ? getDisplayValue(option) : option}
-        </button>
+        </Button.Root>
       ))}
     </div>
   )

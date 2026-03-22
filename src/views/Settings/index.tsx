@@ -7,24 +7,29 @@ import AuthSettings from './components/AuthSettings'
 
 const Settings: React.FC = () => {
   return (
-    <div className='min-h-screen bg-base-100 pb-20'>
-      {/* 顶部导航栏 */}
+    <div className='min-h-dvh bg-background pb-20 text-foreground'>
       <Header title='设置' />
 
-      {/* 主内容区 */}
-      <div className='pt-[calc(5rem+env(safe-area-inset-top))] px-4 md:px-8 max-w-4xl mx-auto'>
-        {/* 安全设置部分 */}
-        <AuthSettings />
+      <main className='mx-auto max-w-4xl px-4 pt-[calc(5.25rem+env(safe-area-inset-top))] md:px-8'>
+        <section className='mb-8'>
+          <p className='text-xs font-medium uppercase tracking-[0.24em] text-muted md:text-sm'>
+            Preferences
+          </p>
+          <h2 className='mt-3 text-3xl font-semibold tracking-tight md:text-4xl'>
+            管理应用外观、安全与数据
+          </h2>
+          <p className='mt-3 max-w-2xl text-sm leading-6 text-muted md:text-base'>
+            所有设置都会即时生效，并保存在当前设备上。
+          </p>
+        </section>
 
-        {/* 主题设置部分 */}
-        <ThemeSettings />
-
-        {/* 订单设置部分 */}
-        <OrderSettings />
-
-        {/* 数据管理部分 */}
-        <DataManagement />
-      </div>
+        <div className='space-y-6'>
+          <AuthSettings />
+          <ThemeSettings />
+          <OrderSettings />
+          <DataManagement />
+        </div>
+      </main>
     </div>
   )
 }

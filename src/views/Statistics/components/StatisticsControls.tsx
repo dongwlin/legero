@@ -1,4 +1,5 @@
 import { CarbonChartMultitype } from '@/components/Icon'
+import { Button, Card } from '@heroui/react'
 import React from 'react'
 
 interface StatisticsControlsProps {
@@ -9,21 +10,27 @@ const StatisticsControls: React.FC<StatisticsControlsProps> = ({
   onCalculate,
 }) => {
   return (
-    <div className='card bg-base-200 shadow-lg rounded-xl mb-6'>
-      <div className='card-body p-6'>
-        <h2 className='card-title text-lg md:text-xl mb-4'>统计操作</h2>
-        <p className='text-base-content/70 mb-4'>
+    <Card.Root
+      variant='secondary'
+      className='border border-border/70 p-0 shadow-surface'
+    >
+      <Card.Header className='gap-1 px-6 pt-6'>
+        <Card.Title className='text-lg md:text-xl'>统计操作</Card.Title>
+        <Card.Description className='leading-6'>
           点击下方按钮开始计算每日订单统计数据。
-        </p>
-        <button
-          className='btn btn-primary w-full md:w-auto text-lg'
-          onClick={onCalculate}
+        </Card.Description>
+      </Card.Header>
+      <Card.Content className='px-6 pb-6 pt-4'>
+        <Button.Root
+          className='w-full md:w-auto'
+          variant='primary'
+          onPress={onCalculate}
         >
-          <CarbonChartMultitype className='w-6 h-6 mr-2' />
+          <CarbonChartMultitype className='size-5' />
           开始统计
-        </button>
-      </div>
-    </div>
+        </Button.Root>
+      </Card.Content>
+    </Card.Root>
   )
 }
 

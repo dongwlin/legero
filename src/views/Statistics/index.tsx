@@ -8,6 +8,41 @@ import Header from '@/components/Header'
 import StatisticsControls from './components/StatisticsControls'
 import PasswordLockScreen from '@/components/PasswordLockScreen'
 
+interface StatisticsViewProps {
+  onCalculate: () => void
+  stats: Map<string, DailyStats>
+}
+
+const StatisticsView: React.FC<StatisticsViewProps> = ({
+  onCalculate,
+  stats,
+}) => {
+  return (
+    <div className='min-h-dvh bg-background pb-20 text-foreground'>
+      <Header title='统计' />
+
+      <main className='mx-auto max-w-4xl px-4 pt-[calc(5.25rem+env(safe-area-inset-top))] md:px-8'>
+        <section className='mb-8'>
+          <p className='text-xs font-medium uppercase tracking-[0.24em] text-muted md:text-sm'>
+            Analytics
+          </p>
+          <h2 className='mt-3 text-3xl font-semibold tracking-tight md:text-4xl'>
+            查看每日订单汇总与营业表现
+          </h2>
+          <p className='mt-3 max-w-2xl text-sm leading-6 text-muted md:text-base'>
+            统计会基于当前设备中的订单数据生成每日汇总，方便你快速查看流水与订单量。
+          </p>
+        </section>
+
+        <div className='space-y-6'>
+          <StatisticsControls onCalculate={onCalculate} />
+          <DailyStatsCard stats={stats} />
+        </div>
+      </main>
+    </div>
+  )
+}
+
 const Statistic: React.FC = () => {
   const orders = useOrderStore((state) => state.orders)
   const { enabled, isAuthenticated, authenticate, reset } =
@@ -21,7 +56,7 @@ const Statistic: React.FC = () => {
   useEffect(() => {
     reset()
     setStats(new Map<string, DailyStats>())
-  }, [])
+  }, [reset])
 
   const handleStatistics = () => {
     setStats(calculateDailyStats(orders))
@@ -32,52 +67,19 @@ const Statistic: React.FC = () => {
   }
 
   const handleCancel = () => {
-    // 返回首页
     navigate('/', {
       replace: true,
     })
   }
 
-  // 如果认证功能未启用，直接显示统计内容
-  if (!enabled) {
-    return (
-      <div className='min-h-screen bg-base-100 pb-20'>
-        {/* 顶部导航栏 */}
-        <Header title='统计' />
-
-        {/* 主内容区 */}
-        <div className='pt-[calc(5rem+env(safe-area-inset-top))] px-4 md:px-8 max-w-4xl mx-auto'>
-          {/* 统计操作部分 */}
-          <StatisticsControls onCalculate={handleStatistics} />
-
-          {/* 统计结果展示部分 */}
-          <DailyStatsCard stats={stats} />
-        </div>
-      </div>
-    )
-  }
-
-  // 未认证时显示密码输入界面
-  if (!isAuthenticated) {
+  if (enabled && !isAuthenticated) {
     return (
       <PasswordLockScreen onUnlock={handleUnlock} onCancel={handleCancel} />
     )
   }
 
   return (
-    <div className='min-h-screen bg-base-100 pb-20'>
-      {/* 顶部导航栏 */}
-      <Header title='统计' />
-
-      {/* 主内容区 */}
-      <div className='pt-[calc(5rem+env(safe-area-inset-top))] px-4 md:px-8 max-w-4xl mx-auto'>
-        {/* 统计操作部分 */}
-        <StatisticsControls onCalculate={handleStatistics} />
-
-        {/* 统计结果展示部分 */}
-        <DailyStatsCard stats={stats} />
-      </div>
-    </div>
+    <StatisticsView onCalculate={handleStatistics} stats={stats} />
   )
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { validatePassword } from '@/services/passwordValidator'
+import { Button, Card } from '@heroui/react'
 
 interface PasswordLockScreenProps {
   onUnlock: () => void
@@ -16,15 +17,19 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({
   const [success, setSuccess] = useState(false)
 
   const handleNumberClick = (num: string) => {
-    if (password.length < 6 && !success) {
-      setPassword(password + num)
-      setError(false)
-    }
+    setPassword((current) => {
+      if (current.length >= 6 || success) {
+        return current
+      }
+
+      return current + num
+    })
+    setError(false)
   }
 
   const handleDelete = () => {
     if (!success) {
-      setPassword(password.slice(0, -1))
+      setPassword((current) => current.slice(0, -1))
       setError(false)
     }
   }
@@ -62,40 +67,50 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({
   const numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '']
 
   return (
-    <div className='fixed inset-0 bg-base-200/95 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-      <div
-        className={`card bg-base-100 shadow-2xl w-full max-w-sm transition-all duration-300 ${shake
+    <div
+      className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-md'
+      role='dialog'
+      aria-modal='true'
+      aria-labelledby='password-lock-title'
+    >
+      <Card.Root
+        variant='default'
+        className={`w-full max-w-sm border border-border/70 bg-overlay p-0 shadow-overlay transition-all duration-300 ${shake
             ? 'animate-shake'
             : success
               ? 'scale-105 opacity-0'
               : 'scale-100'
           }`}
       >
-        <div className='card-body'>
-          <h2 className='card-title text-center text-2xl font-bold mb-6'>
+        <Card.Content className='px-6 py-6'>
+          <Card.Title
+            id='password-lock-title'
+            className='mb-2 text-center text-2xl font-semibold'
+          >
             {success ? '验证成功' : '请输入密码'}
-          </h2>
+          </Card.Title>
+          <Card.Description className='mb-6 text-center leading-6'>
+            输入 6 位密码以继续访问受保护内容。
+          </Card.Description>
 
-          {/* 密码显示区域 */}
-          <div className='flex justify-center gap-4 mb-8'>
+          <div className='mb-8 flex justify-center gap-4'>
             {[...Array(6)].map((_, index) => (
               <div
                 key={index}
-                className={`w-5 h-5 rounded-full border-2 transition-all duration-300 ${index < password.length
+                className={`size-5 rounded-full border-2 transition-all duration-300 ${index < password.length
                     ? success
-                      ? 'bg-success border-success scale-110'
-                      : 'bg-primary border-primary scale-110'
-                    : 'border-base-300'
+                      ? 'scale-110 border-success bg-success'
+                      : 'scale-110 border-accent bg-accent'
+                    : 'border-border-secondary'
                   }`}
                 aria-label={`密码位 ${index + 1}`}
               />
             ))}
           </div>
 
-          {/* 错误提示 */}
           {error && !success && (
             <div
-              className='text-error text-center mb-4 font-medium animate-pulse'
+              className='mb-4 text-center font-medium text-danger motion-safe:animate-pulse'
               role='alert'
               aria-live='polite'
             >
@@ -103,10 +118,9 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({
             </div>
           )}
 
-          {/* 成功提示 */}
           {success && (
             <div
-              className='text-success text-center mb-4 font-medium'
+              className='mb-4 text-center font-medium text-success'
               role='status'
               aria-live='polite'
             >
@@ -114,9 +128,8 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({
             </div>
           )}
 
-          {/* 数字键盘 */}
           <div
-            className='grid grid-cols-3 gap-3 mb-4'
+            className='mb-4 grid grid-cols-3 gap-3'
             role='group'
             aria-label='数字键盘'
           >
@@ -125,53 +138,52 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({
                 return <div key={index} className='aspect-square' />
               }
               return (
-                <button
+                <Button.Root
                   key={num}
-                  onClick={() => handleNumberClick(num)}
-                  disabled={success}
-                  className={`btn btn-lg btn-circle btn-ghost text-2xl font-semibold
-                    hover:bg-base-200 active:bg-base-300 active:scale-95
-                    transition-all duration-150 min-h-14 min-w-14
-                    ${success ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className='mx-auto size-14 rounded-full p-0 text-2xl font-semibold'
                   aria-label={`数字 ${num}`}
-                  tabIndex={0}
+                  isDisabled={success}
+                  variant='ghost'
+                  onPress={() => handleNumberClick(num)}
                 >
                   {num}
-                </button>
+                </Button.Root>
               )
             })}
           </div>
 
-          {/* 操作按钮 */}
           <div className='flex gap-3'>
             {password.length === 0 && onCancel && (
-              <button
-                onClick={onCancel}
-                className='btn btn-outline flex-1 h-12 min-h-12'
-                disabled={success}
+              <Button.Root
+                className='flex-1'
+                isDisabled={success}
+                variant='outline'
+                onPress={onCancel}
               >
                 取消
-              </button>
+              </Button.Root>
             )}
             {password.length > 0 && (
-              <button
-                onClick={handleDelete}
-                className='btn btn-ghost flex-1 h-12 min-h-12'
-                disabled={success}
+              <Button.Root
+                className='flex-1'
+                isDisabled={success}
+                variant='ghost'
+                onPress={handleDelete}
               >
                 删除
-              </button>
+              </Button.Root>
             )}
-            <button
-              onClick={handleConfirm}
-              className='btn btn-primary flex-1 h-12 min-h-12'
-              disabled={password.length === 0 || success}
+            <Button.Root
+              className='flex-1'
+              isDisabled={password.length === 0 || success}
+              variant='primary'
+              onPress={handleConfirm}
             >
               确认
-            </button>
+            </Button.Root>
           </div>
-        </div>
-      </div>
+        </Card.Content>
+      </Card.Root>
 
       <style>{`
         @keyframes shake {

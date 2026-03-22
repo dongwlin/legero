@@ -1,6 +1,9 @@
 import React from 'react'
+import { Button } from '@heroui/react'
 import { ADJUSTMENT_OPTIONS } from '../constants'
 import { Adjustment, NoodleType } from '@/types'
+import OrderField from '../OrderField'
+import { OrderCompactSelect } from '../OrderCompactSelect'
 
 interface NoodleAmountSelectorProps {
   noodleType: NoodleType
@@ -25,45 +28,44 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
 }) => {
   if (noodleType === '伊面') {
     return (
-      <label className='fieldset-label text-xl'>
-        <span className='mr-2'>面饼</span>
-        <div className='flex gap-2 items-center'>
-          <button
-            className='btn text-xl'
-            onClick={() =>
+      <OrderField label='面饼' contentClassName='flex flex-1 flex-col justify-center'>
+        <div className='flex items-center gap-3'>
+          <Button.Root
+            isIconOnly
+            variant='secondary'
+            className='size-11 rounded-xl text-xl touch-manipulation md:size-12'
+            aria-label='减少面饼'
+            onPress={() =>
               onExtraNoodleBlocksChange(Math.max(extraNoodleBlocks - 1, 0))
             }
-            aria-label='减少面饼'
           >
             -
-          </button>
-          <span className='text-xl'>{extraNoodleBlocks + 1}</span>
-          <button
-            className='btn text-xl'
-            onClick={() => onExtraNoodleBlocksChange(extraNoodleBlocks + 1)}
+          </Button.Root>
+          <div className='min-w-14 text-center text-2xl font-semibold tabular-nums text-foreground md:min-w-16 md:text-[28px]'>
+            {extraNoodleBlocks + 1}
+          </div>
+          <Button.Root
+            isIconOnly
+            variant='secondary'
+            className='size-11 rounded-xl text-xl touch-manipulation md:size-12'
             aria-label='增加面饼'
+            onPress={() => onExtraNoodleBlocksChange(extraNoodleBlocks + 1)}
           >
             +
-          </button>
+          </Button.Root>
         </div>
-      </label>
+      </OrderField>
     )
   }
 
   return (
-    <label className='fieldset-label text-xl'>
-      <span className='mr-2'>粉量</span>
-      <select
-        name='noodleAmount'
-        className='select text-xl'
+    <OrderField label='粉量' contentClassName='flex flex-1 flex-col justify-center'>
+      <OrderCompactSelect
+        isDisabled={!includeNoodles}
+        options={ADJUSTMENT_OPTIONS.slice(0, 3)}
         value={noodleAmount}
-        onChange={(e) => onNoodleAmountChange(e.target.value as Adjustment)}
-        disabled={!includeNoodles}
-      >
-        {ADJUSTMENT_OPTIONS.slice(0, 3).map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-    </label>
+        onChange={onNoodleAmountChange}
+      />
+    </OrderField>
   )
 }

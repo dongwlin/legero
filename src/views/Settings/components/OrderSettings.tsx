@@ -1,5 +1,7 @@
 import { useOrderSettingsStore } from '@/store/orderSettings'
+import { Input } from '@heroui/react'
 import React from 'react'
+import SettingsSection from './SettingsSection'
 
 const OrderSettings: React.FC = () => {
   const { waitTimeThresholdMinutes, setWaitTimeThresholdMinutes } =
@@ -13,23 +15,34 @@ const OrderSettings: React.FC = () => {
   }
 
   return (
-    <div className='card bg-base-200 shadow-lg rounded-xl mb-6'>
-      <div className='card-body p-6'>
-        <h2 className='card-title text-lg md:text-xl mb-4'>订单设置</h2>
-        <div className='form-control'>
-          <p className='text-base-content/70 mb-4'>等待时间超时警告(分钟)</p>
-          <input
-            type='number'
-            min='0'
-            step='1'
-            value={waitTimeThresholdMinutes}
-            onChange={handleThresholdChange}
-            className='input input-bordered w-full'
-            placeholder='请输入分钟数，设置为 0 时不显示警告'
-          />
-        </div>
+    <SettingsSection
+      title='订单设置'
+      description='调整订单等待超时的提醒阈值。'
+    >
+      <div className='space-y-3'>
+        <label
+          htmlFor='wait-time-threshold'
+          className='text-sm font-medium text-foreground'
+        >
+          等待时间超时警告（分钟）
+        </label>
+        <Input.Root
+          fullWidth
+          id='wait-time-threshold'
+          inputMode='numeric'
+          min='0'
+          placeholder='请输入分钟数，设置为 0 时不显示警告'
+          step='1'
+          type='number'
+          value={waitTimeThresholdMinutes}
+          variant='secondary'
+          onChange={handleThresholdChange}
+        />
+        <p className='text-sm leading-6 text-muted'>
+          超过该时长的订单会被标记为超时，设置为 `0` 时关闭提醒。
+        </p>
       </div>
-    </div>
+    </SettingsSection>
   )
 }
 

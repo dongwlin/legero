@@ -6,12 +6,12 @@ import OrderList from './components/list/OrderList'
 
 const Order: React.FC = () => {
   return (
-    <div className='h-screen bg-base-100 flex flex-col'>
+    <div className='flex h-screen flex-col bg-background text-foreground'>
       {/* 顶部导航栏 */}
       <Header title='订单' />
 
       {/* 主内容区 - 使用 flex-1 占据剩余空间 */}
-      <div className='flex-1 flex flex-col pt-[calc(5rem+env(safe-area-inset-top))] px-4 md:px-8 max-w-4xl mx-auto w-full h-full overflow-hidden'>
+      <div className='mx-auto flex h-full w-full max-w-5xl flex-1 flex-col overflow-hidden px-4 pt-[calc(4.75rem+env(safe-area-inset-top))] md:px-8'>
         {/* 控制面板部分 (统计、筛选、创建) */}
         <div className='flex-none'>
           <OrderControls />
