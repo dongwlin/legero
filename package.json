@@ -20,7 +20,6 @@
     "@heroui/styles": "^3.0.1",
     "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^25.0.7",
-    "daisyui": "^5.5.14",
     "dayjs": "^1.11.19",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
