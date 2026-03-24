@@ -16,7 +16,7 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
 }) => {
   return (
     <OrderField label='数量' contentClassName='flex flex-1 flex-col justify-center'>
-      <div className='flex items-center gap-3'>
+      <div className='flex items-center gap-2'>
         <Button.Root
           isIconOnly
           variant='secondary'

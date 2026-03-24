@@ -32,7 +32,7 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
   if (noodleType === '伊面') {
     return (
       <OrderField label='面饼' contentClassName='flex flex-1 flex-col justify-center'>
-        <div className='flex items-center gap-3'>
+        <div className='flex items-center gap-2'>
           <Button.Root
             isIconOnly
             variant='secondary'
@@ -85,7 +85,7 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
 
   return (
     <OrderField label='粉量' contentClassName='flex flex-1 flex-col justify-center'>
-      <div className='flex items-center gap-3'>
+      <div className='flex items-center gap-2'>
         <Button.Root
           isIconOnly
           isDisabled={isDecreaseDisabled}

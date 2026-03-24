@@ -234,7 +234,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                       <div className='flex flex-col'>
                         <div className='pb-2.5'>
                           {isCreateMode ? (
-                            <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_12rem_1px_11rem] md:gap-x-4'>
+                            <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_12rem_1px_12rem] md:gap-x-4'>
                               <div className='h-full'>
                                 <NoodleSelector
                                   includeNoodles={item.includeNoodles}
