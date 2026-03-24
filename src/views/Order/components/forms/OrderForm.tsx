@@ -222,7 +222,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                       onPress={close}
                     />
 
-                    <Modal.Header className='border-b border-border/60 px-4 py-3 pr-14 md:px-5 md:pr-16'>
+                    <Modal.Header className='border-b border-border/60 py-4'>
                       <div className='flex items-center gap-3'>
                         <h2 className='text-xl font-semibold text-foreground md:text-2xl'>
                           {formTitle}
@@ -230,7 +230,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                       </div>
                     </Modal.Header>
 
-                    <Modal.Body className='px-4 py-2.5 md:px-5'>
+                    <Modal.Body className='py-4'>
                       <div className='flex flex-col'>
                         <div className='pb-2.5'>
                           {isCreateMode ? (
