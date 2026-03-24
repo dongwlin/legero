@@ -5,7 +5,7 @@ import {
   OrderItem as OI,
   StepStatus,
 } from '@/types'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import {
   getMeatsRequest,
@@ -20,7 +20,6 @@ import dayjs from 'dayjs'
 type OrderItemProps = {
   order: OI
   now: number
-  layoutWidth: number
 }
 
 const getNoodleTypeClass = (noodleType: NoodleType | undefined): string => {
@@ -101,20 +100,13 @@ const getServeMealButtonProps = ({
   }
 }
 
+const SEVERE_TIMEOUT_SECONDS = 60 * 60
+
 const formatWaitTime = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
+  const minutes = Math.floor(seconds / 60)
   const secs = seconds % 60
 
-  if (hours > 0) {
-    return `${hours} 小时 ${minutes} 分 ${secs} 秒`
-  }
-
-  if (minutes > 0) {
-    return `${minutes} 分 ${secs} 秒`
-  }
-
-  return `${secs} 秒`
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
 const renderHighlightedForbiddenText = (text: string): React.ReactNode => {
@@ -134,34 +126,13 @@ const renderHighlightedForbiddenText = (text: string): React.ReactNode => {
   ))
 }
 
-const OrderItem: React.FC<OrderItemProps> = ({ order, now, layoutWidth }) => {
+const OrderItem: React.FC<OrderItemProps> = ({ order, now }) => {
   const item = order
   const removeOrder = useOrderStore((state) => state.removeOrder)
   const updateOrder = useOrderStore((state) => state.updateOrder)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
   const { waitTimeThresholdMinutes } = useOrderSettingsStore()
-
-  const createdAtRef = useRef<HTMLSpanElement>(null)
-  const waitTimeRef = useRef<HTMLSpanElement>(null)
-  const [showWaitTimeSeparator, setShowWaitTimeSeparator] = useState(true)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-
-  // 每秒更新当前时间以实现实时等待时间显示
-
-  useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      if (item.completedAt || !createdAtRef.current || !waitTimeRef.current) {
-        setShowWaitTimeSeparator(false)
-        return
-      }
-
-      setShowWaitTimeSeparator(
-        waitTimeRef.current.offsetTop === createdAtRef.current.offsetTop
-      )
-    })
-
-    return () => window.cancelAnimationFrame(frameId)
-  }, [item.id, item.createdAt, item.completedAt, now, layoutWidth])
 
 
   // 计算等待时间（秒）
@@ -174,6 +145,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, now, layoutWidth }) => {
     waitTime > 0 &&
     waitTimeThresholdMinutes > 0 &&
     waitTime / 60 >= waitTimeThresholdMinutes
+  const isSevereTimeout = !item.completedAt && waitTime >= SEVERE_TIMEOUT_SECONDS
 
   const id = item.id.length === 12 ? Number(item.id.substring(8, 12)) : item.id
   const noodleTypeClass = getNoodleTypeClass(item.noodleType)
@@ -182,10 +154,11 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, now, layoutWidth }) => {
   const req = getOtherRequest(item)
   const noodleStepButton = getStepButtonProps(item.progress.noodles)
   const meatStepButton = getStepButtonProps(item.progress.meat)
-  const waitTimeToneClass = isWaitTimeOverThreshold ? 'text-danger' : 'text-warning'
+  const waitTimeToneClass =
+    isSevereTimeout || isWaitTimeOverThreshold ? 'text-danger' : 'text-warning'
   const orderCardToneClass = item.completedAt
     ? 'border-success/25'
-    : isWaitTimeOverThreshold
+    : isSevereTimeout || isWaitTimeOverThreshold
       ? 'border-warning/35'
       : 'border-border/70'
   const needsNoodleCompletion =
@@ -384,15 +357,26 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, now, layoutWidth }) => {
           </div>
 
           <div className='flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted md:text-base'>
-            <span ref={createdAtRef} className='font-mono tabular-nums'>
+            <span className='font-mono tabular-nums'>
               {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
             </span>
             {!item.completedAt ? (
-              <span ref={waitTimeRef} className='inline-flex items-center gap-2'>
-                {showWaitTimeSeparator ? <span aria-hidden='true'>|</span> : null}
-                <span className={`font-semibold ${waitTimeToneClass}`}>
-                  {formatWaitTime(waitTime)}
-                </span>
+              <span className='inline-flex items-center gap-2 whitespace-nowrap'>
+                <span
+                  aria-hidden='true'
+                  className='inline-block h-[1em] w-px shrink-0 rounded-full bg-current opacity-60'
+                />
+                {isSevereTimeout ? (
+                  <span
+                    className={`font-mono tabular-nums ${waitTimeToneClass}`}
+                  >
+                    --:--
+                  </span>
+                ) : (
+                  <span className={`font-mono tabular-nums ${waitTimeToneClass}`}>
+                    {formatWaitTime(waitTime)}
+                  </span>
+                )}
               </span>
             ) : null}
           </div>
@@ -408,10 +392,6 @@ const areOrderItemPropsEqual = (
   nextProps: OrderItemProps,
 ) => {
   if (prevProps.order !== nextProps.order) {
-    return false
-  }
-
-  if (prevProps.layoutWidth !== nextProps.layoutWidth) {
     return false
   }
 

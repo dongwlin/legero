@@ -12,7 +12,6 @@ const DEFAULT_ORDER_ROW_HEIGHT = 280
 type RowProps = {
   orders: OrderItemType[]
   now: number
-  listWidth: number
 }
 
 type VirtualOrderListProps = {
@@ -21,11 +20,11 @@ type VirtualOrderListProps = {
   rowHeightCacheKey: string
 }
 
-const Row = ({ index, style, orders, now, listWidth }: RowComponentProps<RowProps>) => {
+const Row = ({ index, style, orders, now }: RowComponentProps<RowProps>) => {
   const order = orders[index]
   return (
     <div style={style} className='px-1 py-2 md:px-2'>
-      <OrderItem order={order} now={now} layoutWidth={listWidth} />
+      <OrderItem order={order} now={now} />
     </div>
   )
 }
@@ -81,7 +80,6 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
               rowProps={{
                 orders: filteredOrders,
                 now,
-                listWidth: width ?? 0,
               }}
               rowComponent={Row}
               overscanCount={5}
