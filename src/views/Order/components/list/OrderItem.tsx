@@ -309,7 +309,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, now, layoutWidth }) => {
             <div className='flex shrink-0 gap-3 self-start'>
               <Button.Root
                 isIconOnly
-                className='size-12 rounded-2xl touch-manipulation md:size-14'
+                className='size-12 rounded-2xl border border-border/70 bg-background/95 shadow-sm touch-manipulation transition-[background-color,border-color,box-shadow] duration-200 data-[hovered=true]:border-border-secondary data-[hovered=true]:bg-background data-[hovered=true]:shadow-md md:size-14'
                 variant='secondary'
                 aria-label='编辑订单'
                 onPress={() => setUpdateTargetID(item.id)}
