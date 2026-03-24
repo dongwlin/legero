@@ -117,7 +117,12 @@ const OrderList: React.FC = () => {
       case 'uncompleted':
         return orders.filter((order) => !order.completedAt)
       case 'completed':
-        return orders.filter((order) => !!order.completedAt)
+        return orders
+          .filter((order) => !!order.completedAt)
+          .sort(
+            (a, b) =>
+              new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime(),
+          )
       default:
         return orders
     }
