@@ -5,6 +5,9 @@ import OrderField from '../OrderField'
 
 const NOODLE_AMOUNT_LEVELS: readonly Adjustment[] = ['少', '正常', '多']
 
+const getNoodleAmountLabel = (amount: Adjustment) =>
+  amount === '正常' ? '标' : amount
+
 interface NoodleAmountSelectorProps {
   noodleType: NoodleType
   noodleAmount: Adjustment
@@ -94,7 +97,7 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
           -
         </Button.Root>
         <div className='min-w-14 text-center text-xl font-semibold text-foreground md:min-w-16 md:text-2xl'>
-          {NOODLE_AMOUNT_LEVELS[safeLevelIndex]}
+          {getNoodleAmountLabel(NOODLE_AMOUNT_LEVELS[safeLevelIndex])}
         </div>
         <Button.Root
           isIconOnly

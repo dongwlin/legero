@@ -16,13 +16,12 @@ const OrderField: React.FC<OrderFieldProps> = ({
   label,
 }) => {
   const hasHeader = Boolean(label || description)
+  const contentClasses = `min-h-0 ${contentClassName}`.trim()
 
   return (
-    <section
-      className={`flex h-full flex-col rounded-xl border border-border/60 bg-background-secondary/50 p-3 ${className}`.trim()}
-    >
+    <section className={`flex h-full min-w-0 flex-col ${className}`.trim()}>
       {hasHeader ? (
-        <div className={description ? 'mb-2.5' : 'mb-2'}>
+        <div className={description ? 'mb-2' : 'mb-1.5'}>
           {label ? (
             <h3 className='text-sm font-semibold text-foreground md:text-[15px]'>
               {label}
@@ -35,7 +34,7 @@ const OrderField: React.FC<OrderFieldProps> = ({
           ) : null}
         </div>
       ) : null}
-      <div className={contentClassName}>{children}</div>
+      <div className={contentClasses}>{children}</div>
     </section>
   )
 }

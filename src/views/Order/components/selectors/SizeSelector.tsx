@@ -36,8 +36,11 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
   }, [includeNoodles, noodleType])
 
   return (
-    <OrderField>
-      <div className='flex flex-wrap gap-3'>
+    <OrderField
+      label=''
+      contentClassName='flex flex-1 flex-col justify-center'
+    >
+      <div className='flex flex-wrap gap-2.5'>
         {SIZES.filter((option) => option !== '自定义').map((option) => (
           <Button.Root
             key={option}

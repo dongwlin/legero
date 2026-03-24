@@ -19,7 +19,7 @@ export const MeatSelector: React.FC<MeatSelectorProps> = ({
   showPorkKidney,
 }) => {
   return (
-    <OrderField>
+    <OrderField label=''>
       <div className='grid grid-cols-2 gap-2.5 sm:grid-cols-3'>
         {MEAT_OPTIONS.map((meat) => {
           // 猪腰只在非小份时显示

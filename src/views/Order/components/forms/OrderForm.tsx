@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { CarbonAdd } from '@/components/Icon'
-import { Button, CloseButton, Modal, TextArea } from '@heroui/react'
+import { Button, CloseButton, Modal, Separator, TextArea } from '@heroui/react'
 import {
   OrderItem,
   Adjustment,
@@ -20,6 +20,10 @@ import { MeatSelector } from '../selectors/MeatSelector'
 import { IngredientSelector } from '../selectors/IngredientSelector'
 import { DiningSelector } from '../selectors/DiningSelector'
 import OrderField from '../OrderField'
+
+const sectionSeparatorClassName = 'w-full border-t border-border/60'
+const columnSeparatorClassName =
+  'hidden w-0 self-stretch border-l border-border/60 md:block'
 
 interface OrderFormProps {
   mode: FormMode
@@ -226,126 +230,155 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                       </div>
                     </Modal.Header>
 
-                    <Modal.Body className='space-y-3 px-4 py-3 md:px-5'>
-                      {isCreateMode ? (
-                        <div className='grid items-stretch gap-3 md:grid-cols-[minmax(0,1fr)_12rem_11rem]'>
-                          <div className='h-full'>
-                            <NoodleSelector
-                              includeNoodles={item.includeNoodles}
-                              noodleType={item.noodleType}
-                              onIncludeNoodlesChange={handleIncludeNoodlesChange}
-                              onNoodleTypeChange={(type) => updateItem('noodleType', type)}
-                            />
-                          </div>
-                          <div className='h-full'>
-                            <NoodleAmountSelector
-                              noodleType={item.noodleType}
-                              noodleAmount={item.noodleAmount}
-                              extraNoodleBlocks={item.extraNoodleBlocks}
-                              includeNoodles={item.includeNoodles}
-                              onNoodleAmountChange={handleNoodleAmountChange}
-                              onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
-                            />
-                          </div>
-                          <div className='h-full'>
-                            <QuantitySelector
-                              num={num || 1}
-                              setNum={setNum || (() => { })}
-                            />
-                          </div>
+                    <Modal.Body className='px-4 py-2.5 md:px-5'>
+                      <div className='flex flex-col'>
+                        <div className='pb-2.5'>
+                          {isCreateMode ? (
+                            <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_12rem_1px_11rem] md:gap-x-4'>
+                              <div className='h-full'>
+                                <NoodleSelector
+                                  includeNoodles={item.includeNoodles}
+                                  noodleType={item.noodleType}
+                                  onIncludeNoodlesChange={handleIncludeNoodlesChange}
+                                  onNoodleTypeChange={(type) => updateItem('noodleType', type)}
+                                />
+                              </div>
+                              <Separator
+                                orientation='vertical'
+                                className={columnSeparatorClassName}
+                              />
+                              <div className='h-full'>
+                                <NoodleAmountSelector
+                                  noodleType={item.noodleType}
+                                  noodleAmount={item.noodleAmount}
+                                  extraNoodleBlocks={item.extraNoodleBlocks}
+                                  includeNoodles={item.includeNoodles}
+                                  onNoodleAmountChange={handleNoodleAmountChange}
+                                  onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
+                                />
+                              </div>
+                              <Separator
+                                orientation='vertical'
+                                className={columnSeparatorClassName}
+                              />
+                              <div className='h-full'>
+                                <QuantitySelector
+                                  num={num || 1}
+                                  setNum={setNum || (() => { })}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <NoodleSelector
+                                includeNoodles={item.includeNoodles}
+                                noodleType={item.noodleType}
+                                onIncludeNoodlesChange={handleIncludeNoodlesChange}
+                                onNoodleTypeChange={(type) => updateItem('noodleType', type)}
+                              />
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div>
-                          <NoodleSelector
-                            includeNoodles={item.includeNoodles}
-                            noodleType={item.noodleType}
-                            onIncludeNoodlesChange={handleIncludeNoodlesChange}
-                            onNoodleTypeChange={(type) => updateItem('noodleType', type)}
+
+                        <Separator className={sectionSeparatorClassName} />
+
+                        <div className='py-2.5'>
+                          {isCreateMode ? (
+                            <div>
+                              <SizeSelector
+                                size={item.size}
+                                includeNoodles={item.includeNoodles}
+                                noodleType={item.noodleType}
+                                customSizePrice={item.customSizePrice}
+                                onSizeChange={(size) => updateItem('size', size)}
+                                onCustomSizePriceChange={handleCustomSizePriceChange}
+                                showCustomPrice={showCustomPrice}
+                              />
+                            </div>
+                          ) : (
+                            <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] md:gap-x-4'>
+                              <div className='h-full'>
+                                <SizeSelector
+                                  size={item.size}
+                                  includeNoodles={item.includeNoodles}
+                                  noodleType={item.noodleType}
+                                  customSizePrice={item.customSizePrice}
+                                  onSizeChange={(size) => updateItem('size', size)}
+                                  onCustomSizePriceChange={handleCustomSizePriceChange}
+                                  showCustomPrice={showCustomPrice}
+                                />
+                              </div>
+
+                              <Separator
+                                orientation='vertical'
+                                className={columnSeparatorClassName}
+                              />
+
+                              <div className='h-full'>
+                                <NoodleAmountSelector
+                                  noodleType={item.noodleType}
+                                  noodleAmount={item.noodleAmount}
+                                  extraNoodleBlocks={item.extraNoodleBlocks}
+                                  includeNoodles={item.includeNoodles}
+                                  onNoodleAmountChange={handleNoodleAmountChange}
+                                  onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <Separator className={sectionSeparatorClassName} />
+
+                        <div className='py-2.5'>
+                          <MeatSelector
+                            availableMeats={item.meats.available}
+                            onMeatChange={updateMeats}
+                            showPorkKidney={showPorkKidney}
                           />
                         </div>
-                      )}
 
-                      {isCreateMode ? (
-                        <div>
-                          <SizeSelector
-                            size={item.size}
-                            includeNoodles={item.includeNoodles}
-                            noodleType={item.noodleType}
-                            customSizePrice={item.customSizePrice}
-                            onSizeChange={(size) => updateItem('size', size)}
-                            onCustomSizePriceChange={handleCustomSizePriceChange}
-                            showCustomPrice={showCustomPrice}
+                        <Separator className={sectionSeparatorClassName} />
+
+                        <div className='py-2.5'>
+                          <IngredientSelector
+                            greens={item.ingredients.greens}
+                            scallion={item.ingredients.scallion}
+                            pepper={item.ingredients.pepper}
+                            onGreensChange={handleGreensChange}
+                            onScallionChange={handleScallionChange}
+                            onPepperChange={handlePepperChange}
                           />
                         </div>
-                      ) : (
-                        <div className='grid items-stretch gap-3 md:grid-cols-2'>
-                          <div className='h-full'>
-                            <SizeSelector
-                              size={item.size}
-                              includeNoodles={item.includeNoodles}
-                              noodleType={item.noodleType}
-                              customSizePrice={item.customSizePrice}
-                              onSizeChange={(size) => updateItem('size', size)}
-                              onCustomSizePriceChange={handleCustomSizePriceChange}
-                              showCustomPrice={showCustomPrice}
-                            />
-                          </div>
 
-                          <div className='h-full'>
-                            <NoodleAmountSelector
-                              noodleType={item.noodleType}
-                              noodleAmount={item.noodleAmount}
-                              extraNoodleBlocks={item.extraNoodleBlocks}
-                              includeNoodles={item.includeNoodles}
-                              onNoodleAmountChange={handleNoodleAmountChange}
-                              onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        <Separator className={sectionSeparatorClassName} />
 
-                      <div>
-                        <MeatSelector
-                          availableMeats={item.meats.available}
-                          onMeatChange={updateMeats}
-                          showPorkKidney={showPorkKidney}
-                        />
-                      </div>
-
-                      <div>
-                        <IngredientSelector
-                          greens={item.ingredients.greens}
-                          scallion={item.ingredients.scallion}
-                          pepper={item.ingredients.pepper}
-                          onGreensChange={handleGreensChange}
-                          onScallionChange={handleScallionChange}
-                          onPepperChange={handlePepperChange}
-                        />
-                      </div>
-
-                      <div>
-                        <DiningSelector
-                          diningMethod={item.dining.diningMethod}
-                          packaging={item.dining.packaging}
-                          packagingMethod={item.dining.packagingMethod}
-                          onDiningMethodChange={handleDiningMethodChange}
-                          onPackagingChange={handlePackingChange}
-                          onPackagingMethodChange={handlePackingMethodChange}
-                          showTakeoutOptions={showTakeoutOptions}
-                        />
-                      </div>
-
-                      <div>
-                        <OrderField label='备注'>
-                          <TextArea
-                            fullWidth
-                            rows={3}
-                            variant='secondary'
-                            className='min-h-20 rounded-xl'
-                            value={item.note}
-                            onChange={handleNoteChange}
+                        <div className='py-2.5'>
+                          <DiningSelector
+                            diningMethod={item.dining.diningMethod}
+                            packaging={item.dining.packaging}
+                            packagingMethod={item.dining.packagingMethod}
+                            onDiningMethodChange={handleDiningMethodChange}
+                            onPackagingChange={handlePackingChange}
+                            onPackagingMethodChange={handlePackingMethodChange}
+                            showTakeoutOptions={showTakeoutOptions}
                           />
-                        </OrderField>
+                        </div>
+
+                        <Separator className={sectionSeparatorClassName} />
+
+                        <div className='pt-2.5'>
+                          <OrderField label=''>
+                            <TextArea
+                              fullWidth
+                              rows={3}
+                              variant='secondary'
+                              className='min-h-20 rounded-xl'
+                              value={item.note}
+                              onChange={handleNoteChange}
+                            />
+                          </OrderField>
+                        </div>
                       </div>
                     </Modal.Body>
 
