@@ -232,7 +232,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                       </div>
                     </Modal.Header>
 
-                    <Modal.Body className='py-4'>
+                    <Modal.Body className='pt-2 pb-4'>
                       <div className='flex flex-col'>
                         <div className='pb-2.5'>
                           {isCreateMode ? (
