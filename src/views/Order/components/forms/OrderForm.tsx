@@ -369,7 +369,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
 
                         <Separator className={sectionSeparatorClassName} />
 
-                        <div className='pt-2.5'>
+                        <div className='pt-2.5 p-1'>
                           <OrderField label=''>
                             <TextArea
                               fullWidth
