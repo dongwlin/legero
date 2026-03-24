@@ -356,7 +356,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, now }) => {
             </Button.Root>
           </div>
 
-          <div className='flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted md:text-base'>
+          <div className='flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted md:text-lg'>
             <span className='font-mono tabular-nums'>
               {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
             </span>
