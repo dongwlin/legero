@@ -23,9 +23,8 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
 }) => {
   return (
     <OrderField>
-      <div className='space-y-3'>
-        <div className='flex items-center justify-between rounded-xl border border-border/60 bg-background px-3 py-2.5'>
-          <div className='text-sm font-medium text-foreground md:text-base'>带粉</div>
+      <div className='flex flex-wrap items-center gap-3'>
+        <div className='flex h-11 items-center md:h-12'>
           <Switch.Root
             aria-label='是否带粉'
             className='shrink-0'
@@ -38,8 +37,10 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
           </Switch.Root>
         </div>
         <ToggleButtonGroup
+          className='flex flex-1 flex-wrap gap-3'
           options={NOODLE_TYPES}
-          value={noodleType}
+          value={includeNoodles ? noodleType : undefined}
+          isDisabled={!includeNoodles}
           onChange={onNoodleTypeChange}
         />
       </div>

@@ -2,7 +2,7 @@ import { Button } from '@heroui/react'
 
 interface ToggleButtonGroupProps<T extends string> {
   options: readonly T[]
-  value: T
+  value?: T
   onChange: (value: T) => void
   getDisplayValue?: (value: T) => string
   className?: string
