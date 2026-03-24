@@ -1,9 +1,9 @@
 import React from 'react'
 import { Button } from '@heroui/react'
-import { ADJUSTMENT_OPTIONS } from '../constants'
 import { Adjustment, NoodleType } from '@/types'
 import OrderField from '../OrderField'
-import { OrderCompactSelect } from '../OrderCompactSelect'
+
+const NOODLE_AMOUNT_LEVELS: readonly Adjustment[] = ['少', '正常', '多']
 
 interface NoodleAmountSelectorProps {
   noodleType: NoodleType
@@ -58,14 +58,55 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
     )
   }
 
+  const currentLevelIndex = NOODLE_AMOUNT_LEVELS.indexOf(noodleAmount)
+  const safeLevelIndex = currentLevelIndex === -1 ? 1 : currentLevelIndex
+  const isDecreaseDisabled = !includeNoodles || safeLevelIndex === 0
+  const isIncreaseDisabled =
+    !includeNoodles || safeLevelIndex === NOODLE_AMOUNT_LEVELS.length - 1
+
+  const handleDecrease = () => {
+    if (isDecreaseDisabled) {
+      return
+    }
+
+    onNoodleAmountChange(NOODLE_AMOUNT_LEVELS[safeLevelIndex - 1])
+  }
+
+  const handleIncrease = () => {
+    if (isIncreaseDisabled) {
+      return
+    }
+
+    onNoodleAmountChange(NOODLE_AMOUNT_LEVELS[safeLevelIndex + 1])
+  }
+
   return (
     <OrderField label='粉量' contentClassName='flex flex-1 flex-col justify-center'>
-      <OrderCompactSelect
-        isDisabled={!includeNoodles}
-        options={ADJUSTMENT_OPTIONS.slice(0, 3)}
-        value={noodleAmount}
-        onChange={onNoodleAmountChange}
-      />
+      <div className='flex items-center gap-3'>
+        <Button.Root
+          isIconOnly
+          isDisabled={isDecreaseDisabled}
+          variant='secondary'
+          className='size-11 rounded-xl text-xl touch-manipulation md:size-12'
+          aria-label='减少粉量'
+          onPress={handleDecrease}
+        >
+          -
+        </Button.Root>
+        <div className='min-w-14 text-center text-xl font-semibold text-foreground md:min-w-16 md:text-2xl'>
+          {NOODLE_AMOUNT_LEVELS[safeLevelIndex]}
+        </div>
+        <Button.Root
+          isIconOnly
+          isDisabled={isIncreaseDisabled}
+          variant='secondary'
+          className='size-11 rounded-xl text-xl touch-manipulation md:size-12'
+          aria-label='增加粉量'
+          onPress={handleIncrease}
+        >
+          +
+        </Button.Root>
+      </div>
     </OrderField>
   )
 }
