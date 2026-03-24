@@ -9,15 +9,11 @@ export const getSizeDisplayValue = (
   includeNoodles: boolean,
   noodleType: NoodleType
 ): string => {
-  if (!includeNoodles || noodleType === '无') {
-    return size
-  }
-  
-  const isRiceNoodle = noodleType === '河粉' || noodleType === '米粉'
+  const isYiNoodle = includeNoodles && noodleType === '伊面'
   const sizeMap: Record<Size, string> = {
-    '小': isRiceNoodle ? '10' : '11',
-    '中': isRiceNoodle ? '12' : '13',
-    '大': isRiceNoodle ? '15' : '16',
+    '小': isYiNoodle ? '11' : '10',
+    '中': isYiNoodle ? '13' : '12',
+    '大': isYiNoodle ? '16' : '15',
     '自定义': '自定义',
     '无': '无'
   }
