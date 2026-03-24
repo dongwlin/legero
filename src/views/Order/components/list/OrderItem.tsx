@@ -344,7 +344,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, now, layoutWidth }) => {
                           variant='danger'
                           onPress={() => removeOrder(item.id)}
                         >
-                          确认删除
+                          确认
                         </Button.Root>
                       </AlertDialog.Footer>
                     </AlertDialog.Dialog>
