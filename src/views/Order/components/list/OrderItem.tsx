@@ -272,7 +272,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, now, layoutWidth }) => {
           <div className='flex flex-wrap items-start justify-between gap-4'>
             <div className='flex-1 space-y-3'>
               <div className='flex flex-wrap items-center gap-3'>
-                <span className='inline-flex min-h-14 min-w-16 items-center justify-center rounded-2xl border border-border/60 bg-background px-4 py-3 font-mono text-2xl font-bold tabular-nums text-foreground shadow-sm md:min-h-16 md:min-w-20 md:text-3xl'>
+                <span className='inline-flex min-h-14 min-w-16 items-center justify-center rounded-2xl border border-border/60 bg-background px-4 py-3 font-mono text-2xl font-bold tabular-nums text-muted shadow-sm md:min-h-16 md:min-w-20 md:text-3xl'>
                   {id}
                 </span>
                 {item.noodleType !== '无' ? (
