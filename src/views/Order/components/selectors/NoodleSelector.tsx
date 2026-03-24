@@ -22,7 +22,7 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
   onNoodleTypeChange,
 }) => {
   return (
-    <OrderField>
+    <OrderField contentClassName='flex flex-1 flex-col justify-center'>
       <div className='flex flex-wrap items-center gap-3'>
         <div className='flex h-11 items-center md:h-12'>
           <Switch.Root
