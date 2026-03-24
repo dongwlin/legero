@@ -24,6 +24,8 @@ import OrderField from '../OrderField'
 const sectionSeparatorClassName = 'w-full border-t border-border/60'
 const columnSeparatorClassName =
   'hidden w-0 self-stretch border-l border-border/60 md:block'
+const footerButtonClassName =
+  'h-11 min-w-20 rounded-xl px-4 text-sm font-semibold touch-manipulation md:h-12 md:text-base'
 
 interface OrderFormProps {
   mode: FormMode
@@ -383,13 +385,18 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                     </Modal.Body>
 
                     <Modal.Footer className='border-t border-border/60 px-4 py-3 md:px-5'>
-                      <div className='flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
-                        <Button.Root variant='outline' onPress={close}>
+                      <div className='flex w-full flex-row gap-4'>
+                        <Button.Root
+                          variant='outline'
+                          className={`${footerButtonClassName} basis-0 flex-1`}
+                          onPress={close}
+                        >
                           取消
                         </Button.Root>
                         <Button.Root
                           isDisabled={!isValid}
                           variant='primary'
+                          className={`${footerButtonClassName} basis-0 flex-1`}
                           onPress={() => handleSubmit(close)}
                         >
                           {submitButtonText}
