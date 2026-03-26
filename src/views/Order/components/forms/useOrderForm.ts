@@ -1,8 +1,139 @@
 import { useState, useCallback, useMemo } from 'react'
-import { OrderItem, MeatType } from '@/types'
-import { newDefaultOrderItem } from '@/services/order'
+import {
+  ADJUSTMENT,
+  DINING_METHOD,
+  MEAT,
+  PACKAGING,
+  PACKAGING_METHOD,
+  SIZE,
+  STAPLE_TYPE,
+  type MeatCode,
+  type OrderFormValue,
+  type OrderRecord,
+  type PackagingCode,
+  type PackagingMethodCode,
+  type SizeCode,
+  type StapleTypeCode,
+} from '@/types'
+import {
+  createDefaultOrderFormValue,
+  orderRecordToOrderFormValue,
+} from '@/services/orderFormAdapter'
+import { normalizeSelectedMeatCodes } from '@/services/orderDomainUtils'
 
 export type FormMode = 'create' | 'edit'
+
+const getNormalizedSizeCode = (
+  stapleTypeCode: OrderFormValue['stapleTypeCode'],
+  sizeCode: SizeCode,
+): SizeCode =>
+  stapleTypeCode === STAPLE_TYPE.rice && sizeCode === SIZE.small
+    ? SIZE.medium
+    : sizeCode
+
+const getDefaultPackagingMethodCode = (
+  diningMethodCode: OrderFormValue['diningMethodCode'],
+  stapleTypeCode: OrderFormValue['stapleTypeCode'],
+  packagingMethodCode: PackagingMethodCode | null,
+): PackagingMethodCode | null => {
+  if (diningMethodCode !== DINING_METHOD.takeout) {
+    return null
+  }
+
+  if (packagingMethodCode != null) {
+    return packagingMethodCode
+  }
+
+  return stapleTypeCode === STAPLE_TYPE.rice
+    ? PACKAGING_METHOD.separated
+    : PACKAGING_METHOD.together
+}
+
+type NormalizeFormValueStateOptions = Readonly<{
+  previousEffectiveSize?: SizeCode
+}>
+
+// 只有交互式规格切换时才自动补选猪腰。
+const normalizeSelectedMeatCodesForSizeTransition = (
+  codes: readonly MeatCode[],
+  nextEffectiveSize: SizeCode,
+  previousEffectiveSize?: SizeCode,
+): MeatCode[] => {
+  const normalizedCodes = normalizeSelectedMeatCodes(codes, nextEffectiveSize)
+
+  if (
+    previousEffectiveSize !== SIZE.small ||
+    nextEffectiveSize === SIZE.small ||
+    normalizedCodes.includes(MEAT.kidney)
+  ) {
+    return normalizedCodes
+  }
+
+  return normalizeSelectedMeatCodes(
+    [...normalizedCodes, MEAT.kidney],
+    nextEffectiveSize,
+  )
+}
+
+const normalizeFormValueState = (
+  formValue: OrderFormValue,
+  options: NormalizeFormValueStateOptions = {},
+): OrderFormValue => {
+  const sizeCode = getNormalizedSizeCode(formValue.stapleTypeCode, formValue.sizeCode)
+
+  return {
+    ...formValue,
+    sizeCode,
+    selectedMeatCodes: normalizeSelectedMeatCodesForSizeTransition(
+      formValue.selectedMeatCodes,
+      sizeCode,
+      options.previousEffectiveSize,
+    ),
+    packagingMethodCode: getDefaultPackagingMethodCode(
+      formValue.diningMethodCode,
+      formValue.stapleTypeCode,
+      formValue.packagingMethodCode,
+    ),
+  }
+}
+
+const getInitialFormValue = (initialItem?: OrderRecord): OrderFormValue =>
+  normalizeFormValueState(
+    initialItem
+      ? orderRecordToOrderFormValue(initialItem)
+      : createDefaultOrderFormValue(),
+  )
+
+const applyStapleTypeCode = (
+  previousValue: OrderFormValue,
+  stapleTypeCode: StapleTypeCode | null,
+): OrderFormValue => {
+  const previousEffectiveSize = getNormalizedSizeCode(
+    previousValue.stapleTypeCode,
+    previousValue.sizeCode,
+  )
+
+  return normalizeFormValueState(
+    {
+      ...previousValue,
+      stapleTypeCode,
+      stapleAmountCode:
+        stapleTypeCode === null
+          ? ADJUSTMENT.normal
+          : previousValue.stapleAmountCode,
+      extraStapleUnits:
+        stapleTypeCode === STAPLE_TYPE.yiNoodle
+          ? previousValue.extraStapleUnits
+          : 0,
+      packagingMethodCode:
+        previousValue.diningMethodCode === DINING_METHOD.takeout &&
+        stapleTypeCode === STAPLE_TYPE.rice
+          ? PACKAGING_METHOD.separated
+          : previousValue.packagingMethodCode,
+    },
+    { previousEffectiveSize },
+  )
+}
 
 /**
  * 订单表单自定义 Hook
@@ -11,131 +142,191 @@ export type FormMode = 'create' | 'edit'
  * @param mode - 表单模式：'create' 或 'edit'
  */
 export const useOrderForm = (
-  initialItem?: OrderItem,
+  initialItem?: OrderRecord,
   mode: FormMode = 'create',
 ) => {
   const [num, setNum] = useState<number>(1)
-  const [item, setItem] = useState<OrderItem>(
-    initialItem || newDefaultOrderItem(),
+  const [formValue, setFormValue] = useState<OrderFormValue>(() =>
+    getInitialFormValue(initialItem),
   )
 
   /**
-   * 更新订单项的顶层属性
+   * 更新订单表单字段
    */
-  const updateItem = useCallback(
-    <K extends keyof OrderItem>(key: K, value: OrderItem[K]) => {
-      setItem((prev) => ({ ...prev, [key]: value }))
+  const updateFormValue = useCallback(
+    <K extends keyof OrderFormValue>(key: K, value: OrderFormValue[K]) => {
+      setFormValue((prev) => ({ ...prev, [key]: value }))
     },
     [],
   )
 
-  /**
-   * 更新订单项的嵌套属性
-   */
-  const updateNestedItem = useCallback<
-    <T extends keyof OrderItem, K extends keyof OrderItem[T]>(
-      parentKey: T,
-      childKey: K,
-      value: OrderItem[T][K],
-    ) => void
-  >((parentKey, childKey, value) => {
-    setItem((prev) => {
-      const parentValue = prev[parentKey]
-      if (typeof parentValue === 'object' && parentValue !== null) {
-        return {
-          ...prev,
-          [parentKey]: { ...parentValue, [childKey]: value },
-        }
-      }
-      return prev
-    })
+  const setStapleEnabled = useCallback((checked: boolean) => {
+    setFormValue((prev) =>
+      applyStapleTypeCode(
+        prev,
+        checked ? (prev.stapleTypeCode ?? STAPLE_TYPE.riceSheet) : null,
+      ),
+    )
   }, [])
 
-  /**
-   * 更新肉类选择
-   */
-  const updateMeats = useCallback((meat: MeatType, checked: boolean) => {
-    setItem((prev) => {
-      const { available, excluded } = prev.meats
+  const setStapleTypeCode = useCallback((stapleTypeCode: StapleTypeCode) => {
+    setFormValue((prev) => applyStapleTypeCode(prev, stapleTypeCode))
+  }, [])
 
-      if (checked) {
-        return {
+  const setSizeCode = useCallback((sizeCode: SizeCode) => {
+    setFormValue((prev) =>
+      normalizeFormValueState(
+        {
           ...prev,
-          meats: {
-            available: [...available, meat],
-            excluded: excluded.filter((m) => m !== meat),
-          },
-        }
-      }
-
-      return {
-        ...prev,
-        meats: {
-          available: available.filter((m) => m !== meat),
-          excluded: [...excluded, meat],
+          sizeCode,
+          customSizePriceCents:
+            sizeCode === SIZE.custom ? prev.customSizePriceCents : null,
         },
-      }
-    })
+        {
+          previousEffectiveSize: getNormalizedSizeCode(
+            prev.stapleTypeCode,
+            prev.sizeCode,
+          ),
+        },
+      ),
+    )
   }, [])
 
-  /**
-   * 重置表单
-   */
+  const setCustomSizePriceCents = useCallback((priceCents: number | null) => {
+    setFormValue((prev) => ({
+      ...prev,
+      customSizePriceCents:
+        prev.sizeCode === SIZE.custom ? priceCents : null,
+    }))
+  }, [])
+
+  const setSelectedMeatCodes = useCallback((codes: MeatCode[]) => {
+    setFormValue((prev) => ({
+      ...prev,
+      selectedMeatCodes: normalizeSelectedMeatCodes(codes, prev.sizeCode),
+    }))
+  }, [])
+
+  const setDiningMethodCode = useCallback(
+    (diningMethodCode: OrderFormValue['diningMethodCode']) => {
+      setFormValue((prev) => {
+        if (diningMethodCode === DINING_METHOD.dineIn) {
+          return normalizeFormValueState({
+            ...prev,
+            diningMethodCode,
+            packagingCode: null,
+            packagingMethodCode: null,
+          })
+        }
+
+        return normalizeFormValueState({
+          ...prev,
+          diningMethodCode,
+          packagingCode: prev.packagingCode ?? PACKAGING.container,
+          packagingMethodCode: prev.packagingMethodCode,
+        })
+      })
+    },
+    [],
+  )
+
+  const setPackagingCode = useCallback((packagingCode: PackagingCode) => {
+    setFormValue((prev) => ({
+      ...prev,
+      packagingCode,
+    }))
+  }, [])
+
+  const setPackagingMethodCode = useCallback(
+    (packagingMethodCode: PackagingMethodCode) => {
+      setFormValue((prev) => ({
+        ...prev,
+        packagingMethodCode,
+      }))
+    },
+    [],
+  )
+
+  const setExtraStapleUnits = useCallback((extraStapleUnits: number) => {
+    setFormValue((prev) => ({
+      ...prev,
+      extraStapleUnits: Math.max(0, Math.trunc(extraStapleUnits)),
+    }))
+  }, [])
+
   const resetForm = useCallback(() => {
     setNum(1)
-    setItem(newDefaultOrderItem())
-  }, [])
+    setFormValue(getInitialFormValue(initialItem))
+  }, [initialItem])
 
-  /**
-   * 验证表单是否有效
-   */
   const isValid = useMemo(() => {
-    return !(
-      (item.includeNoodles && item.noodleType === '无') ||
-      item.size === '无' ||
-      (item.meats.available.length === 0 && !item.includeNoodles)
-    )
-  }, [
-    item.includeNoodles,
-    item.noodleType,
-    item.size,
-    item.meats.available.length,
-  ])
+    if (
+      formValue.sizeCode === SIZE.custom &&
+      (formValue.customSizePriceCents == null ||
+        !Number.isInteger(formValue.customSizePriceCents) ||
+        formValue.customSizePriceCents <= 0)
+    ) {
+      return false
+    }
+
+    if (
+      formValue.diningMethodCode === DINING_METHOD.takeout &&
+      (formValue.packagingCode == null || formValue.packagingMethodCode == null)
+    ) {
+      return false
+    }
+
+    if (
+      formValue.stapleTypeCode === null &&
+      formValue.selectedMeatCodes.length === 0
+    ) {
+      return false
+    }
+
+    return formValue.extraStapleUnits >= 0
+  }, [formValue])
 
   /**
    * 是否显示猪腰选项（小份不显示）
    */
   const showPorkKidney = useMemo(() => {
-    return item.size !== '小'
-  }, [item.size])
+    return formValue.sizeCode !== SIZE.small
+  }, [formValue.sizeCode])
 
   /**
    * 是否显示自定义价格输入
    */
   const showCustomPrice = useMemo(() => {
-    return item.size === '自定义'
-  }, [item.size])
+    return formValue.sizeCode === SIZE.custom
+  }, [formValue.sizeCode])
 
   /**
    * 是否显示外带选项
    */
   const showTakeoutOptions = useMemo(() => {
-    return item.dining.diningMethod === '外带'
-  }, [item.dining.diningMethod])
+    return formValue.diningMethodCode === DINING_METHOD.takeout
+  }, [formValue.diningMethodCode])
 
   /**
    * 是否显示伊面面饼选项
    */
   const showYiNoodleBlocks = useMemo(() => {
-    return item.noodleType === '伊面'
-  }, [item.noodleType])
+    return formValue.stapleTypeCode === STAPLE_TYPE.yiNoodle
+  }, [formValue.stapleTypeCode])
 
   return {
-    item,
-    setItem,
-    updateItem,
-    updateNestedItem,
-    updateMeats,
+    formValue,
+    setFormValue,
+    updateFormValue,
+    setStapleEnabled,
+    setStapleTypeCode,
+    setSizeCode,
+    setCustomSizePriceCents,
+    setSelectedMeatCodes,
+    setDiningMethodCode,
+    setPackagingCode,
+    setPackagingMethodCode,
+    setExtraStapleUnits,
     resetForm,
     isValid,
     showPorkKidney,

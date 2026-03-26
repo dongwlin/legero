@@ -1,35 +1,35 @@
 import React from 'react'
 import { Button } from '@heroui/react'
-import { Adjustment, NoodleType } from '@/types'
+import {
+  STAPLE_TYPE,
+  type AdjustmentCode,
+  type StapleTypeCode,
+} from '@/types'
+import { STAPLE_AMOUNT_LEVELS, getStapleAmountLabel } from '../constants'
 import OrderField from '../OrderField'
 
-const NOODLE_AMOUNT_LEVELS: readonly Adjustment[] = ['少', '正常', '多']
-
-const getNoodleAmountLabel = (amount: Adjustment) =>
-  amount === '正常' ? '标' : amount
-
 interface NoodleAmountSelectorProps {
-  noodleType: NoodleType
-  noodleAmount: Adjustment
-  extraNoodleBlocks: number
-  includeNoodles: boolean
-  onNoodleAmountChange: (amount: Adjustment) => void
-  onExtraNoodleBlocksChange: (blocks: number) => void
+  stapleTypeCode: StapleTypeCode | null
+  stapleAmountCode: AdjustmentCode
+  extraStapleUnits: number
+  onStapleAmountCodeChange: (amountCode: AdjustmentCode) => void
+  onExtraStapleUnitsChange: (units: number) => void
 }
 
 /**
- * 面条数量选择器组件
- * 根据面条类型显示不同的选择器
+ * 主食数量选择器组件
+ * 根据主食类型显示不同的选择器
  */
 export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
-  noodleType,
-  noodleAmount,
-  extraNoodleBlocks,
-  includeNoodles,
-  onNoodleAmountChange,
-  onExtraNoodleBlocksChange,
+  stapleTypeCode,
+  stapleAmountCode,
+  extraStapleUnits,
+  onStapleAmountCodeChange,
+  onExtraStapleUnitsChange,
 }) => {
-  if (noodleType === '伊面') {
+  const includeNoodles = stapleTypeCode !== null
+
+  if (stapleTypeCode === STAPLE_TYPE.yiNoodle) {
     return (
       <OrderField label='面饼' contentClassName='flex flex-1 flex-col justify-center'>
         <div className='flex items-center gap-2'>
@@ -39,20 +39,20 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
             className='size-11 rounded-xl text-xl touch-manipulation md:size-12'
             aria-label='减少面饼'
             onPress={() =>
-              onExtraNoodleBlocksChange(Math.max(extraNoodleBlocks - 1, 0))
+              onExtraStapleUnitsChange(Math.max(extraStapleUnits - 1, 0))
             }
           >
             -
           </Button.Root>
           <div className='min-w-14 text-center text-2xl font-semibold tabular-nums text-foreground md:min-w-16 md:text-[28px]'>
-            {extraNoodleBlocks + 1}
+            {extraStapleUnits + 1}
           </div>
           <Button.Root
             isIconOnly
             variant='secondary'
             className='size-11 rounded-xl text-xl touch-manipulation md:size-12'
             aria-label='增加面饼'
-            onPress={() => onExtraNoodleBlocksChange(extraNoodleBlocks + 1)}
+            onPress={() => onExtraStapleUnitsChange(extraStapleUnits + 1)}
           >
             +
           </Button.Root>
@@ -61,18 +61,20 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
     )
   }
 
-  const currentLevelIndex = NOODLE_AMOUNT_LEVELS.indexOf(noodleAmount)
+  const currentLevelIndex = (
+    STAPLE_AMOUNT_LEVELS as readonly AdjustmentCode[]
+  ).indexOf(stapleAmountCode)
   const safeLevelIndex = currentLevelIndex === -1 ? 1 : currentLevelIndex
   const isDecreaseDisabled = !includeNoodles || safeLevelIndex === 0
   const isIncreaseDisabled =
-    !includeNoodles || safeLevelIndex === NOODLE_AMOUNT_LEVELS.length - 1
+    !includeNoodles || safeLevelIndex === STAPLE_AMOUNT_LEVELS.length - 1
 
   const handleDecrease = () => {
     if (isDecreaseDisabled) {
       return
     }
 
-    onNoodleAmountChange(NOODLE_AMOUNT_LEVELS[safeLevelIndex - 1])
+    onStapleAmountCodeChange(STAPLE_AMOUNT_LEVELS[safeLevelIndex - 1])
   }
 
   const handleIncrease = () => {
@@ -80,31 +82,31 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
       return
     }
 
-    onNoodleAmountChange(NOODLE_AMOUNT_LEVELS[safeLevelIndex + 1])
+    onStapleAmountCodeChange(STAPLE_AMOUNT_LEVELS[safeLevelIndex + 1])
   }
 
   return (
-    <OrderField label='粉量' contentClassName='flex flex-1 flex-col justify-center'>
+    <OrderField label='主食量' contentClassName='flex flex-1 flex-col justify-center'>
       <div className='flex items-center gap-2'>
         <Button.Root
           isIconOnly
           isDisabled={isDecreaseDisabled}
           variant='secondary'
           className='size-11 rounded-xl text-xl touch-manipulation md:size-12'
-          aria-label='减少粉量'
+          aria-label='减少主食量'
           onPress={handleDecrease}
         >
           -
         </Button.Root>
         <div className='min-w-14 text-center text-xl font-semibold text-foreground md:min-w-16 md:text-2xl'>
-          {getNoodleAmountLabel(NOODLE_AMOUNT_LEVELS[safeLevelIndex])}
+          {getStapleAmountLabel(STAPLE_AMOUNT_LEVELS[safeLevelIndex])}
         </div>
         <Button.Root
           isIconOnly
           isDisabled={isIncreaseDisabled}
           variant='secondary'
           className='size-11 rounded-xl text-xl touch-manipulation md:size-12'
-          aria-label='增加粉量'
+          aria-label='增加主食量'
           onPress={handleIncrease}
         >
           +

@@ -1,18 +1,20 @@
 import OrderField from './OrderField'
 import { OrderCompactSelect } from './OrderCompactSelect'
 
-interface OrderSelectFieldProps<T extends string> {
+type OrderSelectFieldValue = string | number
+
+interface OrderSelectFieldProps<T extends OrderSelectFieldValue> {
   className?: string
   description?: string
   isDisabled?: boolean
   label: string
-  options: readonly T[]
+  options: readonly T[] | readonly { value: T; label: string }[]
   placeholder?: string
-  value: T
+  value?: T | null
   onChange: (value: T) => void
 }
 
-export const OrderSelectField = <T extends string>({
+export const OrderSelectField = <T extends OrderSelectFieldValue>({
   className = '',
   description,
   isDisabled = false,

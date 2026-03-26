@@ -1,14 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { CarbonAdd } from '@/components/Icon'
 import { Button, CloseButton, Modal, Separator, TextArea } from '@heroui/react'
+import { type OrderFormValue, type OrderRecord } from '@/types'
 import {
-  OrderItem,
-  Adjustment,
-  DiningMethod,
-  Packaging,
-  PackagingMethod,
-} from '@/types'
-import { calcPrice } from '@/services/order'
+  createOrderRecord,
+  rebuildOrderRecord,
+} from '@/services/orderFactories'
 import { useOrderStore } from '@/store/order'
 import dayjs from 'dayjs'
 import { useOrderForm, FormMode } from './useOrderForm'
@@ -29,173 +26,299 @@ const footerButtonClassName =
 
 interface OrderFormProps {
   mode: FormMode
-  initialItem?: OrderItem
+  initialItem?: OrderRecord
 }
 
-const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
-  const genID = useOrderStore((state) => state.genID)
-  const addOrder = useOrderStore((state) => state.addOrder)
-  const updateOrder = useOrderStore((state) => state.updateOrder)
-  const updateTargetID = useOrderStore((state) => state.updateTargetID)
-  const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
-  const findOrder = useOrderStore((state) => state.findOrder)
-  const [isOpen, setIsOpen] = useState(false)
+interface OrderFormContentProps {
+  close: () => void
+  initialItem?: OrderRecord
+  isCreateMode: boolean
+  mode: FormMode
+  submitButtonText: string
+  onSubmit: (formValue: OrderFormValue, quantity: number) => void
+}
 
+const OrderFormContent: React.FC<OrderFormContentProps> = ({
+  close,
+  initialItem,
+  isCreateMode,
+  mode,
+  submitButtonText,
+  onSubmit,
+}) => {
   const {
     num,
     setNum,
-    item,
-    setItem,
-    updateItem,
-    updateNestedItem,
-    updateMeats,
-    resetForm,
+    formValue,
+    updateFormValue,
+    setStapleEnabled,
+    setStapleTypeCode,
+    setSizeCode,
+    setCustomSizePriceCents,
+    setSelectedMeatCodes,
+    setDiningMethodCode,
+    setPackagingCode,
+    setPackagingMethodCode,
+    setExtraStapleUnits,
     isValid,
     showPorkKidney,
     showCustomPrice,
     showTakeoutOptions,
   } = useOrderForm(initialItem, mode)
 
+  const handleNoteChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    updateFormValue('note', event.target.value)
+  }
+
+  const handleSubmit = () => {
+    onSubmit(formValue, num || 1)
+    close()
+  }
+
+  return (
+    <>
+      <Modal.Body className='pt-2 pb-4'>
+        <div className='flex flex-col'>
+          <div className='pb-2.5'>
+            {isCreateMode ? (
+              <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_12rem_1px_12rem] md:gap-x-4'>
+                <div className='h-full'>
+                  <NoodleSelector
+                    stapleTypeCode={formValue.stapleTypeCode}
+                    onStapleEnabledChange={setStapleEnabled}
+                    onStapleTypeCodeChange={setStapleTypeCode}
+                  />
+                </div>
+                <Separator
+                  orientation='vertical'
+                  className={columnSeparatorClassName}
+                />
+                <div className='h-full'>
+                  <NoodleAmountSelector
+                    stapleTypeCode={formValue.stapleTypeCode}
+                    stapleAmountCode={formValue.stapleAmountCode}
+                    extraStapleUnits={formValue.extraStapleUnits}
+                    onStapleAmountCodeChange={(amountCode) =>
+                      updateFormValue('stapleAmountCode', amountCode)
+                    }
+                    onExtraStapleUnitsChange={setExtraStapleUnits}
+                  />
+                </div>
+                <Separator
+                  orientation='vertical'
+                  className={columnSeparatorClassName}
+                />
+                <div className='h-full'>
+                  <QuantitySelector
+                    num={num || 1}
+                    setNum={setNum || (() => {})}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <NoodleSelector
+                  stapleTypeCode={formValue.stapleTypeCode}
+                  onStapleEnabledChange={setStapleEnabled}
+                  onStapleTypeCodeChange={setStapleTypeCode}
+                />
+              </div>
+            )}
+          </div>
+
+          <Separator className={sectionSeparatorClassName} />
+
+          <div className='py-2.5'>
+            {isCreateMode ? (
+              <div>
+                <SizeSelector
+                  sizeCode={formValue.sizeCode}
+                  stapleTypeCode={formValue.stapleTypeCode}
+                  customSizePriceCents={formValue.customSizePriceCents}
+                  onSizeCodeChange={setSizeCode}
+                  onCustomSizePriceCentsChange={setCustomSizePriceCents}
+                  showCustomPrice={showCustomPrice}
+                />
+              </div>
+            ) : (
+              <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] md:gap-x-4'>
+                <div className='h-full'>
+                  <SizeSelector
+                    sizeCode={formValue.sizeCode}
+                    stapleTypeCode={formValue.stapleTypeCode}
+                    customSizePriceCents={formValue.customSizePriceCents}
+                    onSizeCodeChange={setSizeCode}
+                    onCustomSizePriceCentsChange={setCustomSizePriceCents}
+                    showCustomPrice={showCustomPrice}
+                  />
+                </div>
+
+                <Separator
+                  orientation='vertical'
+                  className={columnSeparatorClassName}
+                />
+
+                <div className='h-full'>
+                  <NoodleAmountSelector
+                    stapleTypeCode={formValue.stapleTypeCode}
+                    stapleAmountCode={formValue.stapleAmountCode}
+                    extraStapleUnits={formValue.extraStapleUnits}
+                    onStapleAmountCodeChange={(amountCode) =>
+                      updateFormValue('stapleAmountCode', amountCode)
+                    }
+                    onExtraStapleUnitsChange={setExtraStapleUnits}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator className={sectionSeparatorClassName} />
+
+          <div className='py-2.5'>
+            <MeatSelector
+              selectedMeatCodes={formValue.selectedMeatCodes}
+              onSelectedMeatCodesChange={setSelectedMeatCodes}
+              showPorkKidney={showPorkKidney}
+            />
+          </div>
+
+          <Separator className={sectionSeparatorClassName} />
+
+          <div className='py-2.5'>
+            <IngredientSelector
+              greensCode={formValue.greensCode}
+              scallionCode={formValue.scallionCode}
+              pepperCode={formValue.pepperCode}
+              onGreensCodeChange={(value) => updateFormValue('greensCode', value)}
+              onScallionCodeChange={(value) =>
+                updateFormValue('scallionCode', value)
+              }
+              onPepperCodeChange={(value) => updateFormValue('pepperCode', value)}
+            />
+          </div>
+
+          <Separator className={sectionSeparatorClassName} />
+
+          <div className='py-2.5'>
+            <DiningSelector
+              diningMethodCode={formValue.diningMethodCode}
+              packagingCode={formValue.packagingCode}
+              packagingMethodCode={formValue.packagingMethodCode}
+              onDiningMethodCodeChange={setDiningMethodCode}
+              onPackagingCodeChange={setPackagingCode}
+              onPackagingMethodCodeChange={setPackagingMethodCode}
+              showTakeoutOptions={showTakeoutOptions}
+            />
+          </div>
+
+          <Separator className={sectionSeparatorClassName} />
+
+          <div className='pt-2.5 p-1'>
+            <OrderField label=''>
+              <TextArea
+                fullWidth
+                rows={3}
+                variant='secondary'
+                className='min-h-20 rounded-xl'
+                value={formValue.note}
+                onChange={handleNoteChange}
+              />
+            </OrderField>
+          </div>
+        </div>
+      </Modal.Body>
+
+      <Modal.Footer className='border-t border-border/60 px-4 py-3 md:px-5'>
+        <div className='flex w-full flex-row gap-4'>
+          <Button.Root
+            variant='outline'
+            className={`${footerButtonClassName} basis-0 flex-1`}
+            onPress={close}
+          >
+            取消
+          </Button.Root>
+          <Button.Root
+            isDisabled={!isValid}
+            variant='primary'
+            className={`${footerButtonClassName} basis-0 flex-1`}
+            onPress={handleSubmit}
+          >
+            {submitButtonText}
+          </Button.Root>
+        </div>
+      </Modal.Footer>
+    </>
+  )
+}
+
+const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
+  const genDisplayNo = useOrderStore((state) => state.genDisplayNo)
+  const addOrder = useOrderStore((state) => state.addOrder)
+  const updateOrder = useOrderStore((state) => state.updateOrder)
+  const updateTargetID = useOrderStore((state) => state.updateTargetID)
+  const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
+  const findOrder = useOrderStore((state) => state.findOrder)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [createSessionId, setCreateSessionId] = useState(0)
+
   const handleDialogClose = () => {
     if (mode === 'create') {
-      resetForm?.()
+      setIsCreateOpen(false)
+      setCreateSessionId((prev) => prev + 1)
     } else {
       setUpdateTargetID('')
     }
   }
 
-  // 编辑模式下，监听 updateTargetID 变化并打开对话框
-  useEffect(() => {
-    if (mode === 'edit' && updateTargetID) {
-      const targetItem = findOrder(updateTargetID)
-      if (targetItem) {
-        setItem(targetItem)
-        setIsOpen(true)
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (mode === 'create') {
+      if (nextOpen) {
+        setIsCreateOpen(true)
+        return
       }
     }
-  }, [updateTargetID, findOrder, setItem, mode])
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    setIsOpen(nextOpen)
     if (!nextOpen) {
       handleDialogClose()
     }
   }
 
-  const handleIncludeNoodlesChange = (checked: boolean) => {
-    updateItem('includeNoodles', checked)
-  }
-
-  const handleCustomSizePriceChange = (price: number) => {
-    updateItem('customSizePrice', price)
-  }
-
-  const handleNoodleAmountChange = (amount: Adjustment) => {
-    updateItem('noodleAmount', amount)
-  }
-
-  const handleExtraNoodleBlocksChange = (blocks: number) => {
-    updateItem('extraNoodleBlocks', blocks)
-  }
-
-  const handleGreensChange = (value: Adjustment) => {
-    updateNestedItem('ingredients', 'greens', value)
-  }
-
-  const handleScallionChange = (value: Adjustment) => {
-    updateNestedItem('ingredients', 'scallion', value)
-  }
-
-  const handlePepperChange = (value: Adjustment) => {
-    updateNestedItem('ingredients', 'pepper', value)
-  }
-
-  const handleDiningMethodChange = (diningMethod: DiningMethod) => {
-    updateItem('dining', {
-      diningMethod: diningMethod,
-      packaging: diningMethod === '外带' ? '塑料盒' : '无',
-      packagingMethod: diningMethod === '外带' ? '装在一起' : '无',
-    })
-  }
-
-  const handlePackingChange = (packaging: Packaging) => {
-    updateNestedItem('dining', 'packaging', packaging)
-  }
-
-  const handlePackingMethodChange = (packagingMethod: PackagingMethod) => {
-    updateNestedItem('dining', 'packagingMethod', packagingMethod)
-  }
-
-  const handleNoteChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    updateItem('note', event.target.value)
-  }
-
-  const handleSubmit = (close: () => void) => {
+  const handleSubmit = (formValue: OrderFormValue, quantity: number) => {
     const now = dayjs().tz()
-    const price = calcPrice(item)
-
-    const newItem: OrderItem = {
-      ...item,
-      price: price,
-    }
-
-    // 小份不包含猪腰
-    if (newItem.size === '小' && item.meats.available.includes('猪腰')) {
-      newItem.meats.available = newItem.meats.available.filter(
-        (meat) => meat !== '猪腰',
-      )
-    }
-
-    // 设置面条进度
-    if (newItem.includeNoodles) {
-      newItem.progress.noodles = 'not-started'
-    } else {
-      newItem.progress.noodles = 'unrequired'
-    }
-
-    // 设置肉类进度
-    if (newItem.meats.available.length > 0) {
-      newItem.progress.meat = 'not-started'
-    } else {
-      newItem.progress.meat = 'unrequired'
-    }
-
-    // 不包含面条时，面条类型设为无
-    if (!newItem.includeNoodles) {
-      newItem.noodleType = '无'
-    }
-
-    // 非自定义规格时，自定义价格设为0
-    if (newItem.size !== '自定义') {
-      newItem.customSizePrice = 0
-    }
 
     if (mode === 'create') {
-      // 创建订单模式
-      newItem.createdAt = now.toISOString()
-
-      // 创建多个订单
-      for (let i = 0; i < (num || 1); i++) {
-        const id = genID()
-        const saveItem = {
-          ...newItem,
-          id: id,
-        }
-        addOrder(saveItem)
+      for (let i = 0; i < quantity; i++) {
+        const displayNo = genDisplayNo()
+        const record = createOrderRecord(formValue, {
+          id: displayNo,
+          displayNo,
+          createdAt: now.toISOString(),
+        })
+        addOrder(record)
       }
     } else {
-      // 编辑订单模式
-      setItem(newItem)
-      updateOrder(updateTargetID, newItem)
-    }
+      const activeRecord = activeItem ?? null
 
-    close()
+      if (!activeRecord) {
+        return
+      }
+
+      const record = rebuildOrderRecord(formValue, activeRecord)
+      updateOrder(updateTargetID, record)
+    }
   }
 
   const isCreateMode = mode === 'create'
   const formTitle = isCreateMode ? '创建订单' : '修改订单'
   const submitButtonText = isCreateMode ? '创建' : '修改'
-  const shouldRenderModal = isCreateMode || isOpen
+  const activeItem =
+    !isCreateMode && updateTargetID ? findOrder(updateTargetID) : initialItem
+  const isOpen = isCreateMode ? isCreateOpen : Boolean(updateTargetID)
+  const shouldRenderModal = isCreateMode || Boolean(updateTargetID)
+  const formSessionKey = isCreateMode
+    ? `create-${createSessionId}`
+    : updateTargetID
 
   return (
     <>
@@ -231,178 +354,15 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                         </h2>
                       </div>
                     </Modal.Header>
-
-                    <Modal.Body className='pt-2 pb-4'>
-                      <div className='flex flex-col'>
-                        <div className='pb-2.5'>
-                          {isCreateMode ? (
-                            <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_12rem_1px_12rem] md:gap-x-4'>
-                              <div className='h-full'>
-                                <NoodleSelector
-                                  includeNoodles={item.includeNoodles}
-                                  noodleType={item.noodleType}
-                                  onIncludeNoodlesChange={handleIncludeNoodlesChange}
-                                  onNoodleTypeChange={(type) => updateItem('noodleType', type)}
-                                />
-                              </div>
-                              <Separator
-                                orientation='vertical'
-                                className={columnSeparatorClassName}
-                              />
-                              <div className='h-full'>
-                                <NoodleAmountSelector
-                                  noodleType={item.noodleType}
-                                  noodleAmount={item.noodleAmount}
-                                  extraNoodleBlocks={item.extraNoodleBlocks}
-                                  includeNoodles={item.includeNoodles}
-                                  onNoodleAmountChange={handleNoodleAmountChange}
-                                  onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
-                                />
-                              </div>
-                              <Separator
-                                orientation='vertical'
-                                className={columnSeparatorClassName}
-                              />
-                              <div className='h-full'>
-                                <QuantitySelector
-                                  num={num || 1}
-                                  setNum={setNum || (() => { })}
-                                />
-                              </div>
-                            </div>
-                          ) : (
-                            <div>
-                              <NoodleSelector
-                                includeNoodles={item.includeNoodles}
-                                noodleType={item.noodleType}
-                                onIncludeNoodlesChange={handleIncludeNoodlesChange}
-                                onNoodleTypeChange={(type) => updateItem('noodleType', type)}
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        <Separator className={sectionSeparatorClassName} />
-
-                        <div className='py-2.5'>
-                          {isCreateMode ? (
-                            <div>
-                              <SizeSelector
-                                size={item.size}
-                                includeNoodles={item.includeNoodles}
-                                noodleType={item.noodleType}
-                                customSizePrice={item.customSizePrice}
-                                onSizeChange={(size) => updateItem('size', size)}
-                                onCustomSizePriceChange={handleCustomSizePriceChange}
-                                showCustomPrice={showCustomPrice}
-                              />
-                            </div>
-                          ) : (
-                            <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] md:gap-x-4'>
-                              <div className='h-full'>
-                                <SizeSelector
-                                  size={item.size}
-                                  includeNoodles={item.includeNoodles}
-                                  noodleType={item.noodleType}
-                                  customSizePrice={item.customSizePrice}
-                                  onSizeChange={(size) => updateItem('size', size)}
-                                  onCustomSizePriceChange={handleCustomSizePriceChange}
-                                  showCustomPrice={showCustomPrice}
-                                />
-                              </div>
-
-                              <Separator
-                                orientation='vertical'
-                                className={columnSeparatorClassName}
-                              />
-
-                              <div className='h-full'>
-                                <NoodleAmountSelector
-                                  noodleType={item.noodleType}
-                                  noodleAmount={item.noodleAmount}
-                                  extraNoodleBlocks={item.extraNoodleBlocks}
-                                  includeNoodles={item.includeNoodles}
-                                  onNoodleAmountChange={handleNoodleAmountChange}
-                                  onExtraNoodleBlocksChange={handleExtraNoodleBlocksChange}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <Separator className={sectionSeparatorClassName} />
-
-                        <div className='py-2.5'>
-                          <MeatSelector
-                            availableMeats={item.meats.available}
-                            onMeatChange={updateMeats}
-                            showPorkKidney={showPorkKidney}
-                          />
-                        </div>
-
-                        <Separator className={sectionSeparatorClassName} />
-
-                        <div className='py-2.5'>
-                          <IngredientSelector
-                            greens={item.ingredients.greens}
-                            scallion={item.ingredients.scallion}
-                            pepper={item.ingredients.pepper}
-                            onGreensChange={handleGreensChange}
-                            onScallionChange={handleScallionChange}
-                            onPepperChange={handlePepperChange}
-                          />
-                        </div>
-
-                        <Separator className={sectionSeparatorClassName} />
-
-                        <div className='py-2.5'>
-                          <DiningSelector
-                            diningMethod={item.dining.diningMethod}
-                            packaging={item.dining.packaging}
-                            packagingMethod={item.dining.packagingMethod}
-                            onDiningMethodChange={handleDiningMethodChange}
-                            onPackagingChange={handlePackingChange}
-                            onPackagingMethodChange={handlePackingMethodChange}
-                            showTakeoutOptions={showTakeoutOptions}
-                          />
-                        </div>
-
-                        <Separator className={sectionSeparatorClassName} />
-
-                        <div className='pt-2.5 p-1'>
-                          <OrderField label=''>
-                            <TextArea
-                              fullWidth
-                              rows={3}
-                              variant='secondary'
-                              className='min-h-20 rounded-xl'
-                              value={item.note}
-                              onChange={handleNoteChange}
-                            />
-                          </OrderField>
-                        </div>
-                      </div>
-                    </Modal.Body>
-
-                    <Modal.Footer className='border-t border-border/60 px-4 py-3 md:px-5'>
-                      <div className='flex w-full flex-row gap-4'>
-                        <Button.Root
-                          variant='outline'
-                          className={`${footerButtonClassName} basis-0 flex-1`}
-                          onPress={close}
-                        >
-                          取消
-                        </Button.Root>
-                        <Button.Root
-                          isDisabled={!isValid}
-                          variant='primary'
-                          className={`${footerButtonClassName} basis-0 flex-1`}
-                          onPress={() => handleSubmit(close)}
-                        >
-                          {submitButtonText}
-                        </Button.Root>
-                      </div>
-                    </Modal.Footer>
+                    <OrderFormContent
+                      key={formSessionKey}
+                      close={close}
+                      initialItem={activeItem}
+                      isCreateMode={isCreateMode}
+                      mode={mode}
+                      submitButtonText={submitButtonText}
+                      onSubmit={handleSubmit}
+                    />
                   </>
                 )}
               </Modal.Dialog>

@@ -1,8 +1,8 @@
 import OrderForm from '../forms/OrderForm'
 import { useOrderStore } from '@/store/order'
 import { Filter } from '@/types'
+import { isOrderCreatedToday } from '@/services/orderDomainUtils'
 import { Card, ListBox, Select } from '@heroui/react'
-import dayjs from 'dayjs'
 import React, { useMemo } from 'react'
 
 const OrderControls: React.FC = () => {
@@ -10,25 +10,22 @@ const OrderControls: React.FC = () => {
   const filter = useOrderStore((state) => state.filter)
   const setFilter = useOrderStore((state) => state.setFilter)
 
-  const { todayCompletedCount, uncompletedCount } = useMemo(() => {
-    const now = dayjs()
-    const todayDate = now.date()
+  const todayOrders = useMemo(
+    () => orders.filter((record) => isOrderCreatedToday(record)),
+    [orders],
+  )
 
+  const { todayCompletedCount, uncompletedCount } = useMemo(() => {
     let todayCompleted = 0
     let uncompleted = 0
 
-    orders.forEach((item) => {
-      // Check for uncompleted
-      if (item.completedAt === '') {
+    todayOrders.forEach((record) => {
+      if (record.completedAt === null) {
         uncompleted++
       }
 
-      // Check for today completed
-      if (item.completedAt !== '') {
-        const itemDate = dayjs(item.createdAt).date()
-        if (itemDate === todayDate) {
-          todayCompleted++
-        }
+      if (record.completedAt !== null) {
+        todayCompleted++
       }
     })
 
@@ -36,7 +33,7 @@ const OrderControls: React.FC = () => {
       todayCompletedCount: todayCompleted,
       uncompletedCount: uncompleted,
     }
-  }, [orders])
+  }, [todayOrders])
 
   return (
     <Card.Root
@@ -46,13 +43,13 @@ const OrderControls: React.FC = () => {
       <Card.Content className='flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6'>
         <div className='grid w-full gap-3 grid-cols-2 md:w-auto'>
           <div className='rounded-2xl border border-border/60 bg-background px-4 py-3'>
-            <div className='text-sm text-muted'>{dayjs().date()}日已完成</div>
+            <div className='text-sm text-muted'>今日已完成</div>
             <div className='mt-1 text-2xl font-semibold text-success tabular-nums'>
               {todayCompletedCount}
             </div>
           </div>
           <div className='rounded-2xl border border-border/60 bg-background px-4 py-3'>
-            <div className='text-sm text-muted'>未完成</div>
+            <div className='text-sm text-muted'>今日未完成</div>
             <div className='mt-1 text-2xl font-semibold text-warning tabular-nums'>
               {uncompletedCount}
             </div>

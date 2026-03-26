@@ -3,19 +3,26 @@ import OrderItem from './OrderItem'
 import { useOrderStore } from '@/store/order'
 import { List, RowComponentProps, useDynamicRowHeight } from 'react-window'
 import { AutoSizer } from 'react-virtualized-auto-sizer'
-import { OrderItem as OrderItemType } from '@/types'
+import { type OrderRecord, type OrderViewModel } from '@/types'
+import { orderRecordToOrderViewModel } from '@/services/orderRecordAdapter'
+import { isOrderCreatedToday } from '@/services/orderDomainUtils'
 import { CarbonArrowUp } from '@/components/Icon'
 import { Button, Card, EmptyState } from '@heroui/react'
 
 const DEFAULT_ORDER_ROW_HEIGHT = 280
 
+type OrderListEntry = {
+  record: OrderRecord
+  view: OrderViewModel
+}
+
 type RowProps = {
-  orders: OrderItemType[]
+  orders: OrderListEntry[]
   now: number
 }
 
 type VirtualOrderListProps = {
-  filteredOrders: OrderItemType[]
+  filteredOrders: OrderListEntry[]
   now: number
   rowHeightCacheKey: string
 }
@@ -24,7 +31,7 @@ const Row = ({ index, style, orders, now }: RowComponentProps<RowProps>) => {
   const order = orders[index]
   return (
     <div style={style} className='px-1 py-2 md:px-2'>
-      <OrderItem order={order} now={now} />
+      <OrderItem record={order.record} view={order.view} now={now} />
     </div>
   )
 }
@@ -58,7 +65,7 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
       >
         <Card.Content className='h-full p-4 md:p-6'>
           <EmptyState.Root className='flex h-full items-center justify-center rounded-2xl border border-dashed border-border/70 bg-background-secondary/40 px-6 py-10 text-center leading-6 text-muted'>
-            当前筛选条件下暂无订单
+            当前筛选条件下暂无今日订单
           </EmptyState.Root>
         </Card.Content>
       </Card.Root>
@@ -108,30 +115,47 @@ const OrderList: React.FC = () => {
   const filter = useOrderStore((state) => state.filter)
   const [now, setNow] = useState(() => Date.now())
 
+  const todayOrders = useMemo(
+    () => orders.filter((order) => isOrderCreatedToday(order)),
+    [orders],
+  )
+
+  const orderEntries = useMemo(
+    () =>
+      todayOrders.map((order) => {
+        return {
+          record: order,
+          view: orderRecordToOrderViewModel(order),
+        }
+      }),
+    [todayOrders],
+  )
+
   const filteredOrders = useMemo(() => {
     switch (filter) {
       case 'all':
-        return orders
+        return orderEntries
       case 'uncompleted':
-        return orders.filter((order) => !order.completedAt)
+        return orderEntries.filter((order) => order.record.completedAt === null)
       case 'completed':
-        return orders
-          .filter((order) => !!order.completedAt)
+        return orderEntries
+          .filter((order) => order.record.completedAt !== null)
           .sort(
             (a, b) =>
-              new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime(),
+              new Date(b.record.completedAt ?? 0).getTime() -
+              new Date(a.record.completedAt ?? 0).getTime(),
           )
       default:
-        return orders
+        return orderEntries
     }
-  }, [orders, filter])
+  }, [orderEntries, filter])
 
   const filteredOrderIdsKey = useMemo(
-    () => filteredOrders.map((order) => order.id).join('|'),
+    () => filteredOrders.map((order) => order.record.id).join('|'),
     [filteredOrders],
   )
   const hasActiveOrders = useMemo(
-    () => filteredOrders.some((order) => !order.completedAt),
+    () => filteredOrders.some((order) => order.record.completedAt === null),
     [filteredOrders],
   )
 

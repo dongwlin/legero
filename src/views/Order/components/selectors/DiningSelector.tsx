@@ -1,20 +1,24 @@
 import React from 'react'
 import {
-  DINING_METHODS,
-  PACKAGING_OPTIONS,
-  PACKAGING_METHODS,
+  DINING_METHOD_SELECT_OPTIONS,
+  PACKAGING_METHOD_SELECT_OPTIONS,
+  PACKAGING_SELECT_OPTIONS,
 } from '../constants'
-import { DiningMethod, Packaging, PackagingMethod } from '@/types'
+import {
+  type DiningMethodCode,
+  type PackagingCode,
+  type PackagingMethodCode,
+} from '@/types'
 import OrderField from '../OrderField'
 import { OrderCompactSelect } from '../OrderCompactSelect'
 
 interface DiningSelectorProps {
-  diningMethod: DiningMethod
-  packaging: Packaging
-  packagingMethod: PackagingMethod
-  onDiningMethodChange: (method: DiningMethod) => void
-  onPackagingChange: (packaging: Packaging) => void
-  onPackagingMethodChange: (method: PackagingMethod) => void
+  diningMethodCode: DiningMethodCode
+  packagingCode: PackagingCode | null
+  packagingMethodCode: PackagingMethodCode | null
+  onDiningMethodCodeChange: (method: DiningMethodCode) => void
+  onPackagingCodeChange: (packaging: PackagingCode) => void
+  onPackagingMethodCodeChange: (method: PackagingMethodCode) => void
   showTakeoutOptions: boolean
 }
 
@@ -22,12 +26,12 @@ interface DiningSelectorProps {
  * 就餐方式选择器组件
  */
 export const DiningSelector: React.FC<DiningSelectorProps> = ({
-  diningMethod,
-  packaging,
-  packagingMethod,
-  onDiningMethodChange,
-  onPackagingChange,
-  onPackagingMethodChange,
+  diningMethodCode,
+  packagingCode,
+  packagingMethodCode,
+  onDiningMethodCodeChange,
+  onPackagingCodeChange,
+  onPackagingMethodCodeChange,
   showTakeoutOptions,
 }) => {
   return (
@@ -37,25 +41,25 @@ export const DiningSelector: React.FC<DiningSelectorProps> = ({
       >
         <OrderCompactSelect
           label='方式'
-          value={diningMethod}
-          options={DINING_METHODS}
-          onChange={onDiningMethodChange}
+          value={diningMethodCode}
+          options={DINING_METHOD_SELECT_OPTIONS}
+          onChange={onDiningMethodCodeChange}
         />
 
         {showTakeoutOptions ? (
           <>
             <OrderCompactSelect
               label='包装'
-              value={packaging}
-              options={PACKAGING_OPTIONS}
-              onChange={onPackagingChange}
+              value={packagingCode}
+              options={PACKAGING_SELECT_OPTIONS}
+              onChange={onPackagingCodeChange}
             />
 
             <OrderCompactSelect
               label='打包'
-              value={packagingMethod}
-              options={PACKAGING_METHODS}
-              onChange={onPackagingMethodChange}
+              value={packagingMethodCode}
+              options={PACKAGING_METHOD_SELECT_OPTIONS}
+              onChange={onPackagingMethodCodeChange}
             />
           </>
         ) : null}

@@ -1,53 +1,64 @@
 import { create } from 'zustand'
-import { Filter, OrderItem } from '@/types'
+import { Filter, type OrderRecord } from '@/types'
 import dayjs from 'dayjs'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
-interface OrderState {
-  lastIDNum: number
-  lastGenDate: string | null
-  genID: () => string
+const ORDER_STORE_SCHEMA_VERSION = 2 as const
+
+export type PersistedOrderStoreV2 = {
+  schemaVersion: typeof ORDER_STORE_SCHEMA_VERSION
+  lastDisplayNoSeq: number
+  lastDisplayNoDate: string | null
   updatedAt: string | null
-  orders: OrderItem[]
+  orders: OrderRecord[]
   filter: Filter
-  addOrder: (item: OrderItem) => void
+}
+
+interface OrderState extends PersistedOrderStoreV2 {
+  genDisplayNo: () => string
+  addOrder: (item: OrderRecord) => void
   removeOrder: (id: string) => void
-  updateOrder: (id: string, item: OrderItem) => void
+  updateOrder: (id: string, item: OrderRecord) => void
   clearOrders: () => void
 
   setFilter: (filter: Filter) => void
 
   updateTargetID: string
   setUpdateTargetID: (id: string) => void
-  findOrder: (id: string) => OrderItem
+  findOrder: (id: string) => OrderRecord
 }
 
 export const useOrderStore = create<OrderState>()(
   persist(
     (set, get) => ({
-      lastIDNum: 0,
-      lastGenDate: null,
+      schemaVersion: ORDER_STORE_SCHEMA_VERSION,
+      lastDisplayNoSeq: 0,
+      lastDisplayNoDate: null,
       updatedAt: null,
-      genID: (): string => {
+      genDisplayNo: (): string => {
         const now = dayjs()
         const state = get()
 
-        const lastGenDate = state.lastGenDate ? dayjs(state.lastGenDate) : null
-        const isSameDay = lastGenDate ? lastGenDate.isSame(now, 'date') : false
+        const lastDisplayNoDate = state.lastDisplayNoDate
+          ? dayjs(state.lastDisplayNoDate)
+          : null
+        const isSameDay = lastDisplayNoDate
+          ? lastDisplayNoDate.isSame(now, 'date')
+          : false
 
-        const shouldReset = !state.lastGenDate || !isSameDay
-        const baseNum = shouldReset ? 0 : state.lastIDNum
+        const shouldReset = !state.lastDisplayNoDate || !isSameDay
+        const baseSeq = shouldReset ? 0 : state.lastDisplayNoSeq
 
-        const idNum = baseNum + 1
-        const idNumStr = idNum.toString().padStart(4, '0')
-        const id = `${now.format('YYYYMMDD')}${idNumStr}`
+        const nextSeq = baseSeq + 1
+        const nextSeqText = nextSeq.toString().padStart(4, '0')
+        const displayNo = `${now.format('YYYYMMDD')}${nextSeqText}`
 
         set({
-          lastIDNum: idNum,
-          lastGenDate: now.toISOString(),
+          lastDisplayNoSeq: nextSeq,
+          lastDisplayNoDate: now.toISOString(),
         })
 
-        return id
+        return displayNo
       },
       orders: [],
       filter: 'all',
@@ -61,14 +72,13 @@ export const useOrderStore = create<OrderState>()(
           orders: state.orders.filter((item) => item.id !== id),
           updatedAt: dayjs().toISOString(),
         })),
-      updateOrder: (id: string, newItem: OrderItem) =>
+      updateOrder: (id: string, newItem: OrderRecord) =>
         set((state) => {
           const now = dayjs()
 
           const updatedOrders = state.orders.map((item) => {
             if (item.id === id) {
               return {
-                ...item,
                 ...newItem,
                 id: item.id,
               }
@@ -85,13 +95,13 @@ export const useOrderStore = create<OrderState>()(
         set({
           orders: [],
           updatedAt: dayjs().toISOString(),
-          lastIDNum: 0,
-          lastGenDate: null,
+          lastDisplayNoSeq: 0,
+          lastDisplayNoDate: null,
         }),
       setFilter: (filter) => set({ filter }),
       updateTargetID: '',
       setUpdateTargetID: (id) => set({ updateTargetID: id }),
-      findOrder: (id: string): OrderItem => {
+      findOrder: (id: string): OrderRecord => {
         const order = useOrderStore
           .getState()
           .orders.find((item) => item.id === id)
@@ -104,6 +114,14 @@ export const useOrderStore = create<OrderState>()(
     {
       name: 'order-store',
       storage: createJSONStorage(() => localStorage),
+      partialize: (state): PersistedOrderStoreV2 => ({
+        schemaVersion: state.schemaVersion,
+        lastDisplayNoSeq: state.lastDisplayNoSeq,
+        lastDisplayNoDate: state.lastDisplayNoDate,
+        updatedAt: state.updatedAt,
+        orders: state.orders,
+        filter: state.filter,
+      }),
     },
   ),
 )

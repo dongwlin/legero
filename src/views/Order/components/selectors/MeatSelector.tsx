@@ -1,12 +1,12 @@
 import React from 'react'
 import { Checkbox, Label } from '@heroui/react'
-import { MEAT_OPTIONS } from '../constants'
-import { MeatType } from '@/types'
+import { type MeatCode } from '@/types'
+import { MEAT_CHECKBOX_OPTIONS, PORK_KIDNEY_CODE } from '../constants'
 import OrderField from '../OrderField'
 
 interface MeatSelectorProps {
-  availableMeats: MeatType[]
-  onMeatChange: (meat: MeatType, checked: boolean) => void
+  selectedMeatCodes: MeatCode[]
+  onSelectedMeatCodesChange: (codes: MeatCode[]) => void
   showPorkKidney: boolean
 }
 
@@ -14,35 +14,43 @@ interface MeatSelectorProps {
  * 肉类选择器组件
  */
 export const MeatSelector: React.FC<MeatSelectorProps> = ({
-  availableMeats,
-  onMeatChange,
+  selectedMeatCodes,
+  onSelectedMeatCodesChange,
   showPorkKidney,
 }) => {
   return (
     <OrderField label=''>
       <div className='grid grid-cols-2 gap-2.5 sm:grid-cols-3'>
-        {MEAT_OPTIONS.map((meat) => {
+        {MEAT_CHECKBOX_OPTIONS.map((meat) => {
           // 猪腰只在非小份时显示
-          if (meat === '猪腰' && !showPorkKidney) {
+          if (meat.value === PORK_KIDNEY_CODE && !showPorkKidney) {
             return null
           }
 
+          const isSelected = selectedMeatCodes.includes(meat.value)
+
           return (
             <Checkbox.Root
-              key={meat}
-              name={meat}
-              value={meat}
+              key={meat.value}
+              name={String(meat.value)}
+              value={String(meat.value)}
               className='rounded-xl border border-border/60 bg-background px-3 py-2.5 transition-colors duration-200 hover:bg-background-secondary data-[selected=true]:border-accent/40 data-[selected=true]:bg-accent-soft/45'
-              isSelected={availableMeats.includes(meat)}
+              isSelected={isSelected}
               variant='secondary'
-              onChange={(checked) => onMeatChange(meat, checked)}
+              onChange={(checked) =>
+                onSelectedMeatCodesChange(
+                  checked
+                    ? [...selectedMeatCodes, meat.value]
+                    : selectedMeatCodes.filter((code) => code !== meat.value),
+                )
+              }
             >
               <Checkbox.Control className='mt-0.5'>
                 <Checkbox.Indicator />
               </Checkbox.Control>
               <Checkbox.Content>
                 <Label className='text-sm font-medium text-foreground md:text-[15px]'>
-                  {meat}
+                  {meat.label}
                 </Label>
               </Checkbox.Content>
             </Checkbox.Root>

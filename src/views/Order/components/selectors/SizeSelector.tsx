@@ -1,17 +1,16 @@
 import React, { useMemo, useState } from 'react'
 import { Button, Input } from '@heroui/react'
-import { SIZES } from '../constants'
-import { NoodleType, Size } from '@/types'
+import { SIZE, STAPLE_TYPE, type SizeCode, type StapleTypeCode } from '@/types'
+import { SIZE_BUTTON_OPTIONS } from '../constants'
 import { getSizeDisplayValue } from '../utils'
 import OrderField from '../OrderField'
 
 interface SizeSelectorProps {
-  size: Size
-  includeNoodles: boolean
-  noodleType: NoodleType
-  customSizePrice: number
-  onSizeChange: (size: Size) => void
-  onCustomSizePriceChange: (price: number) => void
+  sizeCode: SizeCode
+  stapleTypeCode: StapleTypeCode | null
+  customSizePriceCents: number | null
+  onSizeCodeChange: (sizeCode: SizeCode) => void
+  onCustomSizePriceCentsChange: (priceCents: number | null) => void
   showCustomPrice: boolean
 }
 
@@ -19,21 +18,32 @@ interface SizeSelectorProps {
  * 规格选择器组件
  */
 export const SizeSelector: React.FC<SizeSelectorProps> = ({
-  size,
-  includeNoodles,
-  noodleType,
-  customSizePrice,
-  onSizeChange,
-  onCustomSizePriceChange,
+  sizeCode,
+  stapleTypeCode,
+  customSizePriceCents,
+  onSizeCodeChange,
+  onCustomSizePriceCentsChange,
   showCustomPrice,
 }) => {
   const [customPriceInput, setCustomPriceInput] = useState(() =>
-    customSizePrice > 0 ? String(customSizePrice) : '',
+    customSizePriceCents != null && customSizePriceCents > 0
+      ? String(customSizePriceCents / 100)
+      : '',
   )
 
   const getDisplayValue = useMemo(() => {
-    return (s: Size) => getSizeDisplayValue(s, includeNoodles, noodleType)
-  }, [includeNoodles, noodleType])
+    return (nextSizeCode: SizeCode) =>
+      getSizeDisplayValue(nextSizeCode, stapleTypeCode)
+  }, [stapleTypeCode])
+  const presetSizeOptions = useMemo(
+    () =>
+      SIZE_BUTTON_OPTIONS.filter(
+        (option) =>
+          option.value !== SIZE.custom &&
+          (stapleTypeCode !== STAPLE_TYPE.rice || option.value !== SIZE.small),
+      ),
+    [stapleTypeCode],
+  )
 
   return (
     <OrderField
@@ -41,15 +51,15 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
       contentClassName='flex flex-1 flex-col justify-center'
     >
       <div className='flex flex-wrap gap-2.5'>
-        {SIZES.filter((option) => option !== '自定义').map((option) => (
+        {presetSizeOptions.map((option) => (
           <Button.Root
-            key={option}
-            aria-pressed={size === option}
+            key={option.value}
+            aria-pressed={sizeCode === option.value}
             className='h-11 min-w-20 rounded-xl px-4 text-sm font-semibold touch-manipulation md:h-12 md:text-base'
-            variant={size === option ? 'primary' : 'secondary'}
-            onPress={() => onSizeChange(option)}
+            variant={sizeCode === option.value ? 'primary' : 'secondary'}
+            onPress={() => onSizeCodeChange(option.value)}
           >
-            {getDisplayValue(option)}
+            {getDisplayValue(option.value)}
           </Button.Root>
         ))}
 
@@ -74,7 +84,11 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
               const nextPrice = Number(nextValue)
 
               setCustomPriceInput(nextValue)
-              onCustomSizePriceChange(Number.isNaN(nextPrice) ? 0 : nextPrice)
+              onCustomSizePriceCentsChange(
+                nextValue === '' || Number.isNaN(nextPrice)
+                  ? null
+                  : Math.max(0, Math.round(nextPrice * 100)),
+              )
             }}
           />
         ) : (
@@ -83,8 +97,12 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
             className='h-11 min-w-20 rounded-xl px-4 text-sm font-semibold touch-manipulation md:h-12 md:text-base'
             variant='secondary'
             onPress={() => {
-              setCustomPriceInput(customSizePrice > 0 ? String(customSizePrice) : '')
-              onSizeChange('自定义')
+              setCustomPriceInput(
+                customSizePriceCents != null && customSizePriceCents > 0
+                  ? String(customSizePriceCents / 100)
+                  : '',
+              )
+              onSizeCodeChange(SIZE.custom)
             }}
           >
             自定义

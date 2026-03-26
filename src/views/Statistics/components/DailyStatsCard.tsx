@@ -1,4 +1,5 @@
 import { DailyStats } from '@/services/statistics'
+import { formatPriceCents } from '@/services/orderPricing'
 import { Card, EmptyState, Table } from '@heroui/react'
 import React from 'react'
 
@@ -53,7 +54,9 @@ const DailyStatsCard: React.FC<DailyStatsCardProps> = ({ stats }) => {
                         {row.date}
                       </Table.Cell>
                       <Table.Cell className='text-right font-mono tabular-nums md:text-base'>
-                        ¥{row.totalAmount.toFixed(2)}
+                        {formatPriceCents(row.totalPriceCents, {
+                          fixedFractionDigits: 2,
+                        })}
                       </Table.Cell>
                       <Table.Cell className='text-right tabular-nums md:text-base'>
                         {row.orderCount}

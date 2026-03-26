@@ -1,22 +1,30 @@
-import { NoodleType, Size } from "@/types"
+import { SIZE, STAPLE_TYPE, type SizeCode, type StapleTypeCode } from '@/types'
 
 /**
  * 获取规格按钮显示的值
- * 根据面条类型和是否包含面条显示不同的价格
+ * 根据主食类型显示不同的价格
  */
 export const getSizeDisplayValue = (
-  size: Size,
-  includeNoodles: boolean,
-  noodleType: NoodleType
+  sizeCode: SizeCode,
+  stapleTypeCode: StapleTypeCode | null,
 ): string => {
-  const isYiNoodle = includeNoodles && noodleType === '伊面'
-  const sizeMap: Record<Size, string> = {
-    '小': isYiNoodle ? '11' : '10',
-    '中': isYiNoodle ? '13' : '12',
-    '大': isYiNoodle ? '16' : '15',
-    '自定义': '自定义',
-    '无': '无'
+  if (stapleTypeCode === STAPLE_TYPE.rice) {
+    const riceSizeMap: Record<SizeCode, string> = {
+      [SIZE.small]: '15',
+      [SIZE.medium]: '15',
+      [SIZE.large]: '20',
+      [SIZE.custom]: '自定义',
+    }
+
+    return riceSizeMap[sizeCode]
   }
-  
-  return sizeMap[size]
+
+  const sizeMap: Record<SizeCode, string> = {
+    [SIZE.small]: stapleTypeCode === STAPLE_TYPE.yiNoodle ? '11' : '10',
+    [SIZE.medium]: stapleTypeCode === STAPLE_TYPE.yiNoodle ? '13' : '12',
+    [SIZE.large]: stapleTypeCode === STAPLE_TYPE.yiNoodle ? '16' : '15',
+    [SIZE.custom]: '自定义',
+  }
+
+  return sizeMap[sizeCode]
 }

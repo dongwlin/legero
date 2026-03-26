@@ -55,7 +55,6 @@ const Statistic: React.FC = () => {
   // 每次进入统计页面时重置认证状态
   useEffect(() => {
     reset()
-    setStats(new Map<string, DailyStats>())
   }, [reset])
 
   const handleStatistics = () => {

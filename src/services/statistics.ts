@@ -1,13 +1,13 @@
-import { OrderItem } from '@/types'
+import { OrderRecord } from '@/types'
 import dayjs from 'dayjs'
 
 export interface DailyStats {
-  totalAmount: number
+  totalPriceCents: number
   orderCount: number
 }
 
 export const calculateDailyStats = (
-  orders: OrderItem[],
+  orders: OrderRecord[],
 ): Map<string, DailyStats> => {
   const statsMap = new Map<string, DailyStats>()
 
@@ -16,11 +16,11 @@ export const calculateDailyStats = (
     const dateKey = date.format('YYYY-MM-DD')
 
     const dailyStats = statsMap.get(dateKey) || {
-      totalAmount: 0,
+      totalPriceCents: 0,
       orderCount: 0,
     }
 
-    dailyStats.totalAmount += item.price
+    dailyStats.totalPriceCents += item.totalPriceCents
     dailyStats.orderCount += 1
 
     statsMap.set(dateKey, dailyStats)
