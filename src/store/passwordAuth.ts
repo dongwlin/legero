@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
 interface PasswordAuthState {
   enabled: boolean
@@ -17,7 +17,10 @@ export const usePasswordAuthStore = create<PasswordAuthState>()(
       authenticate: () => set({ isAuthenticated: true }),
       reset: () => set({ isAuthenticated: false }),
       toggleEnabled: () =>
-        set((state) => ({ enabled: !state.enabled, isAuthenticated: false })),
+        set((state) => ({
+          enabled: !state.enabled,
+          isAuthenticated: false,
+        })),
     }),
     {
       name: 'password-auth-storage',

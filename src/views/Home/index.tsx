@@ -37,7 +37,7 @@ const HOME_SHORTCUTS: HomeShortcut[] = [
   },
   {
     title: '设置',
-    description: '调整主题、密码与基础配置',
+    description: '管理账号、主题与基础配置',
     path: '/settings',
     icon: CarbonSettings,
     iconClassName:

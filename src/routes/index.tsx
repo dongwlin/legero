@@ -1,3 +1,5 @@
+import AuthRoute from '@/routes/AuthRoute'
+import ProtectedRoute from '@/routes/ProtectedRoute'
 import Home from '@/views/Home'
 import NotFound from '@/views/NotFound'
 import Order from '@/views/Order'
@@ -7,20 +9,29 @@ import { createBrowserRouter } from 'react-router'
 
 const router = createBrowserRouter([
   {
-    path: '/',
-    element: <Home />,
+    path: '/auth',
+    element: <AuthRoute />,
   },
   {
-    path: '/order',
-    element: <Order />,
-  },
-  {
-    path: '/statistics',
-    element: <Statistic />,
-  },
-  {
-    path: '/settings',
-    element: <Settings />,
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: '/',
+        element: <Home />,
+      },
+      {
+        path: '/order',
+        element: <Order />,
+      },
+      {
+        path: '/statistics',
+        element: <Statistic />,
+      },
+      {
+        path: '/settings',
+        element: <Settings />,
+      },
+    ],
   },
   {
     path: '*',

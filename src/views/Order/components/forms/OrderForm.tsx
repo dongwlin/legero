@@ -2,12 +2,9 @@ import React, { useState } from 'react'
 import { CarbonAdd } from '@/components/Icon'
 import { Button, CloseButton, Modal, Separator, TextArea } from '@heroui/react'
 import { type OrderFormValue, type OrderRecord } from '@/types'
-import {
-  createOrderRecord,
-  rebuildOrderRecord,
-} from '@/services/orderFactories'
+import { rebuildOrderRecord } from '@/services/orderFactories'
+import { orderRepository } from '@/services/orderRepository'
 import { useOrderStore } from '@/store/order'
-import dayjs from 'dayjs'
 import { useOrderForm, FormMode } from './useOrderForm'
 import { QuantitySelector } from '../selectors/QuantitySelector'
 import { NoodleSelector } from '../selectors/NoodleSelector'
@@ -24,6 +21,9 @@ const columnSeparatorClassName =
 const footerButtonClassName =
   'h-11 min-w-20 rounded-xl px-4 text-sm font-semibold touch-manipulation md:h-12 md:text-base'
 
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : '订单保存失败，请稍后重试。'
+
 interface OrderFormProps {
   mode: FormMode
   initialItem?: OrderRecord
@@ -33,16 +33,20 @@ interface OrderFormContentProps {
   close: () => void
   initialItem?: OrderRecord
   isCreateMode: boolean
+  isSubmitting: boolean
   mode: FormMode
+  submitError: string | null
   submitButtonText: string
-  onSubmit: (formValue: OrderFormValue, quantity: number) => void
+  onSubmit: (formValue: OrderFormValue, quantity: number) => Promise<void>
 }
 
 const OrderFormContent: React.FC<OrderFormContentProps> = ({
   close,
   initialItem,
   isCreateMode,
+  isSubmitting,
   mode,
+  submitError,
   submitButtonText,
   onSubmit,
 }) => {
@@ -71,8 +75,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
   }
 
   const handleSubmit = () => {
-    onSubmit(formValue, num || 1)
-    close()
+    void onSubmit(formValue, num || 1)
   }
 
   return (
@@ -230,22 +233,28 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
       </Modal.Body>
 
       <Modal.Footer className='border-t border-border/60 px-4 py-3 md:px-5'>
-        <div className='flex w-full flex-row gap-4'>
-          <Button.Root
-            variant='outline'
-            className={`${footerButtonClassName} basis-0 flex-1`}
-            onPress={close}
-          >
-            取消
-          </Button.Root>
-          <Button.Root
-            isDisabled={!isValid}
-            variant='primary'
-            className={`${footerButtonClassName} basis-0 flex-1`}
-            onPress={handleSubmit}
-          >
-            {submitButtonText}
-          </Button.Root>
+        <div className='flex w-full flex-col gap-3'>
+          {submitError ? (
+            <p className='text-sm text-danger'>{submitError}</p>
+          ) : null}
+          <div className='flex w-full flex-row gap-4'>
+            <Button.Root
+              isDisabled={isSubmitting}
+              variant='outline'
+              className={`${footerButtonClassName} basis-0 flex-1`}
+              onPress={close}
+            >
+              取消
+            </Button.Root>
+            <Button.Root
+              isDisabled={!isValid || isSubmitting}
+              variant='primary'
+              className={`${footerButtonClassName} basis-0 flex-1`}
+              onPress={handleSubmit}
+            >
+              {isSubmitting ? '提交中...' : submitButtonText}
+            </Button.Root>
+          </div>
         </div>
       </Modal.Footer>
     </>
@@ -253,16 +262,23 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
 }
 
 const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
-  const genDisplayNo = useOrderStore((state) => state.genDisplayNo)
-  const addOrder = useOrderStore((state) => state.addOrder)
-  const updateOrder = useOrderStore((state) => state.updateOrder)
+  const upsertOrder = useOrderStore((state) => state.upsertOrder)
   const updateTargetID = useOrderStore((state) => state.updateTargetID)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
   const findOrder = useOrderStore((state) => state.findOrder)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createSessionId, setCreateSessionId] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const handleDialogClose = () => {
+  const handleDialogClose = (force = false) => {
+    if (isSubmitting && !force) {
+      return
+    }
+
+    setIsSubmitting(false)
+    setSubmitError(null)
+
     if (mode === 'create') {
       setIsCreateOpen(false)
       setCreateSessionId((prev) => prev + 1)
@@ -272,6 +288,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   }
 
   const handleOpenChange = (nextOpen: boolean) => {
+    if (isSubmitting && !nextOpen) {
+      return
+    }
+
     if (mode === 'create') {
       if (nextOpen) {
         setIsCreateOpen(true)
@@ -284,28 +304,34 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
     }
   }
 
-  const handleSubmit = (formValue: OrderFormValue, quantity: number) => {
-    const now = dayjs().tz()
+  const handleSubmit = async (
+    formValue: OrderFormValue,
+    quantity: number,
+  ): Promise<void> => {
+    setIsSubmitting(true)
+    setSubmitError(null)
 
-    if (mode === 'create') {
-      for (let i = 0; i < quantity; i++) {
-        const displayNo = genDisplayNo()
-        const record = createOrderRecord(formValue, {
-          id: displayNo,
-          displayNo,
-          createdAt: now.toISOString(),
-        })
-        addOrder(record)
+    try {
+      if (mode === 'create') {
+        const persistedRecords = await orderRepository.createMany(formValue, quantity)
+        persistedRecords.forEach(upsertOrder)
+      } else {
+        const activeRecord = activeItem ?? null
+
+        if (!activeRecord) {
+          throw new Error('未找到要修改的订单。')
+        }
+
+        const nextRecord = rebuildOrderRecord(formValue, activeRecord)
+        const persistedRecord = await orderRepository.update(updateTargetID, nextRecord)
+
+        upsertOrder(persistedRecord)
       }
-    } else {
-      const activeRecord = activeItem ?? null
 
-      if (!activeRecord) {
-        return
-      }
-
-      const record = rebuildOrderRecord(formValue, activeRecord)
-      updateOrder(updateTargetID, record)
+      handleDialogClose(true)
+    } catch (error) {
+      setIsSubmitting(false)
+      setSubmitError(getErrorMessage(error))
     }
   }
 
@@ -359,7 +385,9 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                       close={close}
                       initialItem={activeItem}
                       isCreateMode={isCreateMode}
+                      isSubmitting={isSubmitting}
                       mode={mode}
+                      submitError={submitError}
                       submitButtonText={submitButtonText}
                       onSubmit={handleSubmit}
                     />

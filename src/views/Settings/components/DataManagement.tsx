@@ -1,13 +1,29 @@
+import { orderRepository } from '@/services/orderRepository'
 import { useOrderStore } from '@/store/order'
 import { AlertDialog, Button, buttonVariants } from '@heroui/react'
-import React from 'react'
+import React, { useState } from 'react'
 import SettingsSection from './SettingsSection'
+
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : '清空订单失败，请稍后重试。'
 
 const DataManagement: React.FC = () => {
   const clear = useOrderStore((state) => state.clearOrders)
+  const [isClearing, setIsClearing] = useState(false)
+  const [clearError, setClearError] = useState<string | null>(null)
 
-  const handleClear = () => {
-    clear()
+  const handleClear = async () => {
+    setIsClearing(true)
+    setClearError(null)
+
+    try {
+      await orderRepository.clearWorkspace()
+      clear()
+    } catch (error) {
+      setClearError(getErrorMessage(error))
+    } finally {
+      setIsClearing(false)
+    }
   }
 
   return (
@@ -17,8 +33,11 @@ const DataManagement: React.FC = () => {
     >
       <div className='space-y-4'>
         <p className='text-sm leading-6 text-muted'>
-          清空后会移除当前设备上的所有订单记录与本地缓存。
+          清空后会移除当前工作区中的全部订单记录，并同步刷新本地缓存。
         </p>
+        {clearError ? (
+          <p className='text-sm text-danger'>{clearError}</p>
+        ) : null}
 
         <AlertDialog.Root>
           <AlertDialog.Trigger
@@ -46,9 +65,12 @@ const DataManagement: React.FC = () => {
                   <Button.Root
                     slot='close'
                     variant='danger'
-                    onPress={handleClear}
+                    isDisabled={isClearing}
+                    onPress={() => {
+                      void handleClear()
+                    }}
                   >
-                    确认清空
+                    {isClearing ? '清空中...' : '确认清空'}
                   </Button.Root>
                 </AlertDialog.Footer>
               </AlertDialog.Dialog>

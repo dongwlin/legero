@@ -4,9 +4,8 @@ import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import {
   needsMeatStep,
   needsStapleStep,
-  toggleOrderServed,
-  toggleOrderStepStatus,
 } from '@/services/orderStatus'
+import { orderRepository } from '@/services/orderRepository'
 import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
 import { AlertDialog, Button, Card } from '@heroui/react'
@@ -104,12 +103,17 @@ const renderHighlightedForbiddenText = (text: string): React.ReactNode => {
   ))
 }
 
+const getMutationErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : '订单同步失败，请稍后重试。'
+
 const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
   const removeOrder = useOrderStore((state) => state.removeOrder)
-  const updateOrder = useOrderStore((state) => state.updateOrder)
+  const upsertOrder = useOrderStore((state) => state.upsertOrder)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
   const { waitTimeThresholdMinutes } = useOrderSettingsStore()
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isMutating, setIsMutating] = useState(false)
+  const [mutationError, setMutationError] = useState<string | null>(null)
 
   // 计算等待时间（秒）
   const waitTime = record.completedAt
@@ -145,20 +149,45 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
     needsMeatCompletion,
   })
 
-  const persistRecord = (nextRecord: OrderRecord) => {
-    updateOrder(record.id, nextRecord)
+  const persistRecord = async (mutate: () => Promise<OrderRecord>) => {
+    setIsMutating(true)
+    setMutationError(null)
+
+    try {
+      const persistedRecord = await mutate()
+      upsertOrder(persistedRecord)
+    } catch (error) {
+      setMutationError(getMutationErrorMessage(error))
+    } finally {
+      setIsMutating(false)
+    }
   }
 
   const handleToggleStapleStep = () => {
-    persistRecord(toggleOrderStepStatus(record, 'staple'))
+    void persistRecord(() => orderRepository.toggleStep(record.id, 'staple', record))
   }
 
   const handleToggleMeatStep = () => {
-    persistRecord(toggleOrderStepStatus(record, 'meat'))
+    void persistRecord(() => orderRepository.toggleStep(record.id, 'meat', record))
   }
 
   const handleServeMeal = () => {
-    persistRecord(toggleOrderServed(record, dayjs().tz().toISOString()))
+    void persistRecord(() => orderRepository.toggleServed(record.id, record))
+  }
+
+  const handleRemove = async () => {
+    setIsMutating(true)
+    setMutationError(null)
+
+    try {
+      await orderRepository.remove(record.id)
+      removeOrder(record.id)
+      setIsDeleteOpen(false)
+    } catch (error) {
+      setMutationError(getMutationErrorMessage(error))
+    } finally {
+      setIsMutating(false)
+    }
   }
 
   return (
@@ -210,16 +239,21 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             <div className='flex shrink-0 gap-3 self-start'>
               <Button.Root
                 isIconOnly
+                isDisabled={isMutating}
                 className='size-12 rounded-2xl border border-border/70 bg-background/95 shadow-sm touch-manipulation transition-[background-color,border-color,box-shadow] duration-200 data-[hovered=true]:border-border-secondary data-[hovered=true]:bg-background data-[hovered=true]:shadow-md md:size-14'
                 variant='secondary'
                 aria-label='编辑订单'
-                onPress={() => setUpdateTargetID(record.id)}
+                onPress={() => {
+                  setMutationError(null)
+                  setUpdateTargetID(record.id)
+                }}
               >
                 <CarbonEdit className='size-5 md:size-6' />
               </Button.Root>
               <AlertDialog.Root isOpen={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
                 <Button.Root
                   isIconOnly
+                  isDisabled={isMutating}
                   className='size-12 rounded-2xl touch-manipulation md:size-14'
                   variant='danger'
                   aria-label='删除订单'
@@ -243,7 +277,10 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                         <Button.Root
                           slot='close'
                           variant='danger'
-                          onPress={() => removeOrder(record.id)}
+                          isDisabled={isMutating}
+                          onPress={() => {
+                            void handleRemove()
+                          }}
                         >
                           确认
                         </Button.Root>
@@ -258,6 +295,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
           <div className='flex flex-wrap gap-3'>
             {record.stapleStepStatusCode !== STEP_STATUS.unrequired ? (
               <Button.Root
+                isDisabled={isMutating}
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 md:text-xl ${stapleStepButton.className}`}
                 variant={stapleStepButton.variant}
                 onPress={handleToggleStapleStep}
@@ -267,6 +305,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             ) : null}
             {record.meatStepStatusCode !== STEP_STATUS.unrequired ? (
               <Button.Root
+                isDisabled={isMutating}
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 md:text-xl ${meatStepButton.className}`}
                 variant={meatStepButton.variant}
                 onPress={handleToggleMeatStep}
@@ -276,7 +315,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             ) : null}
             <Button.Root
               className={`h-14 min-w-28 px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-32 md:text-xl ${serveMealButton.className}`}
-              isDisabled={isServeMealDisabled}
+              isDisabled={isServeMealDisabled || isMutating}
               variant={serveMealButton.variant}
               onPress={handleServeMeal}
             >
@@ -308,6 +347,9 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
               </span>
             ) : null}
           </div>
+          {mutationError ? (
+            <div className='text-sm text-danger md:text-base'>{mutationError}</div>
+          ) : null}
         </Card.Content>
       </Card.Root>
 

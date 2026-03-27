@@ -1,30 +1,32 @@
-import { OrderRecord } from '@/types'
-import dayjs from 'dayjs'
+import { apiRequest } from './apiClient'
+import type { DailyStatsResponse } from './apiTypes'
 
 export interface DailyStats {
   totalPriceCents: number
   orderCount: number
 }
 
-export const calculateDailyStats = (
-  orders: OrderRecord[],
-): Map<string, DailyStats> => {
-  const statsMap = new Map<string, DailyStats>()
+export const fetchDailyStats = async (
+  from: string,
+  to: string,
+): Promise<Map<string, DailyStats>> => {
+  const params = new URLSearchParams({
+    from,
+    to,
+  })
 
-  for (const item of orders) {
-    const date = dayjs(item.createdAt)
-    const dateKey = date.format('YYYY-MM-DD')
+  const response = await apiRequest<DailyStatsResponse>({
+    path: `/api/stats/daily?${params.toString()}`,
+    auth: true,
+  })
 
-    const dailyStats = statsMap.get(dateKey) || {
-      totalPriceCents: 0,
-      orderCount: 0,
-    }
-
-    dailyStats.totalPriceCents += item.totalPriceCents
-    dailyStats.orderCount += 1
-
-    statsMap.set(dateKey, dailyStats)
-  }
-
-  return statsMap
+  return new Map(
+    response.items.map((item) => [
+      item.date,
+      {
+        orderCount: item.orderCount,
+        totalPriceCents: item.totalPriceCents,
+      },
+    ]),
+  )
 }

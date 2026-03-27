@@ -1,5 +1,6 @@
 import React from 'react'
 import Header from '@/components/Header'
+import ApiConnectionSettings from './components/ApiConnectionSettings'
 import ThemeSettings from './components/ThemeSettings'
 import OrderSettings from './components/OrderSettings'
 import DataManagement from './components/DataManagement'
@@ -19,11 +20,12 @@ const Settings: React.FC = () => {
             管理应用外观、安全与数据
           </h2>
           <p className='mt-3 max-w-2xl text-sm leading-6 text-muted md:text-base'>
-            所有设置都会即时生效，并保存在当前设备上。
+            主题与偏好会保存在当前设备上，订单主数据会同步到当前工作区。
           </p>
         </section>
 
         <div className='space-y-6'>
+          <ApiConnectionSettings />
           <AuthSettings />
           <ThemeSettings />
           <OrderSettings />

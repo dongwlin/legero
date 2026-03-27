@@ -1,21 +1,33 @@
-import { calculateDailyStats, DailyStats } from '@/services/statistics'
-import { useOrderStore } from '@/store/order'
+import { fetchDailyStats, DailyStats } from '@/services/statistics'
+import PasswordLockScreen from '@/components/PasswordLockScreen'
 import { usePasswordAuthStore } from '@/store/passwordAuth'
+import dayjs from 'dayjs'
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import DailyStatsCard from './components/DailyStatsCard'
 import Header from '@/components/Header'
 import StatisticsControls from './components/StatisticsControls'
-import PasswordLockScreen from '@/components/PasswordLockScreen'
 
 interface StatisticsViewProps {
+  errorMessage: string | null
+  fromDate: string
+  isLoading: boolean
   onCalculate: () => void
+  onFromDateChange: (value: string) => void
+  onToDateChange: (value: string) => void
   stats: Map<string, DailyStats>
+  toDate: string
 }
 
 const StatisticsView: React.FC<StatisticsViewProps> = ({
+  errorMessage,
+  fromDate,
+  isLoading,
   onCalculate,
+  onFromDateChange,
+  onToDateChange,
   stats,
+  toDate,
 }) => {
   return (
     <div className='min-h-dvh bg-background pb-20 text-foreground'>
@@ -30,12 +42,22 @@ const StatisticsView: React.FC<StatisticsViewProps> = ({
             查看每日订单汇总与营业表现
           </h2>
           <p className='mt-3 max-w-2xl text-sm leading-6 text-muted md:text-base'>
-            统计会基于当前设备中的订单数据生成每日汇总，方便你快速查看流水与订单量。
+            统计会请求后端返回指定日期区间内的每日汇总，方便你快速查看流水与订单量。
           </p>
         </section>
 
         <div className='space-y-6'>
-          <StatisticsControls onCalculate={onCalculate} />
+          <StatisticsControls
+            fromDate={fromDate}
+            isLoading={isLoading}
+            onCalculate={onCalculate}
+            onFromDateChange={onFromDateChange}
+            onToDateChange={onToDateChange}
+            toDate={toDate}
+          />
+          {errorMessage ? (
+            <p className='text-sm text-danger'>{errorMessage}</p>
+          ) : null}
           <DailyStatsCard stats={stats} />
         </div>
       </main>
@@ -44,21 +66,41 @@ const StatisticsView: React.FC<StatisticsViewProps> = ({
 }
 
 const Statistic: React.FC = () => {
-  const orders = useOrderStore((state) => state.orders)
-  const { enabled, isAuthenticated, authenticate, reset } =
-    usePasswordAuthStore()
-  const navigate = useNavigate()
-  const [stats, setStats] = useState<Map<string, DailyStats>>(
-    new Map<string, DailyStats>(),
+  const passwordProtectionEnabled = usePasswordAuthStore(
+    (state) => state.enabled,
   )
+  const isPasswordAuthenticated = usePasswordAuthStore(
+    (state) => state.isAuthenticated,
+  )
+  const authenticate = usePasswordAuthStore((state) => state.authenticate)
+  const resetPasswordAuth = usePasswordAuthStore((state) => state.reset)
+  const navigate = useNavigate()
+  const [fromDate, setFromDate] = useState(() =>
+    dayjs().startOf('month').format('YYYY-MM-DD'),
+  )
+  const [toDate, setToDate] = useState(() => dayjs().format('YYYY-MM-DD'))
+  const [stats, setStats] = useState<Map<string, DailyStats>>(
+    () => new Map<string, DailyStats>(),
+  )
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  // 每次进入统计页面时重置认证状态
   useEffect(() => {
-    reset()
-  }, [reset])
+    resetPasswordAuth()
+  }, [resetPasswordAuth])
 
-  const handleStatistics = () => {
-    setStats(calculateDailyStats(orders))
+  const handleStatistics = async () => {
+    setIsLoading(true)
+    setErrorMessage(null)
+
+    try {
+      const nextStats = await fetchDailyStats(fromDate, toDate)
+      setStats(nextStats)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '统计加载失败，请稍后重试。')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleUnlock = () => {
@@ -71,14 +113,25 @@ const Statistic: React.FC = () => {
     })
   }
 
-  if (enabled && !isAuthenticated) {
+  if (passwordProtectionEnabled && !isPasswordAuthenticated) {
     return (
       <PasswordLockScreen onUnlock={handleUnlock} onCancel={handleCancel} />
     )
   }
 
   return (
-    <StatisticsView onCalculate={handleStatistics} stats={stats} />
+    <StatisticsView
+      errorMessage={errorMessage}
+      fromDate={fromDate}
+      isLoading={isLoading}
+      onCalculate={() => {
+        void handleStatistics()
+      }}
+      onFromDateChange={setFromDate}
+      onToDateChange={setToDate}
+      stats={stats}
+      toDate={toDate}
+    />
   )
 }
 

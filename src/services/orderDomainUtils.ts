@@ -49,5 +49,5 @@ export const deriveDisplayNoFromId = (id: string): string | null => {
     return id.slice(-4)
   }
 
-  return id
+  return null
 }

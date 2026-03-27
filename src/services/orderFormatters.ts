@@ -70,7 +70,11 @@ export const getDisplayNoText = (
   displayNo: string | null,
   id: string,
 ): string => {
-  const rawDisplayNo = displayNo ?? deriveDisplayNoFromId(id) ?? id
+  const rawDisplayNo = displayNo ?? deriveDisplayNoFromId(id)
+
+  if (!rawDisplayNo) {
+    return '#----'
+  }
 
   if (/^\d+$/.test(rawDisplayNo)) {
     return `#${Number(rawDisplayNo.slice(-4))}`

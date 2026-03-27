@@ -1,127 +1,112 @@
 import { create } from 'zustand'
 import { Filter, type OrderRecord } from '@/types'
-import dayjs from 'dayjs'
-import { persist, createJSONStorage } from 'zustand/middleware'
 
-const ORDER_STORE_SCHEMA_VERSION = 2 as const
+export type OrderStoreStatus = 'idle' | 'loading' | 'ready' | 'error'
 
-export type PersistedOrderStoreV2 = {
-  schemaVersion: typeof ORDER_STORE_SCHEMA_VERSION
-  lastDisplayNoSeq: number
-  lastDisplayNoDate: string | null
-  updatedAt: string | null
-  orders: OrderRecord[]
-  filter: Filter
+type HydrationStateInput = {
+  status: OrderStoreStatus
+  errorMessage?: string | null
 }
 
-interface OrderState extends PersistedOrderStoreV2 {
-  genDisplayNo: () => string
-  addOrder: (item: OrderRecord) => void
-  removeOrder: (id: string) => void
-  updateOrder: (id: string, item: OrderRecord) => void
-  clearOrders: () => void
-
-  setFilter: (filter: Filter) => void
-
+interface OrderState {
+  orders: OrderRecord[]
+  filter: Filter
   updateTargetID: string
+  lastHydratedAt: string | null
+  status: OrderStoreStatus
+  errorMessage: string | null
+  setOrders: (orders: OrderRecord[]) => void
+  upsertOrder: (item: OrderRecord) => void
+  removeOrder: (id: string) => void
+  clearOrders: () => void
+  resetSyncState: () => void
+  setFilter: (filter: Filter) => void
   setUpdateTargetID: (id: string) => void
+  setHydrationState: (input: HydrationStateInput) => void
   findOrder: (id: string) => OrderRecord
 }
 
-export const useOrderStore = create<OrderState>()(
-  persist(
-    (set, get) => ({
-      schemaVersion: ORDER_STORE_SCHEMA_VERSION,
-      lastDisplayNoSeq: 0,
-      lastDisplayNoDate: null,
-      updatedAt: null,
-      genDisplayNo: (): string => {
-        const now = dayjs()
-        const state = get()
+const sortOrdersByCreatedAt = (orders: OrderRecord[]): OrderRecord[] =>
+  [...orders].sort(
+    (left, right) =>
+      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+  )
 
-        const lastDisplayNoDate = state.lastDisplayNoDate
-          ? dayjs(state.lastDisplayNoDate)
-          : null
-        const isSameDay = lastDisplayNoDate
-          ? lastDisplayNoDate.isSame(now, 'date')
-          : false
-
-        const shouldReset = !state.lastDisplayNoDate || !isSameDay
-        const baseSeq = shouldReset ? 0 : state.lastDisplayNoSeq
-
-        const nextSeq = baseSeq + 1
-        const nextSeqText = nextSeq.toString().padStart(4, '0')
-        const displayNo = `${now.format('YYYYMMDD')}${nextSeqText}`
-
-        set({
-          lastDisplayNoSeq: nextSeq,
-          lastDisplayNoDate: now.toISOString(),
-        })
-
-        return displayNo
-      },
-      orders: [],
-      filter: 'all',
-      addOrder: (item) =>
-        set((state) => ({
-          orders: [...state.orders, item],
-          updatedAt: dayjs().toISOString(),
-        })),
-      removeOrder: (id) =>
-        set((state) => ({
-          orders: state.orders.filter((item) => item.id !== id),
-          updatedAt: dayjs().toISOString(),
-        })),
-      updateOrder: (id: string, newItem: OrderRecord) =>
-        set((state) => {
-          const now = dayjs()
-
-          const updatedOrders = state.orders.map((item) => {
-            if (item.id === id) {
-              return {
-                ...newItem,
-                id: item.id,
-              }
-            }
-            return item
-          })
-
-          return {
-            orders: updatedOrders,
-            updatedAt: now.toISOString(),
-          }
-        }),
-      clearOrders: () =>
-        set({
-          orders: [],
-          updatedAt: dayjs().toISOString(),
-          lastDisplayNoSeq: 0,
-          lastDisplayNoDate: null,
-        }),
-      setFilter: (filter) => set({ filter }),
-      updateTargetID: '',
-      setUpdateTargetID: (id) => set({ updateTargetID: id }),
-      findOrder: (id: string): OrderRecord => {
-        const order = useOrderStore
-          .getState()
-          .orders.find((item) => item.id === id)
-        if (!order) {
-          throw new Error('Order not found')
-        }
-        return order
-      },
+export const useOrderStore = create<OrderState>()((set, get) => ({
+  orders: [],
+  filter: 'all',
+  updateTargetID: '',
+  lastHydratedAt: null,
+  status: 'idle',
+  errorMessage: null,
+  setOrders: (orders) =>
+    set({
+      orders: sortOrdersByCreatedAt(orders),
+      lastHydratedAt: new Date().toISOString(),
+      status: 'ready',
+      errorMessage: null,
     }),
-    {
-      name: 'order-store',
-      storage: createJSONStorage(() => localStorage),
-      partialize: (state): PersistedOrderStoreV2 => ({
-        schemaVersion: state.schemaVersion,
-        lastDisplayNoSeq: state.lastDisplayNoSeq,
-        lastDisplayNoDate: state.lastDisplayNoDate,
-        updatedAt: state.updatedAt,
-        orders: state.orders,
-        filter: state.filter,
-      }),
-    },
-  ),
-)
+  upsertOrder: (item) =>
+    set((state) => {
+      const existingIndex = state.orders.findIndex((order) => order.id === item.id)
+
+      if (existingIndex === -1) {
+        return {
+          orders: sortOrdersByCreatedAt([...state.orders, item]),
+          lastHydratedAt: new Date().toISOString(),
+          status: 'ready' as const,
+          errorMessage: null,
+        }
+      }
+
+      const nextOrders = state.orders.map((order) =>
+        order.id === item.id ? item : order,
+      )
+
+      return {
+        orders: sortOrdersByCreatedAt(nextOrders),
+        lastHydratedAt: new Date().toISOString(),
+        status: 'ready' as const,
+        errorMessage: null,
+      }
+    }),
+  removeOrder: (id) =>
+    set((state) => ({
+      orders: state.orders.filter((item) => item.id !== id),
+      lastHydratedAt: new Date().toISOString(),
+      status: 'ready',
+      errorMessage: null,
+    })),
+  clearOrders: () =>
+    set({
+      orders: [],
+      lastHydratedAt: new Date().toISOString(),
+      status: 'ready',
+      errorMessage: null,
+      updateTargetID: '',
+    }),
+  resetSyncState: () =>
+    set({
+      orders: [],
+      lastHydratedAt: null,
+      status: 'idle',
+      errorMessage: null,
+      updateTargetID: '',
+    }),
+  setFilter: (filter) => set({ filter }),
+  setUpdateTargetID: (id) => set({ updateTargetID: id }),
+  setHydrationState: ({ status, errorMessage = null }) =>
+    set(() => ({
+      status,
+      errorMessage,
+    })),
+  findOrder: (id: string): OrderRecord => {
+    const order = get().orders.find((item) => item.id === id)
+
+    if (!order) {
+      throw new Error('Order not found')
+    }
+
+    return order
+  },
+}))

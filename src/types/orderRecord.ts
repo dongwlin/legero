@@ -12,6 +12,7 @@ export type OrderRecord = OrderFormValue & {
   stapleStepStatusCode: StepStatusCode
   meatStepStatusCode: StepStatusCode
   createdAt: string
+  updatedAt: string
   completedAt: string | null
 }
 

@@ -18,7 +18,10 @@ import {
   synchronizeOrderCompletion,
 } from './orderStatus'
 
-type OrderRecordMetadata = Pick<OrderRecord, 'id' | 'displayNo' | 'createdAt' | 'completedAt'>
+type OrderRecordMetadata = Pick<
+  OrderRecord,
+  'id' | 'displayNo' | 'createdAt' | 'updatedAt' | 'completedAt'
+>
 
 type OrderRecordStatusFields = Pick<
   OrderRecord,
@@ -99,13 +102,14 @@ export const composeOrderRecord = (
     stapleStepStatusCode: statusFields.stapleStepStatusCode,
     meatStepStatusCode: statusFields.meatStepStatusCode,
     createdAt: metadata.createdAt,
+    updatedAt: metadata.updatedAt,
     completedAt: metadata.completedAt,
   })
 }
 
 export const createOrderRecord = (
   formValue: OrderFormValue,
-  metadata: Pick<OrderRecordMetadata, 'id' | 'displayNo' | 'createdAt'>,
+  metadata: Pick<OrderRecordMetadata, 'id' | 'displayNo' | 'createdAt' | 'updatedAt'>,
 ): OrderRecord => {
   const normalizedFormValue = normalizeOrderFormValue(formValue)
 
@@ -131,6 +135,7 @@ export const rebuildOrderRecord = (
       id: baseRecord.id,
       displayNo: baseRecord.displayNo,
       createdAt: baseRecord.createdAt,
+      updatedAt: baseRecord.updatedAt,
       completedAt: null,
     },
     createInitialOrderStepStatus(normalizedFormValue),

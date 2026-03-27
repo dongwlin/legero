@@ -1,8 +1,9 @@
 import './App.css'
-import { RouterProvider } from 'react-router/dom'
-import router from './routes'
+import AppBootstrap from '@/components/AppBootstrap'
 import { useThemeStore } from '@/store/theme'
+import { RouterProvider } from 'react-router/dom'
 import { useEffect } from 'react'
+import router from './routes'
 
 function App() {
   const { theme, getEffectiveTheme } = useThemeStore()
@@ -30,7 +31,11 @@ function App() {
     }
   }, [theme, getEffectiveTheme])
 
-  return <RouterProvider router={router} />
+  return (
+    <AppBootstrap>
+      <RouterProvider router={router} />
+    </AppBootstrap>
+  )
 }
 
 export default App
