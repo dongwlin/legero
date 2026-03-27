@@ -84,8 +84,8 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
         <div className='flex flex-col'>
           <div className='pb-2.5'>
             {isCreateMode ? (
-              <div className='grid items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_12rem_1px_12rem] md:gap-x-4'>
-                <div className='h-full'>
+              <div className='grid grid-cols-2 items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_12rem_1px_12rem] md:gap-x-4'>
+                <div className='col-span-2 h-full md:col-span-1'>
                   <NoodleSelector
                     stapleTypeCode={formValue.stapleTypeCode}
                     onStapleEnabledChange={setStapleEnabled}
@@ -114,7 +114,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
                 <div className='h-full'>
                   <QuantitySelector
                     num={num || 1}
-                    setNum={setNum || (() => {})}
+                    setNum={setNum || (() => { })}
                   />
                 </div>
               </div>

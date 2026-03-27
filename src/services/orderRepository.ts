@@ -14,14 +14,9 @@ import type {
   OrderListResponse,
 } from './apiTypes'
 import { orderDtoToOrderRecord } from './orderRecordMapper'
+import { sortOrdersByTimeline } from './orderSorting'
 
 const PAGE_SIZE = 200
-
-const sortOrdersByCreatedAt = (orders: OrderRecord[]): OrderRecord[] =>
-  [...orders].sort(
-    (left, right) =>
-      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
-  )
 
 const toFilterStatus = (filter: Filter): 'all' | 'completed' | 'uncompleted' => {
   switch (filter) {
@@ -64,7 +59,7 @@ const listOrders = async (filter: Filter): Promise<OrderRecord[]> => {
     nextCursor = response.nextCursor ?? null
   } while (nextCursor)
 
-  return sortOrdersByCreatedAt([...byId.values()])
+  return sortOrdersByTimeline([...byId.values()])
 }
 
 export const orderRepository = {
@@ -90,7 +85,7 @@ export const orderRepository = {
       },
     })
 
-    return sortOrdersByCreatedAt(response.items.map(orderDtoToOrderRecord))
+    return sortOrdersByTimeline(response.items.map(orderDtoToOrderRecord))
   },
 
   async update(id: string, record: OrderRecord): Promise<OrderRecord> {

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { Filter, type OrderRecord } from '@/types'
+import { sortOrdersByTimeline } from '@/services/orderSorting'
 
 export type OrderStoreStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -26,12 +27,6 @@ interface OrderState {
   findOrder: (id: string) => OrderRecord
 }
 
-const sortOrdersByCreatedAt = (orders: OrderRecord[]): OrderRecord[] =>
-  [...orders].sort(
-    (left, right) =>
-      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
-  )
-
 export const useOrderStore = create<OrderState>()((set, get) => ({
   orders: [],
   filter: 'all',
@@ -41,7 +36,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
   errorMessage: null,
   setOrders: (orders) =>
     set({
-      orders: sortOrdersByCreatedAt(orders),
+      orders: sortOrdersByTimeline(orders),
       lastHydratedAt: new Date().toISOString(),
       status: 'ready',
       errorMessage: null,
@@ -52,7 +47,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
 
       if (existingIndex === -1) {
         return {
-          orders: sortOrdersByCreatedAt([...state.orders, item]),
+          orders: sortOrdersByTimeline([...state.orders, item]),
           lastHydratedAt: new Date().toISOString(),
           status: 'ready' as const,
           errorMessage: null,
@@ -64,7 +59,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
       )
 
       return {
-        orders: sortOrdersByCreatedAt(nextOrders),
+        orders: sortOrdersByTimeline(nextOrders),
         lastHydratedAt: new Date().toISOString(),
         status: 'ready' as const,
         errorMessage: null,
