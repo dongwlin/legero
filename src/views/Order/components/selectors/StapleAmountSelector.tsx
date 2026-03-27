@@ -8,7 +8,7 @@ import {
 import { STAPLE_AMOUNT_LEVELS, getStapleAmountLabel } from '../constants'
 import OrderField from '../OrderField'
 
-interface NoodleAmountSelectorProps {
+interface StapleAmountSelectorProps {
   stapleTypeCode: StapleTypeCode | null
   stapleAmountCode: AdjustmentCode
   extraStapleUnits: number
@@ -17,17 +17,17 @@ interface NoodleAmountSelectorProps {
 }
 
 /**
- * 主食数量选择器组件
+ * 主食量选择器组件
  * 根据主食类型显示不同的选择器
  */
-export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
+export const StapleAmountSelector: React.FC<StapleAmountSelectorProps> = ({
   stapleTypeCode,
   stapleAmountCode,
   extraStapleUnits,
   onStapleAmountCodeChange,
   onExtraStapleUnitsChange,
 }) => {
-  const includeNoodles = stapleTypeCode !== null
+  const includeStaple = stapleTypeCode !== null
 
   if (stapleTypeCode === STAPLE_TYPE.yiNoodle) {
     return (
@@ -65,9 +65,9 @@ export const NoodleAmountSelector: React.FC<NoodleAmountSelectorProps> = ({
     STAPLE_AMOUNT_LEVELS as readonly AdjustmentCode[]
   ).indexOf(stapleAmountCode)
   const safeLevelIndex = currentLevelIndex === -1 ? 1 : currentLevelIndex
-  const isDecreaseDisabled = !includeNoodles || safeLevelIndex === 0
+  const isDecreaseDisabled = !includeStaple || safeLevelIndex === 0
   const isIncreaseDisabled =
-    !includeNoodles || safeLevelIndex === STAPLE_AMOUNT_LEVELS.length - 1
+    !includeStaple || safeLevelIndex === STAPLE_AMOUNT_LEVELS.length - 1
 
   const handleDecrease = () => {
     if (isDecreaseDisabled) {

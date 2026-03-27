@@ -5,7 +5,7 @@ import { type StapleTypeCode } from '@/types'
 import { STAPLE_TYPE_OPTIONS } from '../constants'
 import OrderField from '../OrderField'
 
-interface NoodleSelectorProps {
+interface StapleSelectorProps {
   stapleTypeCode: StapleTypeCode | null
   onStapleEnabledChange: (checked: boolean) => void
   onStapleTypeCodeChange: (code: StapleTypeCode) => void
@@ -14,12 +14,12 @@ interface NoodleSelectorProps {
 /**
  * 主食选择器组件
  */
-export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
+export const StapleSelector: React.FC<StapleSelectorProps> = ({
   stapleTypeCode,
   onStapleEnabledChange,
   onStapleTypeCodeChange,
 }) => {
-  const includeNoodles = stapleTypeCode !== null
+  const includeStaple = stapleTypeCode !== null
 
   return (
     <OrderField contentClassName='flex flex-1 flex-col'>
@@ -30,7 +30,7 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
         <Switch.Root
           aria-label='是否带主食'
           className='shrink-0'
-          isSelected={includeNoodles}
+          isSelected={includeStaple}
           onChange={onStapleEnabledChange}
         >
           <Switch.Control>
@@ -43,7 +43,7 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
           className='flex flex-1 flex-wrap gap-2'
           options={STAPLE_TYPE_OPTIONS}
           value={stapleTypeCode}
-          isDisabled={!includeNoodles}
+          isDisabled={!includeStaple}
           onChange={onStapleTypeCodeChange}
         />
       </div>

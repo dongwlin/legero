@@ -7,9 +7,9 @@ import { orderRepository } from '@/services/orderRepository'
 import { useOrderStore } from '@/store/order'
 import { useOrderForm, FormMode } from './useOrderForm'
 import { QuantitySelector } from '../selectors/QuantitySelector'
-import { NoodleSelector } from '../selectors/NoodleSelector'
+import { StapleSelector } from '../selectors/StapleSelector'
 import { SizeSelector } from '../selectors/SizeSelector'
-import { NoodleAmountSelector } from '../selectors/NoodleAmountSelector'
+import { StapleAmountSelector } from '../selectors/StapleAmountSelector'
 import { MeatSelector } from '../selectors/MeatSelector'
 import { IngredientSelector } from '../selectors/IngredientSelector'
 import { DiningSelector } from '../selectors/DiningSelector'
@@ -86,7 +86,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
             {isCreateMode ? (
               <div className='grid grid-cols-2 items-stretch gap-2.5 md:grid-cols-[minmax(0,1fr)_1px_12rem_1px_12rem] md:gap-x-4'>
                 <div className='col-span-2 h-full md:col-span-1'>
-                  <NoodleSelector
+                  <StapleSelector
                     stapleTypeCode={formValue.stapleTypeCode}
                     onStapleEnabledChange={setStapleEnabled}
                     onStapleTypeCodeChange={setStapleTypeCode}
@@ -97,7 +97,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
                   className={columnSeparatorClassName}
                 />
                 <div className='h-full'>
-                  <NoodleAmountSelector
+                  <StapleAmountSelector
                     stapleTypeCode={formValue.stapleTypeCode}
                     stapleAmountCode={formValue.stapleAmountCode}
                     extraStapleUnits={formValue.extraStapleUnits}
@@ -120,7 +120,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
               </div>
             ) : (
               <div>
-                <NoodleSelector
+                <StapleSelector
                   stapleTypeCode={formValue.stapleTypeCode}
                   onStapleEnabledChange={setStapleEnabled}
                   onStapleTypeCodeChange={setStapleTypeCode}
@@ -162,7 +162,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
                 />
 
                 <div className='h-full'>
-                  <NoodleAmountSelector
+                  <StapleAmountSelector
                     stapleTypeCode={formValue.stapleTypeCode}
                     stapleAmountCode={formValue.stapleAmountCode}
                     extraStapleUnits={formValue.extraStapleUnits}
