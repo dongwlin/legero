@@ -1,10 +1,6 @@
 import { STEP_STATUS, type OrderRecord, type OrderViewModel, type StepStatusCode } from '@/types'
 import React, { useState } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
-import {
-  needsMeatStep,
-  needsStapleStep,
-} from '@/services/orderStatus'
 import { orderRepository } from '@/services/orderRepository'
 import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
@@ -40,23 +36,14 @@ const getStepButtonProps = (stepStatusCode: StepStatusCode) => {
 const getServeMealButtonProps = ({
   completedAt,
   isDisabled,
-  needsMeatCompletion,
-  needsStapleCompletion,
 }: {
   completedAt: string | null
   isDisabled: boolean
-  needsMeatCompletion: boolean
-  needsStapleCompletion: boolean
 }) => {
   if (isDisabled) {
     return {
       className:
         'rounded-2xl border-dashed border-border/80 bg-background-secondary/80 font-bold text-muted shadow-none',
-      label: needsStapleCompletion && needsMeatCompletion
-        ? '待主食肉'
-        : needsStapleCompletion
-          ? '待主食'
-          : '待肉',
       variant: 'outline' as const,
     }
   }
@@ -64,7 +51,6 @@ const getServeMealButtonProps = ({
   if (!completedAt) {
     return {
       className: 'rounded-2xl font-bold',
-      label: '出餐',
       variant: 'primary' as const,
     }
   }
@@ -72,7 +58,6 @@ const getServeMealButtonProps = ({
   return {
     className:
       'rounded-2xl border-success/40 bg-success/12 font-bold text-success hover:bg-success/18',
-    label: '出餐',
     variant: 'secondary' as const,
   }
 }
@@ -136,17 +121,10 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
     : isSevereTimeout || isWaitTimeOverThreshold
       ? 'border-warning/35'
       : 'border-border/70'
-  const needsStapleCompletion =
-    needsStapleStep(record) &&
-    record.stapleStepStatusCode !== STEP_STATUS.completed
-  const needsMeatCompletion =
-    needsMeatStep(record) && record.meatStepStatusCode !== STEP_STATUS.completed
   const isServeMealDisabled = !view.canServe
   const serveMealButton = getServeMealButtonProps({
     completedAt: record.completedAt,
     isDisabled: isServeMealDisabled,
-    needsStapleCompletion,
-    needsMeatCompletion,
   })
 
   const persistRecord = async (mutate: () => Promise<OrderRecord>) => {
@@ -314,12 +292,12 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
               </Button.Root>
             ) : null}
             <Button.Root
-              className={`h-14 min-w-28 px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-32 md:text-xl ${serveMealButton.className}`}
+              className={`h-14 min-w-24 px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 md:text-xl ${serveMealButton.className}`}
               isDisabled={isServeMealDisabled || isMutating}
               variant={serveMealButton.variant}
               onPress={handleServeMeal}
             >
-              {serveMealButton.label}
+              出餐
             </Button.Root>
           </div>
 
