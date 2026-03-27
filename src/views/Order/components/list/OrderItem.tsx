@@ -270,7 +270,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             </div>
           </div>
 
-          <div className='flex flex-wrap gap-3'>
+          <div className='flex flex-wrap gap-2'>
             {record.stapleStepStatusCode !== STEP_STATUS.unrequired ? (
               <Button.Root
                 isDisabled={isMutating}
