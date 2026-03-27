@@ -23,7 +23,7 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
 
   return (
     <OrderField contentClassName='flex flex-1 flex-col'>
-      <div className='mb-1.5 flex items-center gap-2.5'>
+      <div className='mb-1.5 flex items-center gap-2'>
         <h3 className='text-sm font-semibold text-foreground md:text-[15px]'>
           主食
         </h3>
@@ -40,7 +40,7 @@ export const NoodleSelector: React.FC<NoodleSelectorProps> = ({
       </div>
       <div className='flex flex-1 items-center'>
         <ToggleButtonGroup
-          className='flex flex-1 flex-wrap gap-2.5'
+          className='flex flex-1 flex-wrap gap-2'
           options={STAPLE_TYPE_OPTIONS}
           value={stapleTypeCode}
           isDisabled={!includeNoodles}
