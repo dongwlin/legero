@@ -56,10 +56,10 @@ const OrderControls: React.FC = () => {
           </div>
         </div>
 
-        <div className='flex w-full gap-3 flex-row md:w-auto md:items-center'>
+        <div className='flex w-full flex-row items-center gap-3 md:w-auto'>
           <Select.Root
             aria-label='订单筛选'
-            className='w-full md:w-40'
+            className='h-14 w-full md:w-40'
             value={filter}
             variant='secondary'
             onChange={(selected) => {
@@ -68,7 +68,7 @@ const OrderControls: React.FC = () => {
               }
             }}
           >
-            <Select.Trigger className='min-h-12 rounded-2xl border border-border/60 bg-background px-4 text-sm md:text-base'>
+            <Select.Trigger className='h-full rounded-2xl border border-border/60 bg-background px-4 text-sm md:text-base'>
               <Select.Value />
               <Select.Indicator />
             </Select.Trigger>
@@ -104,7 +104,7 @@ const OrderControls: React.FC = () => {
             </Select.Popover>
           </Select.Root>
 
-          <div className='flex-none self-end sm:self-auto'>
+          <div className='flex-none'>
             <OrderForm mode='create' />
           </div>
         </div>
