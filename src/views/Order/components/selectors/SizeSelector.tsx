@@ -50,12 +50,12 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
       label=''
       contentClassName='flex flex-1 flex-col justify-center'
     >
-      <div className='flex flex-wrap gap-2'>
+      <div className='flex flex-wrap gap-1 xs:gap-2'>
         {presetSizeOptions.map((option) => (
           <Button.Root
             key={option.value}
             aria-pressed={sizeCode === option.value}
-            className='h-11 min-w-20 rounded-xl px-4 text-sm font-semibold touch-manipulation md:h-12 md:text-base'
+            className='h-11 min-w-18 rounded-xl px-4 text-sm font-semibold touch-manipulation xs:min-w-20 md:h-12 md:text-base'
             variant={sizeCode === option.value ? 'primary' : 'secondary'}
             onPress={() => onSizeCodeChange(option.value)}
           >
@@ -70,12 +70,11 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
             aria-label='自定义价格'
             inputMode='numeric'
             min='0'
-            placeholder='输入价格'
             step='1'
             type='number'
             value={customPriceInput}
             variant='secondary'
-            className='w-28 min-h-11 rounded-xl md:min-h-12'
+            className='w-20 min-h-11 rounded-xl md:min-h-12'
             onFocus={(event) => {
               event.target.select()
             }}
