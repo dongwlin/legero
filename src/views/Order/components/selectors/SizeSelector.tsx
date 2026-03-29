@@ -50,7 +50,7 @@ export const SizeSelector: React.FC<SizeSelectorProps> = ({
       label=''
       contentClassName='flex flex-1 flex-col justify-center'
     >
-      <div className='flex flex-wrap gap-2.5'>
+      <div className='flex flex-wrap gap-2'>
         {presetSizeOptions.map((option) => (
           <Button.Root
             key={option.value}
