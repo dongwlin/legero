@@ -20,7 +20,7 @@ export const MeatSelector: React.FC<MeatSelectorProps> = ({
 }) => {
   return (
     <OrderField label=''>
-      <div className='grid grid-cols-2 gap-2.5 sm:grid-cols-3'>
+      <div className='grid grid-cols-3 gap-2'>
         {MEAT_CHECKBOX_OPTIONS.map((meat) => {
           // 猪腰只在非小份时显示
           if (meat.value === PORK_KIDNEY_CODE && !showPorkKidney) {
