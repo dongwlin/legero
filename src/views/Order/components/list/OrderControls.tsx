@@ -40,7 +40,7 @@ const OrderControls: React.FC = () => {
       variant='secondary'
       className='mb-4 border border-border/70 p-0 shadow-surface'
     >
-      <Card.Content className='flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6'>
+      <Card.Content className='flex flex-col gap-4 px-4 py-4 xs:flex-row xs:items-center xs:justify-between md:px-6'>
         <div className='grid w-full gap-3 grid-cols-2 md:w-auto'>
           <div className='rounded-2xl border border-border/60 bg-background px-4 py-3'>
             <div className='text-sm text-muted'>今日已完成</div>
