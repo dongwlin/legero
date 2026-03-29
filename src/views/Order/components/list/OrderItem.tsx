@@ -177,26 +177,26 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
         <Card.Content className='space-y-4 p-4 md:p-5'>
           <div className='flex flex-wrap items-start justify-between gap-4'>
             <div className='flex-1 space-y-3'>
-              <div className='flex flex-wrap items-center gap-2'>
-                <span className='inline-flex shrink-0 items-center font-mono text-base font-medium leading-none tabular-nums text-muted md:text-xl'>
+              <div className='flex flex-wrap items-center gap-2 xs:gap-4'>
+                <span className='inline-flex shrink-0 items-center font-mono text-lg font-medium leading-none tabular-nums text-muted xs:text-xl'>
                   {view.displayNoText}
                 </span>
                 {view.stapleTypeLabel ? (
                   <span
-                    className={`inline-flex min-h-12 items-center rounded-2xl border px-4 py-2 text-lg font-semibold shadow-sm md:min-h-14 md:text-xl ${view.stapleToneClass}`}
+                    className={`inline-flex min-h-12 items-center rounded-2xl border px-4 py-2 text-lg font-semibold shadow-sm md:min-h-14 xs:text-xl ${view.stapleToneClass}`}
                   >
                     {view.stapleTypeLabel}
                   </span>
                 ) : null}
-                <span className='inline-flex shrink-0 items-center text-xl font-bold leading-none text-foreground tabular-nums md:text-2xl'>
+                <span className='inline-flex shrink-0 items-center text-lg font-bold leading-none text-foreground tabular-nums xs:text-xl'>
                   {view.sizePriceText}
                 </span>
-                <span className='inline-flex shrink-0 items-center text-lg font-semibold leading-none text-foreground md:text-xl'>
+                <span className='inline-flex shrink-0 items-center text-lg font-semibold leading-none text-foreground xs:text-xl'>
                   {view.diningMethodLabel}
                 </span>
               </div>
 
-              <div className='space-y-2 text-base leading-7 text-foreground md:text-lg'>
+              <div className='space-y-2 text-base leading-7 text-foreground xs:text-lg'>
                 {view.meatRequestText !== '' ? (
                   <div>{renderHighlightedForbiddenText(view.meatRequestText)}</div>
                 ) : null}
@@ -269,7 +269,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             {record.stapleStepStatusCode !== STEP_STATUS.unrequired ? (
               <Button.Root
                 isDisabled={isMutating}
-                className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 md:text-xl ${stapleStepButton.className}`}
+                className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${stapleStepButton.className}`}
                 variant={stapleStepButton.variant}
                 onPress={handleToggleStapleStep}
               >
@@ -279,7 +279,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             {record.meatStepStatusCode !== STEP_STATUS.unrequired ? (
               <Button.Root
                 isDisabled={isMutating}
-                className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 md:text-xl ${meatStepButton.className}`}
+                className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${meatStepButton.className}`}
                 variant={meatStepButton.variant}
                 onPress={handleToggleMeatStep}
               >
@@ -296,7 +296,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             </Button.Root>
           </div>
 
-          <div className='flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted md:text-lg'>
+          <div className='flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted xs:text-base'>
             <span className='font-mono tabular-nums'>
               {dayjs(record.createdAt).format('YYYY-MM-DD HH:mm:ss')}
             </span>
