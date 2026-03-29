@@ -194,11 +194,6 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                 <span className='inline-flex shrink-0 items-center text-lg font-semibold leading-none text-foreground md:text-xl'>
                   {view.diningMethodLabel}
                 </span>
-                {record.completedAt ? (
-                  <span className='inline-flex min-h-12 items-center rounded-2xl border border-success/30 bg-success/12 px-4 py-2 text-base font-semibold text-success shadow-sm md:min-h-14 md:text-lg'>
-                    已出餐
-                  </span>
-                ) : null}
               </div>
 
               <div className='space-y-2 text-base leading-7 text-foreground md:text-lg'>
