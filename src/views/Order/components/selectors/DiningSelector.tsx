@@ -37,7 +37,7 @@ export const DiningSelector: React.FC<DiningSelectorProps> = ({
   return (
     <OrderField label=''>
       <div
-        className={showTakeoutOptions ? 'grid gap-2.5 sm:grid-cols-3' : 'sm:max-w-56'}
+        className='grid gap-2.5 sm:grid-cols-3'
       >
         <OrderCompactSelect
           label='方式'
