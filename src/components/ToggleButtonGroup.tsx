@@ -30,9 +30,9 @@ const normalizeOptions = <T extends ToggleButtonValue>(
     isToggleButtonOption(option)
       ? option
       : {
-          value: option,
-          label: getDisplayValue ? getDisplayValue(option) : String(option),
-        },
+        value: option,
+        label: getDisplayValue ? getDisplayValue(option) : String(option),
+      },
   )
 
 /**
