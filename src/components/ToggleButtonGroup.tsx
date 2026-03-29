@@ -45,7 +45,7 @@ export const ToggleButtonGroup = <T extends ToggleButtonValue>({
   onChange,
   getDisplayValue,
   className = 'flex flex-wrap gap-3',
-  buttonClassName = 'h-11 min-w-20 rounded-xl px-4 text-sm font-semibold touch-manipulation md:h-12 md:text-base',
+  buttonClassName = 'h-11 min-w-18 rounded-xl px-4 text-sm font-semibold touch-manipulation xs:min-w-20 md:h-12 md:text-base',
   isDisabled = false,
 }: ToggleButtonGroupProps<T>) => {
   const normalizedOptions = normalizeOptions(options, getDisplayValue)
