@@ -26,7 +26,7 @@ export const IngredientSelector: React.FC<IngredientSelectorProps> = ({
 }) => {
   return (
     <OrderField label=''>
-      <div className='grid gap-2.5 sm:grid-cols-3'>
+      <div className='grid gap-2 grid-cols-3'>
         <OrderCompactSelect
           label='青菜'
           value={greensCode}
