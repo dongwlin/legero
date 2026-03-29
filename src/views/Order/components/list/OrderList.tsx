@@ -30,7 +30,7 @@ type VirtualOrderListProps = {
 const Row = ({ index, style, orders, now }: RowComponentProps<RowProps>) => {
   const order = orders[index]
   return (
-    <div style={style} className='px-1 py-2 md:px-2'>
+    <div style={style} className='px-1 py-1 md:px-2'>
       <OrderItem record={order.record} view={order.view} now={now} />
     </div>
   )
