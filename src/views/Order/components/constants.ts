@@ -49,4 +49,4 @@ export const isSmallSizeCode = (sizeCode: SizeCode): boolean =>
   sizeCode === SIZE.small
 
 export const getStapleAmountLabel = (amountCode: AdjustmentCode): string =>
-  amountCode === ADJUSTMENT.normal ? '标' : ADJUSTMENT_LABELS[amountCode]
+ ADJUSTMENT_LABELS[amountCode]
