@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import { Filter, type OrderRecord } from '@/types'
 import { sortOrdersByTimeline } from '@/services/orderSorting'
 
@@ -27,81 +28,92 @@ interface OrderState {
   findOrder: (id: string) => OrderRecord
 }
 
-export const useOrderStore = create<OrderState>()((set, get) => ({
-  orders: [],
-  filter: 'all',
-  updateTargetID: '',
-  lastHydratedAt: null,
-  status: 'idle',
-  errorMessage: null,
-  setOrders: (orders) =>
-    set({
-      orders: sortOrdersByTimeline(orders),
-      lastHydratedAt: new Date().toISOString(),
-      status: 'ready',
-      errorMessage: null,
-    }),
-  upsertOrder: (item) =>
-    set((state) => {
-      const existingIndex = state.orders.findIndex((order) => order.id === item.id)
-
-      if (existingIndex === -1) {
-        return {
-          orders: sortOrdersByTimeline([...state.orders, item]),
-          lastHydratedAt: new Date().toISOString(),
-          status: 'ready' as const,
-          errorMessage: null,
-        }
-      }
-
-      const nextOrders = state.orders.map((order) =>
-        order.id === item.id ? item : order,
-      )
-
-      return {
-        orders: sortOrdersByTimeline(nextOrders),
-        lastHydratedAt: new Date().toISOString(),
-        status: 'ready' as const,
-        errorMessage: null,
-      }
-    }),
-  removeOrder: (id) =>
-    set((state) => ({
-      orders: state.orders.filter((item) => item.id !== id),
-      lastHydratedAt: new Date().toISOString(),
-      status: 'ready',
-      errorMessage: null,
-    })),
-  clearOrders: () =>
-    set({
+export const useOrderStore = create<OrderState>()(
+  persist(
+    (set, get) => ({
       orders: [],
-      lastHydratedAt: new Date().toISOString(),
-      status: 'ready',
-      errorMessage: null,
+      filter: 'all',
       updateTargetID: '',
-    }),
-  resetSyncState: () =>
-    set({
-      orders: [],
       lastHydratedAt: null,
       status: 'idle',
       errorMessage: null,
-      updateTargetID: '',
+      setOrders: (orders) =>
+        set({
+          orders: sortOrdersByTimeline(orders),
+          lastHydratedAt: new Date().toISOString(),
+          status: 'ready',
+          errorMessage: null,
+        }),
+      upsertOrder: (item) =>
+        set((state) => {
+          const existingIndex = state.orders.findIndex((order) => order.id === item.id)
+
+          if (existingIndex === -1) {
+            return {
+              orders: sortOrdersByTimeline([...state.orders, item]),
+              lastHydratedAt: new Date().toISOString(),
+              status: 'ready' as const,
+              errorMessage: null,
+            }
+          }
+
+          const nextOrders = state.orders.map((order) =>
+            order.id === item.id ? item : order,
+          )
+
+          return {
+            orders: sortOrdersByTimeline(nextOrders),
+            lastHydratedAt: new Date().toISOString(),
+            status: 'ready' as const,
+            errorMessage: null,
+          }
+        }),
+      removeOrder: (id) =>
+        set((state) => ({
+          orders: state.orders.filter((item) => item.id !== id),
+          lastHydratedAt: new Date().toISOString(),
+          status: 'ready',
+          errorMessage: null,
+        })),
+      clearOrders: () =>
+        set({
+          orders: [],
+          lastHydratedAt: new Date().toISOString(),
+          status: 'ready',
+          errorMessage: null,
+          updateTargetID: '',
+        }),
+      resetSyncState: () =>
+        set({
+          orders: [],
+          lastHydratedAt: null,
+          status: 'idle',
+          errorMessage: null,
+          updateTargetID: '',
+        }),
+      setFilter: (filter) => set({ filter }),
+      setUpdateTargetID: (id) => set({ updateTargetID: id }),
+      setHydrationState: ({ status, errorMessage = null }) =>
+        set(() => ({
+          status,
+          errorMessage,
+        })),
+      findOrder: (id: string): OrderRecord => {
+        const order = get().orders.find((item) => item.id === id)
+
+        if (!order) {
+          throw new Error('Order not found')
+        }
+
+        return order
+      },
     }),
-  setFilter: (filter) => set({ filter }),
-  setUpdateTargetID: (id) => set({ updateTargetID: id }),
-  setHydrationState: ({ status, errorMessage = null }) =>
-    set(() => ({
-      status,
-      errorMessage,
-    })),
-  findOrder: (id: string): OrderRecord => {
-    const order = get().orders.find((item) => item.id === id)
-
-    if (!order) {
-      throw new Error('Order not found')
-    }
-
-    return order
-  },
-}))
+    {
+      name: 'order-store-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        filter: state.filter,
+      }),
+    },
+  ),
+)
