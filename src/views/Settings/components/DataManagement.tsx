@@ -49,7 +49,7 @@ const DataManagement: React.FC = () => {
           </AlertDialog.Trigger>
 
           <AlertDialog.Backdrop variant='blur'>
-            <AlertDialog.Container size='sm'>
+            <AlertDialog.Container size='sm' placement='center'>
               <AlertDialog.Dialog>
                 <AlertDialog.Header>
                   <AlertDialog.Icon status='danger' />
@@ -58,7 +58,7 @@ const DataManagement: React.FC = () => {
                 <AlertDialog.Body className='pt-4 text-sm leading-6 text-muted'>
                   确定要清空所有订单数据吗？此操作不可恢复，请谨慎操作。
                 </AlertDialog.Body>
-                <AlertDialog.Footer className='mt-6 flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
+                <AlertDialog.Footer className='mt-6 gap-3 flex-row justify-end'>
                   <Button.Root slot='close' variant='outline'>
                     取消
                   </Button.Root>
@@ -70,7 +70,7 @@ const DataManagement: React.FC = () => {
                       void handleClear()
                     }}
                   >
-                    {isClearing ? '清空中...' : '确认清空'}
+                    {isClearing ? '清空中...' : '确认'}
                   </Button.Root>
                 </AlertDialog.Footer>
               </AlertDialog.Dialog>
