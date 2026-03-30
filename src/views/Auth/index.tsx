@@ -5,6 +5,7 @@ import { useApiBaseUrl } from '@/hooks/useApiBaseUrl'
 import { useRefreshWorkspaceAccess } from '@/hooks/useAuthSessionBootstrap'
 import { authService } from '@/services/authService'
 import { API_CONFIGURATION_ERROR } from '@/services/apiClient'
+import { getRememberedPhone, rememberPhone } from '@/services/rememberedPhone'
 import { orderDtoToOrderRecord } from '@/services/orderRecordMapper'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
@@ -62,7 +63,7 @@ const Auth: React.FC = () => {
   const refreshWorkspaceAccess = useRefreshWorkspaceAccess()
   const resetSyncState = useOrderStore((state) => state.resetSyncState)
   const setOrders = useOrderStore((state) => state.setOrders)
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState(() => getRememberedPhone())
   const [password, setPassword] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [formInfo, setFormInfo] = useState<string | null>(null)
@@ -97,6 +98,7 @@ const Auth: React.FC = () => {
 
     try {
       const result = await authService.signInWithPassword(phone.trim(), password)
+      rememberPhone(result.user.phone)
       setAuthenticatedContext(result)
       setOrders(result.activeOrders.map(orderDtoToOrderRecord))
       setFormInfo('登录成功，正在进入工作区。')

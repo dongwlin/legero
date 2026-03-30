@@ -7,6 +7,7 @@ import {
 import { useApiBaseUrl } from '@/hooks/useApiBaseUrl'
 import { authService } from '@/services/authService'
 import { orderDtoToOrderRecord } from '@/services/orderRecordMapper'
+import { rememberPhone } from '@/services/rememberedPhone'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 
@@ -50,6 +51,7 @@ export const useRefreshWorkspaceAccess = () => {
 
     try {
       const result = await authService.bootstrap()
+      rememberPhone(result.user.phone)
       setAuthenticatedContext(result)
       setOrders(result.activeOrders.map(orderDtoToOrderRecord))
       return 'authenticated'
