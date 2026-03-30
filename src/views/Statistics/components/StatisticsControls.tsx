@@ -59,8 +59,7 @@ const StatisticsControls: React.FC<StatisticsControlsProps> = ({
             variant='primary'
             onPress={onCalculate}
           >
-            <CarbonChartMultitype className='size-5' />
-            {isLoading ? '统计中...' : '开始统计'}
+            {isLoading ? '统计中...' : '统计'}
           </Button.Root>
         </div>
       </Card.Content>
