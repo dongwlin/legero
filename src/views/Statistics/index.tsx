@@ -34,18 +34,6 @@ const StatisticsView: React.FC<StatisticsViewProps> = ({
       <Header title='统计' />
 
       <main className='mx-auto max-w-4xl px-4 pt-[calc(5.25rem+env(safe-area-inset-top))] md:px-8'>
-        <section className='mb-8'>
-          <p className='text-xs font-medium uppercase tracking-[0.24em] text-muted md:text-sm'>
-            Analytics
-          </p>
-          <h2 className='mt-3 text-3xl font-semibold tracking-tight md:text-4xl'>
-            查看每日订单汇总与营业表现
-          </h2>
-          <p className='mt-3 max-w-2xl text-sm leading-6 text-muted md:text-base'>
-            统计会请求后端返回指定日期区间内的每日汇总，方便你快速查看流水与订单量。
-          </p>
-        </section>
-
         <div className='space-y-6'>
           <StatisticsControls
             fromDate={fromDate}
