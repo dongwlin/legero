@@ -2,7 +2,7 @@ import { fetchDailyStats, DailyStats } from '@/services/statistics'
 import PasswordLockScreen from '@/components/PasswordLockScreen'
 import { usePasswordAuthStore } from '@/store/passwordAuth'
 import dayjs from 'dayjs'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import DailyStatsCard from './components/DailyStatsCard'
 import Header from '@/components/Header'
@@ -72,12 +72,14 @@ const Statistic: React.FC = () => {
   )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const hasAutoLoadedRef = useRef(false)
 
   useEffect(() => {
     resetPasswordAuth()
   }, [resetPasswordAuth])
 
-  const handleStatistics = async () => {
+  const handleStatistics = useCallback(async () => {
+    hasAutoLoadedRef.current = true
     setIsLoading(true)
     setErrorMessage(null)
 
@@ -89,7 +91,7 @@ const Statistic: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [fromDate, toDate])
 
   const handleUnlock = () => {
     authenticate()
@@ -100,6 +102,38 @@ const Statistic: React.FC = () => {
       replace: true,
     })
   }
+
+  useEffect(() => {
+    if (hasAutoLoadedRef.current) {
+      return
+    }
+
+    if (fromDate === '' || toDate === '') {
+      return
+    }
+
+    if (passwordProtectionEnabled && !isPasswordAuthenticated) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (hasAutoLoadedRef.current) {
+        return
+      }
+
+      void handleStatistics()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [
+    fromDate,
+    handleStatistics,
+    isPasswordAuthenticated,
+    passwordProtectionEnabled,
+    toDate,
+  ])
 
   if (passwordProtectionEnabled && !isPasswordAuthenticated) {
     return (
