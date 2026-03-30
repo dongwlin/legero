@@ -176,7 +176,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
       >
         <Card.Content className='space-y-4 p-4 md:p-5'>
           <div className='flex flex-wrap items-start justify-between gap-4'>
-            <div className='flex-1'>
+            <div className='flex-1 space-y-3'>
               <div className='flex flex-wrap items-center gap-2 xs:gap-4'>
                 <span className='inline-flex shrink-0 items-center font-mono text-lg font-medium leading-none tabular-nums text-muted xs:text-xl'>
                   {view.displayNoText}
