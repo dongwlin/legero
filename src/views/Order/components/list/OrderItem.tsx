@@ -234,7 +234,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                   <CarbonTrashCan className='size-5 md:size-6' />
                 </Button.Root>
                 <AlertDialog.Backdrop variant='blur'>
-                  <AlertDialog.Container size='sm'>
+                  <AlertDialog.Container size='sm' placement='center'>
                     <AlertDialog.Dialog className='border border-border/70 bg-background shadow-xl'>
                       <AlertDialog.Header>
                         <AlertDialog.Icon status='danger' />
@@ -243,7 +243,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                       <AlertDialog.Body className='pt-4 text-sm leading-6 text-muted'>
                         确定要删除订单 {view.displayNoText} 吗？此操作不可恢复。
                       </AlertDialog.Body>
-                      <AlertDialog.Footer className='mt-6 flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
+                      <AlertDialog.Footer className='mt-6 gap-3 flex-row justify-end'>
                         <Button.Root slot='close' variant='outline'>
                           取消
                         </Button.Root>
