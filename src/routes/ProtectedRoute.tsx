@@ -1,4 +1,4 @@
-import { Button, Card } from '@heroui/react'
+import { Button, Card, Spinner } from '@heroui/react'
 import React from 'react'
 import { Navigate, Outlet } from 'react-router'
 import { useOrderWorkspaceSync } from '@/hooks/useOrderWorkspaceSync'
@@ -6,12 +6,14 @@ import { useAuthStore } from '@/store/auth'
 
 type ProtectedRouteStateProps = {
   description: string
+  isLoading?: boolean
   onRetry?: () => void
   title: string
 }
 
 const ProtectedRouteState: React.FC<ProtectedRouteStateProps> = ({
   description,
+  isLoading = false,
   onRetry,
   title,
 }) => (
@@ -29,6 +31,11 @@ const ProtectedRouteState: React.FC<ProtectedRouteStateProps> = ({
             {description}
           </p>
         </div>
+        {isLoading ? (
+          <div className='flex justify-center'>
+            <Spinner size="lg" />
+          </div>
+        ) : null}
         {onRetry ? (
           <div className='flex justify-center'>
             <Button.Root variant='secondary' onPress={onRetry}>
@@ -49,6 +56,7 @@ const ProtectedRoute: React.FC = () => {
   if (authStatus === 'loading') {
     return (
       <ProtectedRouteState
+        isLoading
         title='正在恢复登录状态'
         description='正在检查当前会话，请稍候。'
       />

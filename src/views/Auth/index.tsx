@@ -1,4 +1,4 @@
-import { Button, Card } from '@heroui/react'
+import { Button, Card, Spinner } from '@heroui/react'
 import React, { useState } from 'react'
 import ApiBaseUrlForm from '@/components/ApiBaseUrlForm'
 import { useApiBaseUrl } from '@/hooks/useApiBaseUrl'
@@ -30,12 +30,14 @@ const AuthSurface: React.FC<AuthSurfaceProps> = ({ children }) => (
 type StatusPanelProps = {
   actions?: React.ReactNode
   description: string
+  isLoading?: boolean
   title: string
 }
 
 const StatusPanel: React.FC<StatusPanelProps> = ({
   actions,
   description,
+  isLoading = false,
   title,
 }) => (
   <div className='space-y-6'>
@@ -43,6 +45,11 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       <h2 className='text-2xl font-semibold tracking-tight'>{title}</h2>
       <p className='text-sm leading-6 text-muted'>{description}</p>
     </div>
+    {isLoading ? (
+      <div className='flex justify-center'>
+        <Spinner size="lg" />
+      </div>
+    ) : null}
     {actions ? <div className='space-y-3'>{actions}</div> : null}
   </div>
 )
@@ -117,6 +124,7 @@ const Auth: React.FC = () => {
     return (
       <AuthSurface>
         <StatusPanel
+          isLoading
           title='正在恢复登录状态'
           description='正在检查当前会话并解析可访问的工作区，请稍候。'
         />
