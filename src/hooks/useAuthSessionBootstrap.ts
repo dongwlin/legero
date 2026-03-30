@@ -10,6 +10,15 @@ import { orderDtoToOrderRecord } from '@/services/orderRecordMapper'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 
+const SESSION_BOOTSTRAP_MAX_ATTEMPTS = 3
+const SESSION_BOOTSTRAP_RETRY_DELAY_MS = 1_000
+
+type WorkspaceAccessResolution =
+  | 'authenticated'
+  | 'anonymous'
+  | 'no_access'
+  | 'error'
+
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Failed to resolve workspace access.'
 
@@ -18,6 +27,11 @@ const isUnauthorizedError = (error: unknown): boolean =>
 
 const isMissingWorkspaceError = (error: unknown): boolean =>
   error instanceof ApiError && error.code === 'workspace_not_found'
+
+const waitForRetry = (durationMs: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, durationMs)
+  })
 
 export const useRefreshWorkspaceAccess = () => {
   const setWorkspaceLoading = useAuthStore((state) => state.setWorkspaceLoading)
@@ -30,7 +44,7 @@ export const useRefreshWorkspaceAccess = () => {
   const resetSyncState = useOrderStore((state) => state.resetSyncState)
   const setOrders = useOrderStore((state) => state.setOrders)
 
-  return useCallback(async () => {
+  return useCallback(async (): Promise<WorkspaceAccessResolution> => {
     setWorkspaceLoading()
     resetSyncState()
 
@@ -38,18 +52,20 @@ export const useRefreshWorkspaceAccess = () => {
       const result = await authService.bootstrap()
       setAuthenticatedContext(result)
       setOrders(result.activeOrders.map(orderDtoToOrderRecord))
+      return 'authenticated'
     } catch (error) {
       if (isUnauthorizedError(error)) {
         setAnonymous()
-        return
+        return 'anonymous'
       }
 
       if (isMissingWorkspaceError(error)) {
         setNoWorkspaceAccess('当前账号尚未加入任何工作区。')
-        return
+        return 'no_access'
       }
 
       setWorkspaceError(getErrorMessage(error))
+      return 'error'
     }
   }, [
     setAnonymous,
@@ -70,19 +86,51 @@ export const useAuthSessionBootstrap = () => {
   const resetSyncState = useOrderStore((state) => state.resetSyncState)
 
   useEffect(() => {
-    if (!apiBaseUrl) {
-      setAnonymous()
-      setWorkspaceError(API_CONFIGURATION_ERROR)
-      return
+    let cancelled = false
+
+    const bootstrapSession = async () => {
+      if (!apiBaseUrl) {
+        setAnonymous()
+        setWorkspaceError(API_CONFIGURATION_ERROR)
+        return
+      }
+
+      if (!hasStoredAuthTokens()) {
+        setAnonymous()
+        resetSyncState()
+        return
+      }
+
+      for (let attempt = 1; attempt <= SESSION_BOOTSTRAP_MAX_ATTEMPTS; attempt += 1) {
+        const result = await refreshWorkspaceAccess()
+
+        if (cancelled) {
+          return
+        }
+
+        if (result !== 'error') {
+          return
+        }
+
+        if (attempt === SESSION_BOOTSTRAP_MAX_ATTEMPTS) {
+          setAnonymous()
+          resetSyncState()
+          return
+        }
+
+        await waitForRetry(SESSION_BOOTSTRAP_RETRY_DELAY_MS)
+
+        if (cancelled) {
+          return
+        }
+      }
     }
 
-    if (!hasStoredAuthTokens()) {
-      setAnonymous()
-      resetSyncState()
-      return
-    }
+    void bootstrapSession()
 
-    void refreshWorkspaceAccess()
+    return () => {
+      cancelled = true
+    }
   }, [
     apiBaseUrl,
     refreshWorkspaceAccess,
