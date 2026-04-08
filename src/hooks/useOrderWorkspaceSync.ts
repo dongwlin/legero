@@ -115,10 +115,6 @@ export const useOrderWorkspaceSync = () => {
             }
           },
         })
-
-        if (!shouldBlock) {
-          void syncSnapshot(false)
-        }
       } catch (error) {
         if (isDisposed) {
           return

@@ -91,6 +91,11 @@ export type OrdersClearedEvent = {
   clearedCount: number
 }
 
-export type PingEvent = {
+export type RealtimeSessionResponse = {
+  ticket: string
+  expiresAt: string
+}
+
+export type RealtimeReadyEvent = {
   serverTime: string
 }

@@ -1,15 +1,11 @@
-import {
-  ApiError,
-  ensureFreshAuthTokens,
-  getApiBaseUrl,
-  refreshAuthTokens,
-} from './apiClient'
+import { ApiError, ensureFreshAuthTokens, getApiBaseUrl } from './apiClient'
 import type {
   OrderDTO,
   OrderDeletedEvent,
   OrdersClearedEvent,
 } from './apiTypes'
 import { orderDtoToOrderRecord } from './orderRecordMapper'
+import { realtimeSession } from './realtimeSession'
 
 type SubscriptionStatus =
   | 'SUBSCRIBED'
@@ -19,6 +15,11 @@ type SubscriptionStatus =
 
 type OrderUpsertEvent = {
   item: OrderDTO
+}
+
+type RealtimeEnvelope = {
+  type?: unknown
+  data?: unknown
 }
 
 type WorkspaceOrderRealtimeOptions = {
@@ -32,82 +33,9 @@ export type OrderRealtimeSubscription = {
   close: () => void
 }
 
-const parseApiError = (status: number, payload: string): ApiError => {
-  if (payload.trim() === '') {
-    return new ApiError(status, `http_${status}`, `Request failed with status ${status}.`)
-  }
-
-  try {
-    const parsed = JSON.parse(payload) as {
-      error?: {
-        code?: string
-        message?: string
-      }
-    }
-
-    return new ApiError(
-      status,
-      parsed.error?.code?.trim() || `http_${status}`,
-      parsed.error?.message?.trim() ||
-        payload.trim() ||
-        `Request failed with status ${status}.`,
-    )
-  } catch {
-    return new ApiError(
-      status,
-      `http_${status}`,
-      payload.trim() || `Request failed with status ${status}.`,
-    )
-  }
-}
-
-const parseEventBlock = (
-  block: string,
-): {
-  eventType: string
-  payload: unknown
-} | null => {
-  const lines = block
-    .split(/\r?\n/)
-    .map((line) => line.trimEnd())
-    .filter((line) => line !== '')
-
-  if (lines.length === 0) {
-    return null
-  }
-
-  let eventType = 'message'
-  const dataLines: string[] = []
-
-  for (const line of lines) {
-    if (line.startsWith('event:')) {
-      eventType = line.slice('event:'.length).trim()
-      continue
-    }
-
-    if (line.startsWith('data:')) {
-      dataLines.push(line.slice('data:'.length).trim())
-    }
-  }
-
-  if (dataLines.length === 0) {
-    return null
-  }
-
-  const payloadText = dataLines.join('\n')
-
-  try {
-    return {
-      eventType,
-      payload: JSON.parse(payloadText),
-    }
-  } catch {
-    return {
-      eventType,
-      payload: payloadText,
-    }
-  }
-}
+const INITIAL_RECONNECT_DELAY_MS = 1_000
+const MAX_INITIAL_RECONNECT_ATTEMPTS = 3
+const MAX_RECONNECT_DELAY_MS = 10_000
 
 const dispatchEvent = (
   eventType: string,
@@ -143,120 +71,183 @@ const dispatchEvent = (
   }
 }
 
-const readEventStream = async (
-  response: Response,
-  signal: AbortSignal,
-  options: WorkspaceOrderRealtimeOptions,
-) => {
-  if (!response.body) {
-    throw new Error('SSE response body is missing.')
+const parseRealtimeEnvelope = (
+  value: unknown,
+): {
+  eventType: string
+  payload: unknown
+} | null => {
+  if (typeof value !== 'string') {
+    return null
   }
 
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  while (!signal.aborted) {
-    const { done, value } = await reader.read()
-
-    if (done) {
-      break
+  try {
+    const parsed = JSON.parse(value) as RealtimeEnvelope
+    if (typeof parsed.type !== 'string' || parsed.type.trim() === '') {
+      return null
     }
 
-    buffer += decoder.decode(value, { stream: true })
-
-    while (true) {
-      const separatorIndex = buffer.search(/\r?\n\r?\n/)
-
-      if (separatorIndex === -1) {
-        break
-      }
-
-      const block = buffer.slice(0, separatorIndex)
-      const separatorMatch = buffer.match(/\r?\n\r?\n/)
-      const separatorLength = separatorMatch?.[0].length ?? 2
-      buffer = buffer.slice(separatorIndex + separatorLength)
-
-      const parsed = parseEventBlock(block)
-
-      if (parsed) {
-        dispatchEvent(parsed.eventType, parsed.payload, options)
-      }
+    return {
+      eventType: parsed.type.trim(),
+      payload: parsed.data,
     }
+  } catch {
+    return null
   }
 }
 
-const openEventStream = async (
-  options: WorkspaceOrderRealtimeOptions,
-  signal: AbortSignal,
-  allowRefreshRetry: boolean,
-) => {
-  const accessToken = (await ensureFreshAuthTokens())?.accessToken
-
-  if (!accessToken) {
-    throw new ApiError(401, 'unauthorized', 'Not authenticated.')
-  }
-
-  const response = await fetch(`${getApiBaseUrl()}/api/events`, {
-    headers: {
-      Accept: 'text/event-stream',
-      Authorization: `Bearer ${accessToken}`,
-      'Cache-Control': 'no-cache',
-    },
-    signal,
-  })
-
-  if (!response.ok) {
-    const apiError = parseApiError(response.status, await response.text())
-
-    if (
-      allowRefreshRetry &&
-      apiError.status === 401 &&
-      apiError.code === 'token_expired'
-    ) {
-      await refreshAuthTokens()
-      return openEventStream(options, signal, false)
-    }
-
-    throw apiError
-  }
-
-  options.onSubscriptionStatus?.('SUBSCRIBED')
-  await readEventStream(response, signal, options)
+const buildWebSocketUrl = (ticket: string): string => {
+  const url = new URL(getApiBaseUrl())
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  url.pathname = `${url.pathname.replace(/\/+$/, '')}/api/ws`
+  url.search = ''
+  url.hash = ''
+  url.searchParams.set('ticket', ticket)
+  return url.toString()
 }
+
+const getReconnectDelayMs = (attempt: number): number =>
+  Math.min(
+    INITIAL_RECONNECT_DELAY_MS * 2 ** Math.max(attempt - 1, 0),
+    MAX_RECONNECT_DELAY_MS,
+  )
 
 export const orderRealtime = {
   subscribeToWorkspaceOrders(
     options: WorkspaceOrderRealtimeOptions,
   ): OrderRealtimeSubscription {
-    const controller = new AbortController()
+    let socket: WebSocket | null = null
+    let reconnectTimer: number | null = null
+    let reconnectAttempts = 0
+    let generation = 0
+    let closedByUser = false
+    let hasEverSubscribed = false
 
-    void openEventStream(options, controller.signal, true)
-      .then(() => {
-        if (!controller.signal.aborted) {
-          options.onSubscriptionStatus?.('TIMED_OUT')
-        }
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) {
-          return
-        }
+    const clearReconnectTimer = () => {
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+    }
 
-        if (
-          error instanceof ApiError &&
-          error.status === 401 &&
-          error.code === 'token_expired'
-        ) {
-          options.onSubscriptionStatus?.('TIMED_OUT')
-          return
-        }
+    const scheduleReconnect = () => {
+      if (closedByUser) {
+        return
+      }
 
+      reconnectAttempts += 1
+
+      if (
+        !hasEverSubscribed &&
+        reconnectAttempts > MAX_INITIAL_RECONNECT_ATTEMPTS
+      ) {
         options.onSubscriptionStatus?.('CHANNEL_ERROR')
-      })
+        return
+      }
+
+      clearReconnectTimer()
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null
+        void connect()
+      }, getReconnectDelayMs(reconnectAttempts))
+    }
+
+    const closeSocket = (code?: number, reason?: string) => {
+      if (!socket) {
+        return
+      }
+
+      const activeSocket = socket
+      socket = null
+
+      if (
+        activeSocket.readyState === WebSocket.OPEN ||
+        activeSocket.readyState === WebSocket.CONNECTING
+      ) {
+        activeSocket.close(code, reason)
+      }
+    }
+
+    const connect = async () => {
+      clearReconnectTimer()
+
+      const currentGeneration = ++generation
+
+      try {
+        if (!(await ensureFreshAuthTokens())?.accessToken) {
+          throw new ApiError(401, 'unauthorized', 'Not authenticated.')
+        }
+
+        const session = await realtimeSession.create()
+        if (closedByUser || currentGeneration !== generation) {
+          return
+        }
+
+        const nextSocket = new WebSocket(buildWebSocketUrl(session.ticket))
+        socket = nextSocket
+
+        nextSocket.onmessage = (event) => {
+          if (closedByUser || currentGeneration !== generation) {
+            return
+          }
+
+          const parsed = parseRealtimeEnvelope(event.data)
+          if (!parsed) {
+            return
+          }
+
+          if (parsed.eventType === 'ready') {
+            reconnectAttempts = 0
+            hasEverSubscribed = true
+            options.onSubscriptionStatus?.('SUBSCRIBED')
+            return
+          }
+
+          dispatchEvent(parsed.eventType, parsed.payload, options)
+        }
+
+        nextSocket.onerror = () => {
+          // The browser will follow with an onclose event.
+        }
+
+        nextSocket.onclose = () => {
+          if (socket === nextSocket) {
+            socket = null
+          }
+
+          if (closedByUser || currentGeneration !== generation) {
+            return
+          }
+
+          scheduleReconnect()
+        }
+      } catch (error) {
+        if (closedByUser || currentGeneration !== generation) {
+          return
+        }
+
+        if (error instanceof ApiError && error.status === 401) {
+          options.onSubscriptionStatus?.('TIMED_OUT')
+          return
+        }
+
+        if (error instanceof ApiError && error.status < 500) {
+          options.onSubscriptionStatus?.('CHANNEL_ERROR')
+          return
+        }
+
+        scheduleReconnect()
+      }
+    }
+
+    void connect()
 
     return {
       close: () => {
-        controller.abort()
+        closedByUser = true
+        generation += 1
+        clearReconnectTimer()
+        closeSocket(1000, 'client_closed')
         options.onSubscriptionStatus?.('CLOSED')
       },
     }
