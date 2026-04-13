@@ -88,13 +88,13 @@ export const getStapleToneClass = (
 ): string => {
   switch (stapleTypeCode) {
     case STAPLE_TYPE.riceSheet:
-      return 'border-sky-500/35 bg-sky-500/12 text-sky-700 dark:text-sky-300'
+      return 'border-blue-500/35 bg-blue-500 text-white'
     case STAPLE_TYPE.riceVermicelli:
-      return 'border-emerald-500/35 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300'
+      return 'border-green-500/35 bg-green-500 text-white'
     case STAPLE_TYPE.yiNoodle:
-      return 'border-amber-500/35 bg-amber-500/12 text-amber-700 dark:text-amber-300'
+      return 'border-yellow-500/35 bg-yellow-500 text-white'
     case STAPLE_TYPE.rice:
-      return 'border-violet-500/35 bg-violet-500/12 text-violet-700 dark:text-violet-300'
+      return 'border-violet-500/35 bg-violet-500 text-white'
     default:
       return 'border-border/70 bg-background text-foreground'
   }
