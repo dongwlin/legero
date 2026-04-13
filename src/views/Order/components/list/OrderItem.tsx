@@ -196,7 +196,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                 </span>
               </div>
 
-              <div className='space-y-2 text-base leading-7 text-foreground xs:text-lg'>
+              <div className='space-y-2 text-base leading-7 text-foreground xs:text-xl'>
                 {view.meatRequestText !== '' ? (
                   <div>{renderHighlightedForbiddenText(view.meatRequestText)}</div>
                 ) : null}
