@@ -8,6 +8,7 @@ import { normalizeOrderFormValue } from './orderFactories'
 import { orderRecordToOrderFormValue } from './orderFormAdapter'
 import { apiRequest } from './apiClient'
 import type {
+  ClearWorkspaceMode,
   ClearOrdersResponse,
   OrderItemResponse,
   OrderItemsResponse,
@@ -138,13 +139,14 @@ export const orderRepository = {
     })
   },
 
-  async clearWorkspace(): Promise<number> {
+  async clearWorkspace(mode: ClearWorkspaceMode = 'all'): Promise<number> {
     const response = await apiRequest<ClearOrdersResponse>({
       path: '/api/orders/actions/clear',
       method: 'POST',
       auth: true,
       body: {
         confirm: true,
+        mode,
       },
     })
 

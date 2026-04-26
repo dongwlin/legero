@@ -1,5 +1,6 @@
 import { ApiError, ensureFreshAuthTokens, getApiBaseUrl } from './apiClient'
 import type {
+  ClearWorkspaceMode,
   OrderDTO,
   OrderDeletedEvent,
   OrdersClearedEvent,
@@ -23,11 +24,14 @@ type RealtimeEnvelope = {
 }
 
 type WorkspaceOrderRealtimeOptions = {
-  onClear?: (clearedCount: number) => void
+  onClear?: (event: OrdersClearedEvent) => void
   onRemove: (id: string) => void
   onSubscriptionStatus?: (status: SubscriptionStatus) => void
   onUpsert: (order: ReturnType<typeof orderDtoToOrderRecord>) => void
 }
+
+const normalizeClearMode = (mode: unknown): ClearWorkspaceMode =>
+  mode === 'before_today' ? 'before_today' : 'all'
 
 export type OrderRealtimeSubscription = {
   close: () => void
@@ -63,10 +67,14 @@ const dispatchEvent = (
   }
 
   if (eventType === 'order.cleared') {
-    const clearedCount = (payload as OrdersClearedEvent | null)?.clearedCount
+    const clearedEvent = payload as OrdersClearedEvent | null
+    const clearedCount = clearedEvent?.clearedCount
 
     if (typeof clearedCount === 'number') {
-      options.onClear?.(clearedCount)
+      options.onClear?.({
+        clearedCount,
+        mode: normalizeClearMode(clearedEvent?.mode),
+      })
     }
   }
 }

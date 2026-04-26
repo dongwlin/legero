@@ -71,6 +71,8 @@ export type OrderListResponse = {
   nextCursor?: string | null
 }
 
+export type ClearWorkspaceMode = 'all' | 'before_today'
+
 export type ClearOrdersResponse = {
   clearedCount: number
 }
@@ -91,6 +93,7 @@ export type OrderDeletedEvent = {
 
 export type OrdersClearedEvent = {
   clearedCount: number
+  mode: ClearWorkspaceMode
 }
 
 export type RealtimeSessionResponse = {

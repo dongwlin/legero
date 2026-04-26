@@ -18,7 +18,6 @@ export const useOrderWorkspaceSync = () => {
   const setOrders = useOrderStore((state) => state.setOrders)
   const upsertOrder = useOrderStore((state) => state.upsertOrder)
   const removeOrder = useOrderStore((state) => state.removeOrder)
-  const clearOrders = useOrderStore((state) => state.clearOrders)
   const resetSyncState = useOrderStore((state) => state.resetSyncState)
   const setHydrationState = useOrderStore((state) => state.setHydrationState)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -90,7 +89,7 @@ export const useOrderWorkspaceSync = () => {
           },
           onClear: () => {
             if (!isDisposed) {
-              clearOrders()
+              void syncSnapshot(false)
             }
           },
           onSubscriptionStatus: (subscriptionStatus) => {
@@ -139,7 +138,6 @@ export const useOrderWorkspaceSync = () => {
   }, [
     activeWorkspaceId,
     authStatus,
-    clearOrders,
     refreshKey,
     removeOrder,
     resetSyncState,
