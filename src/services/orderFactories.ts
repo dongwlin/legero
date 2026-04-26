@@ -65,6 +65,8 @@ export const normalizeOrderFormValue = (
       stapleTypeCode === STAPLE_TYPE.yiNoodle
         ? Math.max(0, Math.trunc(formValue.extraStapleUnits))
         : 0,
+    friedEggCount: Math.max(0, Math.trunc(formValue.friedEggCount)),
+    tofuSkewerCount: Math.max(0, Math.trunc(formValue.tofuSkewerCount)),
     selectedMeatCodes: normalizeSelectedMeatCodes(
       formValue.selectedMeatCodes,
       sizeCode,

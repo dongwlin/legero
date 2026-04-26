@@ -14,6 +14,8 @@ type OrderPricingInput = {
   sizeCode: SizeCode
   customSizePriceCents: number | null
   extraStapleUnits: number
+  friedEggCount: number
+  tofuSkewerCount: number
   diningMethodCode: DiningMethodCode
   packagingCode: PackagingCode | null
 }
@@ -33,6 +35,8 @@ const YI_NOODLE_BASE_PRICE_CENTS_BY_SIZE: Record<SizeCode, number> = {
 }
 
 export const EXTRA_STAPLE_UNIT_PRICE_CENTS = 300
+export const FRIED_EGG_PRICE_CENTS = 200
+export const TOFU_SKEWER_PRICE_CENTS = 200
 export const PLASTIC_CONTAINER_PRICE_CENTS = 50
 
 const getRiceBasePriceCents = (sizeCode: SizeCode): number => {
@@ -74,6 +78,11 @@ export const calculateOrderTotalPriceCents = (
       Math.max(0, Math.trunc(input.extraStapleUnits)) *
       EXTRA_STAPLE_UNIT_PRICE_CENTS
   }
+
+  totalPriceCents +=
+    Math.max(0, Math.trunc(input.friedEggCount)) * FRIED_EGG_PRICE_CENTS
+  totalPriceCents +=
+    Math.max(0, Math.trunc(input.tofuSkewerCount)) * TOFU_SKEWER_PRICE_CENTS
 
   if (
     input.diningMethodCode === DINING_METHOD.takeout &&

@@ -1,5 +1,6 @@
 import { type OrderRecord, type OrderViewModel } from '@/types'
 import {
+  formatAddOnText,
   formatMeatRequestText,
   formatOrderSizePriceText,
   formatOtherRequestText,
@@ -20,6 +21,7 @@ export const orderRecordToOrderViewModel = (
   sizePriceText: formatOrderSizePriceText(record),
   diningMethodLabel: getDiningMethodLabel(record.diningMethodCode),
   meatRequestText: formatMeatRequestText(record),
+  addOnText: formatAddOnText(record),
   otherRequestText: formatOtherRequestText(record),
   noteText: record.note,
   canServe: canServeOrder(record),

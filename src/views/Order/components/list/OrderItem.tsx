@@ -200,6 +200,9 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                 {view.meatRequestText !== '' ? (
                   <div>{renderHighlightedForbiddenText(view.meatRequestText)}</div>
                 ) : null}
+                {view.addOnText ? (
+                  <div>{view.addOnText}</div>
+                ) : null}
                 {view.otherRequestText ? (
                   <div>{renderHighlightedForbiddenText(view.otherRequestText)}</div>
                 ) : null}

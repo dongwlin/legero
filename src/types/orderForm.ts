@@ -21,6 +21,8 @@ export type OrderFormValue = {
   customSizePriceCents: number | null
   stapleAmountCode: AdjustmentCode
   extraStapleUnits: number
+  friedEggCount: number
+  tofuSkewerCount: number
   selectedMeatCodes: MeatCode[]
   greensCode: AdjustmentCode
   scallionCode: AdjustmentCode
@@ -41,6 +43,8 @@ export const DEFAULT_ORDER_FORM_VALUE: Readonly<OrderFormValue> = {
   customSizePriceCents: null,
   stapleAmountCode: ADJUSTMENT.normal,
   extraStapleUnits: 0,
+  friedEggCount: 0,
+  tofuSkewerCount: 0,
   selectedMeatCodes: [
     MEAT.leanPork,
     MEAT.liver,

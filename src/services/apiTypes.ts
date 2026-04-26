@@ -27,6 +27,8 @@ export type OrderDTO = {
   customSizePriceCents: number | null
   stapleAmountCode: number
   extraStapleUnits: number
+  friedEggCount: number
+  tofuSkewerCount: number
   selectedMeatCodes: number[]
   greensCode: number
   scallionCode: number

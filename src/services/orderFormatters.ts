@@ -127,6 +127,20 @@ export const formatMeatRequestText = (record: OrderRecord): string => {
   return `不要${mergeExcludedIntestines(excludedMeatCodes).join('、')}`
 }
 
+export const formatAddOnText = (record: OrderRecord): string => {
+  const parts: string[] = []
+
+  if (record.friedEggCount > 0) {
+    parts.push(`${record.friedEggCount}个煎蛋`)
+  }
+
+  if (record.tofuSkewerCount > 0) {
+    parts.push(`${record.tofuSkewerCount}串豆腐串`)
+  }
+
+  return parts.join('，')
+}
+
 export const formatOtherRequestText = (record: OrderRecord): string => {
   const parts: string[] = []
   const stapleTypeLabel = getStapleTypeLabel(record.stapleTypeCode)

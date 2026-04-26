@@ -10,6 +10,8 @@ export const orderDtoToOrderRecord = (row: OrderDTO): OrderRecord => ({
     row.customSizePriceCents as OrderRecord['customSizePriceCents'],
   stapleAmountCode: row.stapleAmountCode as OrderRecord['stapleAmountCode'],
   extraStapleUnits: row.extraStapleUnits,
+  friedEggCount: row.friedEggCount,
+  tofuSkewerCount: row.tofuSkewerCount,
   selectedMeatCodes: row.selectedMeatCodes as OrderRecord['selectedMeatCodes'],
   greensCode: row.greensCode as OrderRecord['greensCode'],
   scallionCode: row.scallionCode as OrderRecord['scallionCode'],

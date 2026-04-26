@@ -6,6 +6,7 @@ export type OrderViewModel = {
   sizePriceText: string
   diningMethodLabel: string
   meatRequestText: string
+  addOnText: string
   otherRequestText: string
   noteText: string
   canServe: boolean

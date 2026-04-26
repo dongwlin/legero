@@ -12,6 +12,7 @@ import { SizeSelector } from '../selectors/SizeSelector'
 import { StapleAmountSelector } from '../selectors/StapleAmountSelector'
 import { MeatSelector } from '../selectors/MeatSelector'
 import { IngredientSelector } from '../selectors/IngredientSelector'
+import { AddOnSelector } from '../selectors/AddOnSelector'
 import { DiningSelector } from '../selectors/DiningSelector'
 import OrderField from '../OrderField'
 
@@ -64,6 +65,8 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
     setPackagingCode,
     setPackagingMethodCode,
     setExtraStapleUnits,
+    setFriedEggCount,
+    setTofuSkewerCount,
     isValid,
     showPorkKidney,
     showCustomPrice,
@@ -198,6 +201,17 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
                 updateFormValue('scallionCode', value)
               }
               onPepperCodeChange={(value) => updateFormValue('pepperCode', value)}
+            />
+          </div>
+
+          <Separator className={sectionSeparatorClassName} />
+
+          <div className='py-2.5'>
+            <AddOnSelector
+              friedEggCount={formValue.friedEggCount}
+              tofuSkewerCount={formValue.tofuSkewerCount}
+              onFriedEggCountChange={setFriedEggCount}
+              onTofuSkewerCountChange={setTofuSkewerCount}
             />
           </div>
 

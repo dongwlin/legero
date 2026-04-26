@@ -254,6 +254,20 @@ export const useOrderForm = (
     }))
   }, [])
 
+  const setFriedEggCount = useCallback((friedEggCount: number) => {
+    setFormValue((prev) => ({
+      ...prev,
+      friedEggCount: Math.max(0, Math.trunc(friedEggCount)),
+    }))
+  }, [])
+
+  const setTofuSkewerCount = useCallback((tofuSkewerCount: number) => {
+    setFormValue((prev) => ({
+      ...prev,
+      tofuSkewerCount: Math.max(0, Math.trunc(tofuSkewerCount)),
+    }))
+  }, [])
+
   const resetForm = useCallback(() => {
     setNum(1)
     setFormValue(getInitialFormValue(initialItem))
@@ -284,6 +298,8 @@ export const useOrderForm = (
     }
 
     return formValue.extraStapleUnits >= 0
+        && formValue.friedEggCount >= 0
+        && formValue.tofuSkewerCount >= 0
   }, [formValue])
 
   /**
@@ -327,6 +343,8 @@ export const useOrderForm = (
     setPackagingCode,
     setPackagingMethodCode,
     setExtraStapleUnits,
+    setFriedEggCount,
+    setTofuSkewerCount,
     resetForm,
     isValid,
     showPorkKidney,

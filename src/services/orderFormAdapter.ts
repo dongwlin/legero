@@ -20,6 +20,8 @@ export const orderRecordToOrderFormValue = (
   customSizePriceCents: record.customSizePriceCents,
   stapleAmountCode: record.stapleAmountCode,
   extraStapleUnits: record.extraStapleUnits,
+  friedEggCount: record.friedEggCount,
+  tofuSkewerCount: record.tofuSkewerCount,
   selectedMeatCodes: [...record.selectedMeatCodes],
   greensCode: record.greensCode,
   scallionCode: record.scallionCode,
