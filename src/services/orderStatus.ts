@@ -1,4 +1,5 @@
 import {
+  STAPLE_TYPE,
   STEP_STATUS,
   type OrderFormValue,
   type OrderRecord,
@@ -14,7 +15,7 @@ const getStepFieldName = (
   stepKey === 'staple' ? 'stapleStepStatusCode' : 'meatStepStatusCode'
 
 export const needsStapleStep = (input: OrderRequirementInput): boolean =>
-  input.stapleTypeCode !== null
+  input.stapleTypeCode !== null && input.stapleTypeCode !== STAPLE_TYPE.rice
 
 export const needsMeatStep = (input: OrderRequirementInput): boolean =>
   input.selectedMeatCodes.length > 0

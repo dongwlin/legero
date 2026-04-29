@@ -2,6 +2,7 @@ import { STEP_STATUS, type OrderRecord, type OrderViewModel, type StepStatusCode
 import React, { useState } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import { orderRepository } from '@/services/orderRepository'
+import { needsStapleStep } from '@/services/orderStatus'
 import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
 import { AlertDialog, Button, Card } from '@heroui/react'
@@ -114,6 +115,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
 
   const stapleStepButton = getStepButtonProps(record.stapleStepStatusCode)
   const meatStepButton = getStepButtonProps(record.meatStepStatusCode)
+  const shouldShowStapleStepButton = needsStapleStep(record)
   const waitTimeToneClass =
     isSevereTimeout || isWaitTimeOverThreshold ? 'text-danger' : 'text-warning'
   const orderCardToneClass = record.completedAt
@@ -269,7 +271,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
           </div>
 
           <div className='flex flex-wrap gap-2'>
-            {record.stapleStepStatusCode !== STEP_STATUS.unrequired ? (
+            {shouldShowStapleStepButton ? (
               <Button.Root
                 isDisabled={isMutating}
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${stapleStepButton.className}`}
