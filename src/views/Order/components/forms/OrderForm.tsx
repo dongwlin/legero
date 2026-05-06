@@ -389,7 +389,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
               scroll='inside'
               className='items-end p-2 xs:items-center xs:p-4'
             >
-              <Modal.Dialog className='relative max-h-[calc(100dvh-1rem)] border border-border/70 bg-background shadow-2xl xs:max-w-[1100px]'>
+              <Modal.Dialog className='relative max-h-[calc(100dvh-1rem)] border border-border/70 bg-background shadow-2xl xs:max-w-275'>
                 {({ close }) => (
                   <>
                     <CloseButton
