@@ -83,7 +83,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
 
   return (
     <>
-      <Modal.Body className='pt-2 pb-4'>
+      <Modal.Body className='pt-2'>
         <div className='flex flex-col'>
           <div className='pb-2.5'>
             {isCreateMode ? (
@@ -179,8 +179,6 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
             )}
           </div>
 
-          <Separator className={sectionSeparatorClassName} />
-
           <div className='py-2.5'>
             <MeatSelector
               selectedMeatCodes={formValue.selectedMeatCodes}
@@ -188,8 +186,6 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
               showPorkKidney={showPorkKidney}
             />
           </div>
-
-          <Separator className={sectionSeparatorClassName} />
 
           <div className='py-2.5'>
             <IngredientSelector
@@ -208,8 +204,6 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
             />
           </div>
 
-          <Separator className={sectionSeparatorClassName} />
-
           <div className='py-2.5'>
             <AddOnSelector
               friedEggCount={formValue.friedEggCount}
@@ -218,8 +212,6 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
               onTofuSkewerCountChange={setTofuSkewerCount}
             />
           </div>
-
-          <Separator className={sectionSeparatorClassName} />
 
           <div className='py-2.5'>
             <DiningSelector
@@ -232,8 +224,6 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
               showTakeoutOptions={showTakeoutOptions}
             />
           </div>
-
-          <Separator className={sectionSeparatorClassName} />
 
           <div className='pt-2.5 p-1'>
             <OrderField label=''>
