@@ -1,4 +1,9 @@
-import { STEP_STATUS, type OrderRecord, type OrderViewModel, type StepStatusCode } from '@/types'
+import {
+  STEP_STATUS,
+  type OrderRecord,
+  type OrderViewModel,
+  type StepStatusCode,
+} from '@/types'
 import React, { useState } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import { orderRepository } from '@/services/orderRepository'
@@ -18,17 +23,20 @@ const getStepButtonProps = (stepStatusCode: StepStatusCode) => {
   switch (stepStatusCode) {
     case STEP_STATUS.notStarted:
       return {
-        className: 'border-border/60 text-foreground hover:bg-background-secondary',
+        className:
+          'border-border/60 text-foreground hover:bg-background-secondary',
         variant: 'outline' as const,
       }
     case STEP_STATUS.completed:
       return {
-        className: 'border-success/40 bg-success/12 text-success hover:bg-success/18',
+        className:
+          'border-success/40 bg-success/12 text-success hover:bg-success/18',
         variant: 'secondary' as const,
       }
     default:
       return {
-        className: 'border-border/60 text-foreground hover:bg-background-secondary',
+        className:
+          'border-border/60 text-foreground hover:bg-background-secondary',
         variant: 'outline' as const,
       }
   }
@@ -111,7 +119,8 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
     waitTime > 0 &&
     waitTimeThresholdMinutes > 0 &&
     waitTime / 60 >= waitTimeThresholdMinutes
-  const isSevereTimeout = record.completedAt === null && waitTime >= SEVERE_TIMEOUT_SECONDS
+  const isSevereTimeout =
+    record.completedAt === null && waitTime >= SEVERE_TIMEOUT_SECONDS
 
   const stapleStepButton = getStepButtonProps(record.stapleStepStatusCode)
   const meatStepButton = getStepButtonProps(record.meatStepStatusCode)
@@ -144,11 +153,15 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
   }
 
   const handleToggleStapleStep = () => {
-    void persistRecord(() => orderRepository.toggleStep(record.id, 'staple', record))
+    void persistRecord(() =>
+      orderRepository.toggleStep(record.id, 'staple', record),
+    )
   }
 
   const handleToggleMeatStep = () => {
-    void persistRecord(() => orderRepository.toggleStep(record.id, 'meat', record))
+    void persistRecord(() =>
+      orderRepository.toggleStep(record.id, 'meat', record),
+    )
   }
 
   const handleServeMeal = () => {
@@ -200,13 +213,15 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
 
               <div className='space-y-2 text-base leading-7 text-foreground xs:text-xl'>
                 {view.meatRequestText !== '' ? (
-                  <div>{renderHighlightedForbiddenText(view.meatRequestText)}</div>
+                  <div>
+                    {renderHighlightedForbiddenText(view.meatRequestText)}
+                  </div>
                 ) : null}
-                {view.addOnText ? (
-                  <div>{view.addOnText}</div>
-                ) : null}
+                {view.addOnText ? <div>{view.addOnText}</div> : null}
                 {view.otherRequestText ? (
-                  <div>{renderHighlightedForbiddenText(view.otherRequestText)}</div>
+                  <div>
+                    {renderHighlightedForbiddenText(view.otherRequestText)}
+                  </div>
                 ) : null}
                 {view.noteText ? (
                   <div className='italic text-muted'>{view.noteText}</div>
@@ -228,7 +243,10 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
               >
                 <CarbonEdit className='size-5 md:size-6' />
               </Button.Root>
-              <AlertDialog.Root isOpen={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+              <AlertDialog.Root
+                isOpen={isDeleteOpen}
+                onOpenChange={setIsDeleteOpen}
+              >
                 <Button.Root
                   isIconOnly
                   isDisabled={isMutating}
@@ -318,7 +336,9 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                     --:--
                   </span>
                 ) : (
-                  <span className={`font-mono tabular-nums ${waitTimeToneClass}`}>
+                  <span
+                    className={`font-mono tabular-nums ${waitTimeToneClass}`}
+                  >
                     {formatWaitTime(waitTime)}
                   </span>
                 )}
@@ -326,11 +346,12 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             ) : null}
           </div>
           {mutationError ? (
-            <div className='text-sm text-danger md:text-base'>{mutationError}</div>
+            <div className='text-sm text-danger md:text-base'>
+              {mutationError}
+            </div>
           ) : null}
         </Card.Content>
       </Card.Root>
-
     </>
   )
 }
@@ -339,11 +360,17 @@ const areOrderItemPropsEqual = (
   prevProps: OrderItemProps,
   nextProps: OrderItemProps,
 ) => {
-  if (prevProps.record !== nextProps.record || prevProps.view !== nextProps.view) {
+  if (
+    prevProps.record !== nextProps.record ||
+    prevProps.view !== nextProps.view
+  ) {
     return false
   }
 
-  if (prevProps.record.completedAt === null && prevProps.now !== nextProps.now) {
+  if (
+    prevProps.record.completedAt === null &&
+    prevProps.now !== nextProps.now
+  ) {
     return false
   }
 
