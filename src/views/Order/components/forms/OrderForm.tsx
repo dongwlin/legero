@@ -117,7 +117,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
                 <div className='h-full'>
                   <QuantitySelector
                     num={num || 1}
-                    setNum={setNum || (() => { })}
+                    setNum={setNum || (() => {})}
                   />
                 </div>
               </div>
@@ -196,11 +196,15 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
               greensCode={formValue.greensCode}
               scallionCode={formValue.scallionCode}
               pepperCode={formValue.pepperCode}
-              onGreensCodeChange={(value) => updateFormValue('greensCode', value)}
+              onGreensCodeChange={(value) =>
+                updateFormValue('greensCode', value)
+              }
               onScallionCodeChange={(value) =>
                 updateFormValue('scallionCode', value)
               }
-              onPepperCodeChange={(value) => updateFormValue('pepperCode', value)}
+              onPepperCodeChange={(value) =>
+                updateFormValue('pepperCode', value)
+              }
             />
           </div>
 
@@ -327,7 +331,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
 
     try {
       if (mode === 'create') {
-        const persistedRecords = await orderRepository.createMany(formValue, quantity)
+        const persistedRecords = await orderRepository.createMany(
+          formValue,
+          quantity,
+        )
         persistedRecords.forEach(upsertOrder)
       } else {
         const activeRecord = activeItem ?? null
@@ -337,7 +344,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         }
 
         const nextRecord = rebuildOrderRecord(formValue, activeRecord)
-        const persistedRecord = await orderRepository.update(updateTargetID, nextRecord)
+        const persistedRecord = await orderRepository.update(
+          updateTargetID,
+          nextRecord,
+        )
 
         upsertOrder(persistedRecord)
       }
