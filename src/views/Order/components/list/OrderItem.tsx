@@ -292,7 +292,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             {shouldShowStapleStepButton ? (
               <Button.Root
                 isDisabled={isMutating}
-                className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${stapleStepButton.className}`}
+                className={`h-14 min-w-24 rounded-2xl px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${stapleStepButton.className}`}
                 variant={stapleStepButton.variant}
                 onPress={handleToggleStapleStep}
               >
@@ -302,7 +302,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             {record.meatStepStatusCode !== STEP_STATUS.unrequired ? (
               <Button.Root
                 isDisabled={isMutating}
-                className={`h-14 min-w-24 rounded-2xl px-6 text-lg font-semibold shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${meatStepButton.className}`}
+                className={`h-14 min-w-24 rounded-2xl px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${meatStepButton.className}`}
                 variant={meatStepButton.variant}
                 onPress={handleToggleMeatStep}
               >
@@ -310,7 +310,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
               </Button.Root>
             ) : null}
             <Button.Root
-              className={`h-14 min-w-24 px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 md:text-xl ${serveMealButton.className}`}
+              className={`h-14 min-w-24 px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${serveMealButton.className}`}
               isDisabled={isServeMealDisabled || isMutating}
               variant={serveMealButton.variant}
               onPress={handleServeMeal}
