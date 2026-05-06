@@ -198,15 +198,15 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                 </span>
                 {view.stapleTypeLabel ? (
                   <span
-                    className={`inline-flex min-h-12 items-center rounded-2xl border px-4 py-2 text-lg font-semibold shadow-sm md:min-h-14 xs:text-xl ${view.stapleToneClass}`}
+                    className={`inline-flex min-h-12 items-center rounded-2xl border px-4 py-2 text-lg font-semibold shadow-sm md:min-h-14 xs:text-2xl ${view.stapleToneClass}`}
                   >
                     {view.stapleTypeLabel}
                   </span>
                 ) : null}
-                <span className='inline-flex shrink-0 items-center text-lg font-bold leading-none text-foreground tabular-nums xs:text-xl'>
+                <span className='inline-flex shrink-0 items-center text-lg font-bold leading-none text-foreground tabular-nums xs:text-2xl'>
                   {view.sizePriceText}
                 </span>
-                <span className='inline-flex shrink-0 items-center text-lg font-semibold leading-none text-foreground xs:text-xl'>
+                <span className='inline-flex shrink-0 items-center text-lg font-semibold leading-none text-foreground xs:text-2xl'>
                   {view.diningMethodLabel}
                 </span>
               </div>
