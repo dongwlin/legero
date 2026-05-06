@@ -120,7 +120,14 @@ export const formatMeatRequestText = (record: OrderRecord): string => {
     (code) => !selectedMeatSet.has(code),
   )
 
-  if (selectedMeatCodes.length <= excludedMeatCodes.length) {
+  let excludedMeatCodesLen = excludedMeatCodes.length
+  // 如果大肠和小肠都被排除，则合并为“肠”，避免出现“不要大肠、小肠”的冗余表述；
+  // 同时在计算被排除的肉类数量时，合并后的“肠”只算一个，方便在卡片上简介地表示要求
+  if (excludedMeatCodes.includes(MEAT.largeIntestine) && excludedMeatCodes.includes(MEAT.smallIntestine)) {
+    excludedMeatCodesLen -= 1
+  }
+
+  if (selectedMeatCodes.length <= excludedMeatCodesLen) {
     return `只要${selectedMeatCodes.map((code) => MEAT_LABELS[code]).join('、')}`
   }
 
