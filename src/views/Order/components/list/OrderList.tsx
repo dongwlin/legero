@@ -6,6 +6,7 @@ import { AutoSizer } from 'react-virtualized-auto-sizer'
 import { type OrderRecord, type OrderViewModel } from '@/types'
 import { orderRecordToOrderViewModel } from '@/services/orderRecordAdapter'
 import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import { formatPriceCents } from '@/services/orderPricing'
 import { CarbonArrowUp } from '@/components/Icon'
 import { Button, Card, EmptyState } from '@heroui/react'
 
@@ -19,19 +20,47 @@ type OrderListEntry = {
 type RowProps = {
   orders: OrderListEntry[]
   now: number
+  isQuickCalcMode: boolean
+  selectedOrderIdSet: Set<string>
+  onEnterQuickCalc: (id: string) => void
+  onToggleQuickCalcSelection: (id: string) => void
 }
 
 type VirtualOrderListProps = {
   filteredOrders: OrderListEntry[]
   now: number
   rowHeightCacheKey: string
+  isQuickCalcMode: boolean
+  selectedOrderCount: number
+  selectedOrderTotalPriceCents: number
+  selectedOrderIdSet: Set<string>
+  onEnterQuickCalc: (id: string) => void
+  onToggleQuickCalcSelection: (id: string) => void
+  onExitQuickCalc: () => void
 }
 
-const Row = ({ index, style, orders, now }: RowComponentProps<RowProps>) => {
+const Row = ({
+  index,
+  style,
+  orders,
+  now,
+  isQuickCalcMode,
+  selectedOrderIdSet,
+  onEnterQuickCalc,
+  onToggleQuickCalcSelection,
+}: RowComponentProps<RowProps>) => {
   const order = orders[index]
   return (
     <div style={style} className='px-1 py-1 md:px-2'>
-      <OrderItem record={order.record} view={order.view} now={now} />
+      <OrderItem
+        record={order.record}
+        view={order.view}
+        now={now}
+        isQuickCalcMode={isQuickCalcMode}
+        isQuickCalcSelected={selectedOrderIdSet.has(order.record.id)}
+        onEnterQuickCalc={onEnterQuickCalc}
+        onToggleQuickCalcSelection={onToggleQuickCalcSelection}
+      />
     </div>
   )
 }
@@ -40,6 +69,13 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
   filteredOrders,
   now,
   rowHeightCacheKey,
+  isQuickCalcMode,
+  selectedOrderCount,
+  selectedOrderTotalPriceCents,
+  selectedOrderIdSet,
+  onEnterQuickCalc,
+  onToggleQuickCalcSelection,
+  onExitQuickCalc,
 }) => {
   const [showBackToTop, setShowBackToTop] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -87,6 +123,10 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
               rowProps={{
                 orders: filteredOrders,
                 now,
+                isQuickCalcMode,
+                selectedOrderIdSet,
+                onEnterQuickCalc,
+                onToggleQuickCalcSelection,
               }}
               rowComponent={Row}
               overscanCount={5}
@@ -95,6 +135,36 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
           )}
         />
       </Card.Content>
+      {isQuickCalcMode && selectedOrderCount > 0 ? (
+        <Card.Root
+          variant='secondary'
+          className='fixed left-1/2 top-[calc(4.75rem+env(safe-area-inset-top)+0.25rem)] z-30 w-[min(28rem,calc(100vw-1.5rem))] -translate-x-1/2 border border-border/70 bg-background/95 shadow-2xl backdrop-blur-md'
+        >
+          <Card.Content className='flex min-h-18 items-center justify-between gap-2'>
+            <div className='min-w-0'>
+              <div className='text-xs font-semibold uppercase tracking-[0.24em] text-muted'>
+                快速计算
+              </div>
+              <div className='mt-1 text-sm text-muted md:text-base'>
+                已选 {selectedOrderCount} 单
+              </div>
+            </div>
+            <div className='text-2xl font-semibold tabular-nums text-foreground md:text-3xl'>
+              {formatPriceCents(selectedOrderTotalPriceCents)}
+            </div>
+          </Card.Content>
+        </Card.Root>
+      ) : null}
+      {isQuickCalcMode ? (
+        <Button.Root
+          variant='secondary'
+          className='fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-[calc(1rem+env(safe-area-inset-left))] z-30 h-12 rounded-full border border-border/60 bg-background/95 px-4 shadow-lg backdrop-blur-md md:h-13'
+          aria-label='退出快速计算'
+          onPress={onExitQuickCalc}
+        >
+          <span className='text-sm font-semibold md:text-base'>退出计算</span>
+        </Button.Root>
+      ) : null}
       {showBackToTop ? (
         <Button.Root
           isIconOnly
@@ -113,6 +183,18 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
 const OrderList: React.FC = () => {
   const orders = useOrderStore((state) => state.orders)
   const filter = useOrderStore((state) => state.filter)
+  const isQuickCalcMode = useOrderStore((state) => state.isQuickCalcMode)
+  const quickCalcSelectedOrderIds = useOrderStore(
+    (state) => state.quickCalcSelectedOrderIds,
+  )
+  const enterQuickCalcWith = useOrderStore((state) => state.enterQuickCalcWith)
+  const toggleQuickCalcSelection = useOrderStore(
+    (state) => state.toggleQuickCalcSelection,
+  )
+  const exitQuickCalc = useOrderStore((state) => state.exitQuickCalc)
+  const pruneQuickCalcSelection = useOrderStore(
+    (state) => state.pruneQuickCalcSelection,
+  )
   const [now, setNow] = useState(() => Date.now())
 
   const todayOrders = useMemo(
@@ -154,10 +236,41 @@ const OrderList: React.FC = () => {
     () => filteredOrders.map((order) => order.record.id).join('|'),
     [filteredOrders],
   )
+  const selectedOrderIdSet = useMemo(
+    () => new Set(quickCalcSelectedOrderIds),
+    [quickCalcSelectedOrderIds],
+  )
+  const selectedQuickCalcOrders = useMemo(
+    () =>
+      filteredOrders.filter((order) => selectedOrderIdSet.has(order.record.id)),
+    [filteredOrders, selectedOrderIdSet],
+  )
+  const selectedOrderTotalPriceCents = useMemo(
+    () =>
+      selectedQuickCalcOrders.reduce(
+        (totalPriceCents, order) =>
+          totalPriceCents + order.record.totalPriceCents,
+        0,
+      ),
+    [selectedQuickCalcOrders],
+  )
   const hasActiveOrders = useMemo(
     () => filteredOrders.some((order) => order.record.completedAt === null),
     [filteredOrders],
   )
+
+  useEffect(() => {
+    if (!isQuickCalcMode) {
+      return
+    }
+
+    pruneQuickCalcSelection(filteredOrders.map((order) => order.record.id))
+  }, [
+    filteredOrderIdsKey,
+    filteredOrders,
+    isQuickCalcMode,
+    pruneQuickCalcSelection,
+  ])
 
   useEffect(() => {
     if (!hasActiveOrders) {
@@ -184,6 +297,13 @@ const OrderList: React.FC = () => {
       filteredOrders={filteredOrders}
       now={now}
       rowHeightCacheKey={filteredOrderIdsKey}
+      isQuickCalcMode={isQuickCalcMode}
+      selectedOrderCount={selectedQuickCalcOrders.length}
+      selectedOrderTotalPriceCents={selectedOrderTotalPriceCents}
+      selectedOrderIdSet={selectedOrderIdSet}
+      onEnterQuickCalc={enterQuickCalcWith}
+      onToggleQuickCalcSelection={toggleQuickCalcSelection}
+      onExitQuickCalc={exitQuickCalc}
     />
   )
 }

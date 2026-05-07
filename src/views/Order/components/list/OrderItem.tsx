@@ -4,7 +4,7 @@ import {
   type OrderViewModel,
   type StepStatusCode,
 } from '@/types'
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import { orderRepository } from '@/services/orderRepository'
 import { needsStapleStep } from '@/services/orderStatus'
@@ -17,7 +17,17 @@ type OrderItemProps = {
   record: OrderRecord
   view: OrderViewModel
   now: number
+  isQuickCalcMode: boolean
+  isQuickCalcSelected: boolean
+  onEnterQuickCalc: (id: string) => void
+  onToggleQuickCalcSelection: (id: string) => void
 }
+
+const QUICK_CALC_DOUBLE_TAP_THRESHOLD_MS = 280
+
+const isQuickCalcIgnoredTarget = (target: EventTarget | null): boolean =>
+  target instanceof Element &&
+  target.closest('[data-quick-calc-ignore="true"]') !== null
 
 const getStepButtonProps = (stepStatusCode: StepStatusCode) => {
   switch (stepStatusCode) {
@@ -100,7 +110,15 @@ const renderHighlightedForbiddenText = (text: string): React.ReactNode => {
 const getMutationErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : '订单同步失败，请稍后重试。'
 
-const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
+const OrderItem: React.FC<OrderItemProps> = ({
+  record,
+  view,
+  now,
+  isQuickCalcMode,
+  isQuickCalcSelected,
+  onEnterQuickCalc,
+  onToggleQuickCalcSelection,
+}) => {
   const removeOrder = useOrderStore((state) => state.removeOrder)
   const upsertOrder = useOrderStore((state) => state.upsertOrder)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
@@ -108,6 +126,8 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isMutating, setIsMutating] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const lastTouchEndAtRef = useRef<number | null>(null)
+  const suppressNextQuickCalcToggleRef = useRef(false)
 
   // 计算等待时间（秒）
   const waitTime = record.completedAt
@@ -132,6 +152,9 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
     : isSevereTimeout || isWaitTimeOverThreshold
       ? 'border-warning/35'
       : 'border-border/70'
+  const quickCalcSelectionClassName = isQuickCalcSelected
+    ? 'ring-2 ring-accent/45 ring-offset-2 ring-offset-background bg-accent/5 shadow-lg'
+    : ''
   const isServeMealDisabled = !view.canServe
   const serveMealButton = getServeMealButtonProps({
     completedAt: record.completedAt,
@@ -183,11 +206,66 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
     }
   }
 
+  const handleEnterQuickCalc = () => {
+    setMutationError(null)
+    onEnterQuickCalc(record.id)
+  }
+
+  const handleCardDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (isQuickCalcMode || isQuickCalcIgnoredTarget(event.target)) {
+      return
+    }
+
+    handleEnterQuickCalc()
+  }
+
+  const handleCardTouchEnd = (event: React.TouchEvent<HTMLElement>) => {
+    if (
+      isQuickCalcMode ||
+      isQuickCalcIgnoredTarget(event.target) ||
+      event.changedTouches.length !== 1
+    ) {
+      return
+    }
+
+    const currentTouchEndAt = event.timeStamp
+    const previousTouchEndAt = lastTouchEndAtRef.current
+
+    lastTouchEndAtRef.current = currentTouchEndAt
+
+    if (
+      previousTouchEndAt !== null &&
+      currentTouchEndAt - previousTouchEndAt <=
+        QUICK_CALC_DOUBLE_TAP_THRESHOLD_MS
+    ) {
+      suppressNextQuickCalcToggleRef.current = true
+      lastTouchEndAtRef.current = null
+      handleEnterQuickCalc()
+    }
+  }
+
+  const handleCardClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (!isQuickCalcMode || isQuickCalcIgnoredTarget(event.target)) {
+      return
+    }
+
+    if (suppressNextQuickCalcToggleRef.current) {
+      suppressNextQuickCalcToggleRef.current = false
+      return
+    }
+
+    setMutationError(null)
+    onToggleQuickCalcSelection(record.id)
+  }
+
   return (
     <>
       <Card.Root
         variant='secondary'
-        className={`border p-0 transition-shadow duration-200 hover:shadow-lg ${orderCardToneClass}`}
+        className={`border p-0 touch-manipulation transition-shadow duration-200 hover:shadow-lg ${orderCardToneClass} ${quickCalcSelectionClassName}`}
+        onClick={handleCardClick}
+        onDoubleClick={handleCardDoubleClick}
+        onTouchEnd={handleCardTouchEnd}
       >
         <Card.Content className='space-y-4 p-4 md:p-5'>
           <div className='flex flex-wrap items-start justify-between gap-4'>
@@ -233,6 +311,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
               <Button.Root
                 isIconOnly
                 isDisabled={isMutating}
+                data-quick-calc-ignore='true'
                 className='size-12 rounded-2xl border border-border/70 bg-background/95 shadow-sm touch-manipulation transition-[background-color,border-color,box-shadow] duration-200 data-[hovered=true]:border-border-secondary data-[hovered=true]:bg-background data-[hovered=true]:shadow-md md:size-14'
                 variant='secondary'
                 aria-label='编辑订单'
@@ -250,6 +329,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
                 <Button.Root
                   isIconOnly
                   isDisabled={isMutating}
+                  data-quick-calc-ignore='true'
                   className='size-12 rounded-2xl touch-manipulation md:size-14'
                   variant='danger'
                   aria-label='删除订单'
@@ -292,6 +372,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             {shouldShowStapleStepButton ? (
               <Button.Root
                 isDisabled={isMutating}
+                data-quick-calc-ignore='true'
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${stapleStepButton.className}`}
                 variant={stapleStepButton.variant}
                 onPress={handleToggleStapleStep}
@@ -302,6 +383,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
             {record.meatStepStatusCode !== STEP_STATUS.unrequired ? (
               <Button.Root
                 isDisabled={isMutating}
+                data-quick-calc-ignore='true'
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${meatStepButton.className}`}
                 variant={meatStepButton.variant}
                 onPress={handleToggleMeatStep}
@@ -310,6 +392,7 @@ const OrderItem: React.FC<OrderItemProps> = ({ record, view, now }) => {
               </Button.Root>
             ) : null}
             <Button.Root
+              data-quick-calc-ignore='true'
               className={`h-14 min-w-24 px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${serveMealButton.className}`}
               isDisabled={isServeMealDisabled || isMutating}
               variant={serveMealButton.variant}
@@ -362,7 +445,9 @@ const areOrderItemPropsEqual = (
 ) => {
   if (
     prevProps.record !== nextProps.record ||
-    prevProps.view !== nextProps.view
+    prevProps.view !== nextProps.view ||
+    prevProps.isQuickCalcMode !== nextProps.isQuickCalcMode ||
+    prevProps.isQuickCalcSelected !== nextProps.isQuickCalcSelected
   ) {
     return false
   }
