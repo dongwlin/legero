@@ -21,7 +21,9 @@ const AuthSurface: React.FC<AuthSurfaceProps> = ({ children }) => (
         variant='secondary'
         className='border border-border/70 p-0 shadow-surface'
       >
-        <Card.Content className='px-6 py-8 md:px-8 md:py-10'>{children}</Card.Content>
+        <Card.Content className='px-6 py-8 md:px-8 md:py-10'>
+          {children}
+        </Card.Content>
       </Card.Root>
     </div>
   </div>
@@ -47,7 +49,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
     </div>
     {isLoading ? (
       <div className='flex justify-center'>
-        <Spinner size="lg" />
+        <Spinner size='lg' />
       </div>
     ) : null}
     {actions ? <div className='space-y-3'>{actions}</div> : null}
@@ -104,13 +106,18 @@ const Auth: React.FC = () => {
     setIsSubmitting(true)
 
     try {
-      const result = await authService.signInWithPassword(phone.trim(), password)
+      const result = await authService.signInWithPassword(
+        phone.trim(),
+        password,
+      )
       rememberPhone(result.user.phone)
       setAuthenticatedContext(result)
       setOrders(result.activeOrders.map(orderDtoToOrderRecord))
       setFormInfo('登录成功，正在进入工作区。')
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : '登录失败，请稍后重试。')
+      setFormError(
+        error instanceof Error ? error.message : '登录失败，请稍后重试。',
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -189,9 +196,7 @@ const Auth: React.FC = () => {
           description={errorMessage ?? '请检查后端 API 配置或网络状态。'}
           actions={
             <div className='space-y-4'>
-              <ApiBaseUrlForm
-                submitLabel='更新 API 地址'
-              />
+              <ApiBaseUrlForm submitLabel='更新 API 地址' />
               <Button.Root
                 variant='secondary'
                 onPress={() => {
@@ -263,7 +268,11 @@ const Auth: React.FC = () => {
             void handleSubmit()
           }}
         >
-          {isSubmitting ? '登录中...' : isApiConfigured ? '登录' : '请先配置 API 地址'}
+          {isSubmitting
+            ? '登录中...'
+            : isApiConfigured
+              ? '登录'
+              : '请先配置 API 地址'}
         </Button.Root>
       </div>
     </AuthSurface>
