@@ -13,11 +13,11 @@ import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
 import { AlertDialog, Button, Card } from '@heroui/react'
 import dayjs from 'dayjs'
+import { useNow } from './NowContext'
 
 type OrderItemProps = {
   record: OrderRecord
   view: OrderViewModel
-  now: number
   isQuickCalcMode: boolean
   isQuickCalcSelected: boolean
   onEnterQuickCalc: (id: string) => void
@@ -114,12 +114,12 @@ const getMutationErrorMessage = (error: unknown): string =>
 const OrderItem: React.FC<OrderItemProps> = ({
   record,
   view,
-  now,
   isQuickCalcMode,
   isQuickCalcSelected,
   onEnterQuickCalc,
   onToggleQuickCalcSelection,
 }) => {
+  const now = useNow()
   const removeOrder = useOrderStore((state) => state.removeOrder)
   const upsertOrder = useOrderStore((state) => state.upsertOrder)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
@@ -456,23 +456,12 @@ const areOrderItemPropsEqual = (
   prevProps: OrderItemProps,
   nextProps: OrderItemProps,
 ) => {
-  if (
-    prevProps.record !== nextProps.record ||
-    prevProps.view !== nextProps.view ||
-    prevProps.isQuickCalcMode !== nextProps.isQuickCalcMode ||
-    prevProps.isQuickCalcSelected !== nextProps.isQuickCalcSelected
-  ) {
-    return false
-  }
-
-  if (
-    prevProps.record.completedAt === null &&
-    prevProps.now !== nextProps.now
-  ) {
-    return false
-  }
-
-  return true
+  return (
+    prevProps.record === nextProps.record &&
+    prevProps.view === nextProps.view &&
+    prevProps.isQuickCalcMode === nextProps.isQuickCalcMode &&
+    prevProps.isQuickCalcSelected === nextProps.isQuickCalcSelected
+  )
 }
 
 export default React.memo(OrderItem, areOrderItemPropsEqual)

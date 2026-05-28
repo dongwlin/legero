@@ -6,6 +6,7 @@ import {
 } from '@/services/orderRealtime'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
+import type { OrderRecord } from '@/types'
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Failed to sync workspace orders.'
@@ -16,8 +17,6 @@ export const useOrderWorkspaceSync = () => {
   const status = useOrderStore((state) => state.status)
   const errorMessage = useOrderStore((state) => state.errorMessage)
   const setOrders = useOrderStore((state) => state.setOrders)
-  const upsertOrder = useOrderStore((state) => state.upsertOrder)
-  const removeOrder = useOrderStore((state) => state.removeOrder)
   const resetSyncState = useOrderStore((state) => state.resetSyncState)
   const setHydrationState = useOrderStore((state) => state.setHydrationState)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -34,6 +33,41 @@ export const useOrderWorkspaceSync = () => {
 
     let isDisposed = false
     let subscription: OrderRealtimeSubscription | null = null
+
+    const pendingUpserts = new Map<string, OrderRecord>()
+    const pendingRemoves = new Set<string>()
+    let flushRafId: number | null = null
+
+    const flushBatched = () => {
+      flushRafId = null
+
+      if (isDisposed) {
+        return
+      }
+
+      const upserts = Array.from(pendingUpserts.values())
+      const removes = Array.from(pendingRemoves.values())
+      pendingUpserts.clear()
+      pendingRemoves.clear()
+
+      const store = useOrderStore.getState()
+
+      if (upserts.length > 0) {
+        store.upsertOrders(upserts)
+      }
+
+      for (const id of removes) {
+        store.removeOrder(id)
+      }
+    }
+
+    const scheduleBatchFlush = () => {
+      if (flushRafId !== null) {
+        return
+      }
+
+      flushRafId = window.requestAnimationFrame(flushBatched)
+    }
 
     const syncSnapshot = async (shouldBlock: boolean) => {
       if (shouldBlock) {
@@ -79,12 +113,14 @@ export const useOrderWorkspaceSync = () => {
         subscription = orderRealtime.subscribeToWorkspaceOrders({
           onUpsert: (order) => {
             if (!isDisposed) {
-              upsertOrder(order)
+              pendingUpserts.set(order.id, order)
+              scheduleBatchFlush()
             }
           },
           onRemove: (id) => {
             if (!isDisposed) {
-              removeOrder(id)
+              pendingRemoves.add(id)
+              scheduleBatchFlush()
             }
           },
           onClear: () => {
@@ -131,6 +167,11 @@ export const useOrderWorkspaceSync = () => {
     return () => {
       isDisposed = true
 
+      if (flushRafId !== null) {
+        window.cancelAnimationFrame(flushRafId)
+        flushRafId = null
+      }
+
       if (subscription) {
         void orderRealtime.unsubscribe(subscription)
       }
@@ -139,11 +180,9 @@ export const useOrderWorkspaceSync = () => {
     activeWorkspaceId,
     authStatus,
     refreshKey,
-    removeOrder,
     resetSyncState,
     setHydrationState,
     setOrders,
-    upsertOrder,
   ])
 
   return {

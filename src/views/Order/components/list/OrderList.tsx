@@ -9,6 +9,7 @@ import { isOrderCreatedToday } from '@/services/orderDomainUtils'
 import { formatPriceCents } from '@/services/orderPricing'
 import { CarbonArrowUp } from '@/components/Icon'
 import { Button, Card, EmptyState } from '@heroui/react'
+import { NowProvider } from './NowContext'
 
 const DEFAULT_ORDER_ROW_HEIGHT = 280
 
@@ -19,7 +20,6 @@ type OrderListEntry = {
 
 type RowProps = {
   orders: OrderListEntry[]
-  now: number
   isQuickCalcMode: boolean
   selectedOrderIdSet: Set<string>
   onEnterQuickCalc: (id: string) => void
@@ -28,7 +28,6 @@ type RowProps = {
 
 type VirtualOrderListProps = {
   filteredOrders: OrderListEntry[]
-  now: number
   rowHeightCacheKey: string
   isQuickCalcMode: boolean
   selectedOrderCount: number
@@ -43,7 +42,6 @@ const Row = ({
   index,
   style,
   orders,
-  now,
   isQuickCalcMode,
   selectedOrderIdSet,
   onEnterQuickCalc,
@@ -55,7 +53,6 @@ const Row = ({
       <OrderItem
         record={order.record}
         view={order.view}
-        now={now}
         isQuickCalcMode={isQuickCalcMode}
         isQuickCalcSelected={selectedOrderIdSet.has(order.record.id)}
         onEnterQuickCalc={onEnterQuickCalc}
@@ -67,7 +64,6 @@ const Row = ({
 
 const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
   filteredOrders,
-  now,
   rowHeightCacheKey,
   isQuickCalcMode,
   selectedOrderCount,
@@ -92,6 +88,23 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
   const handleBackToTop = useCallback(() => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
+
+  const rowProps = useMemo(
+    () => ({
+      orders: filteredOrders,
+      isQuickCalcMode,
+      selectedOrderIdSet,
+      onEnterQuickCalc,
+      onToggleQuickCalcSelection,
+    }),
+    [
+      filteredOrders,
+      isQuickCalcMode,
+      selectedOrderIdSet,
+      onEnterQuickCalc,
+      onToggleQuickCalcSelection,
+    ],
+  )
 
   if (filteredOrders.length === 0) {
     return (
@@ -120,14 +133,7 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
               style={{ height: height ?? 0, width: width ?? 0 }}
               rowCount={filteredOrders.length}
               rowHeight={dynamicRowHeight}
-              rowProps={{
-                orders: filteredOrders,
-                now,
-                isQuickCalcMode,
-                selectedOrderIdSet,
-                onEnterQuickCalc,
-                onToggleQuickCalcSelection,
-              }}
+              rowProps={rowProps}
               rowComponent={Row}
               overscanCount={5}
               onScroll={handleScroll}
@@ -195,8 +201,6 @@ const OrderList: React.FC = () => {
   const pruneQuickCalcSelection = useOrderStore(
     (state) => state.pruneQuickCalcSelection,
   )
-  const [now, setNow] = useState(() => Date.now())
-
   const todayOrders = useMemo(
     () => orders.filter((order) => isOrderCreatedToday(order)),
     [orders],
@@ -272,39 +276,21 @@ const OrderList: React.FC = () => {
     pruneQuickCalcSelection,
   ])
 
-  useEffect(() => {
-    if (!hasActiveOrders) {
-      return
-    }
-
-    const frameId = window.requestAnimationFrame(() => {
-      setNow(Date.now())
-    })
-
-    const interval = setInterval(() => {
-      setNow(Date.now())
-    }, 1000)
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      clearInterval(interval)
-    }
-  }, [hasActiveOrders])
-
   return (
-    <VirtualOrderList
-      key={filter}
-      filteredOrders={filteredOrders}
-      now={now}
-      rowHeightCacheKey={filteredOrderIdsKey}
-      isQuickCalcMode={isQuickCalcMode}
-      selectedOrderCount={selectedQuickCalcOrders.length}
-      selectedOrderTotalPriceCents={selectedOrderTotalPriceCents}
-      selectedOrderIdSet={selectedOrderIdSet}
-      onEnterQuickCalc={enterQuickCalcWith}
-      onToggleQuickCalcSelection={toggleQuickCalcSelection}
-      onExitQuickCalc={exitQuickCalc}
-    />
+    <NowProvider active={hasActiveOrders}>
+      <VirtualOrderList
+        key={filter}
+        filteredOrders={filteredOrders}
+        rowHeightCacheKey={filteredOrderIdsKey}
+        isQuickCalcMode={isQuickCalcMode}
+        selectedOrderCount={selectedQuickCalcOrders.length}
+        selectedOrderTotalPriceCents={selectedOrderTotalPriceCents}
+        selectedOrderIdSet={selectedOrderIdSet}
+        onEnterQuickCalc={enterQuickCalcWith}
+        onToggleQuickCalcSelection={toggleQuickCalcSelection}
+        onExitQuickCalc={exitQuickCalc}
+      />
+    </NowProvider>
   )
 }
 
