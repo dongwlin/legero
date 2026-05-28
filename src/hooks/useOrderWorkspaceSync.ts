@@ -6,6 +6,7 @@ import {
 } from '@/services/orderRealtime'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
+import { orderOptimistic } from '@/services/orderOptimistic'
 import type { OrderRecord } from '@/types'
 
 const getErrorMessage = (error: unknown): string =>
@@ -113,6 +114,10 @@ export const useOrderWorkspaceSync = () => {
         subscription = orderRealtime.subscribeToWorkspaceOrders({
           onUpsert: (order) => {
             if (!isDisposed) {
+              if (orderOptimistic.hasPending(order.id)) {
+                return
+              }
+
               pendingUpserts.set(order.id, order)
               scheduleBatchFlush()
             }

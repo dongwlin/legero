@@ -8,7 +8,12 @@ import React, { useEffect, useRef, useState } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import { registerAndroidBackInterceptor } from '@/hooks/useAndroidBackButton'
 import { orderRepository } from '@/services/orderRepository'
-import { needsStapleStep } from '@/services/orderStatus'
+import {
+  needsStapleStep,
+  toggleOrderServed,
+  toggleOrderStepStatus,
+} from '@/services/orderStatus'
+import { orderOptimistic } from '@/services/orderOptimistic'
 import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
 import { AlertDialog, Button, Card } from '@heroui/react'
@@ -119,6 +124,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
   const [mutationError, setMutationError] = useState<string | null>(null)
   const lastTouchEndAtRef = useRef<number | null>(null)
   const suppressNextQuickCalcToggleRef = useRef(false)
+  const lastActionAtRef = useRef<number>(0)
 
   const stapleStepButton = getStepButtonProps(record.stapleStepStatusCode)
   const meatStepButton = getStepButtonProps(record.meatStepStatusCode)
@@ -147,34 +153,111 @@ const OrderItem: React.FC<OrderItemProps> = ({
     })
   }, [isDeleteOpen])
 
-  const persistRecord = async (mutate: () => Promise<OrderRecord>) => {
-    setIsMutating(true)
-    setMutationError(null)
-
-    try {
-      const persistedRecord = await mutate()
-      upsertOrder(persistedRecord)
-    } catch (error) {
-      setMutationError(getMutationErrorMessage(error))
-    } finally {
-      setIsMutating(false)
-    }
-  }
+  const DEBOUNCE_MS = 300
 
   const handleToggleStapleStep = () => {
-    void persistRecord(() =>
-      orderRepository.toggleStep(record.id, 'staple', record),
-    )
+    const now = Date.now()
+
+    if (now - lastActionAtRef.current < DEBOUNCE_MS) {
+      return
+    }
+
+    lastActionAtRef.current = now
+    setMutationError(null)
+
+    const nextRecord = toggleOrderStepStatus(record, 'staple')
+
+    if (nextRecord === record) {
+      return
+    }
+
+    const gen = orderOptimistic.beginMutation(record.id, record)
+
+    upsertOrder(nextRecord)
+
+    orderRepository
+      .toggleStep(record.id, 'staple', record)
+      .then((serverRecord) => {
+        if (orderOptimistic.endMutation(record.id, gen)) {
+          upsertOrder(serverRecord)
+        }
+      })
+      .catch((error) => {
+        if (orderOptimistic.endMutation(record.id, gen)) {
+          upsertOrder(record)
+          setMutationError(getMutationErrorMessage(error))
+        }
+      })
   }
 
   const handleToggleMeatStep = () => {
-    void persistRecord(() =>
-      orderRepository.toggleStep(record.id, 'meat', record),
-    )
+    const now = Date.now()
+
+    if (now - lastActionAtRef.current < DEBOUNCE_MS) {
+      return
+    }
+
+    lastActionAtRef.current = now
+    setMutationError(null)
+
+    const nextRecord = toggleOrderStepStatus(record, 'meat')
+
+    if (nextRecord === record) {
+      return
+    }
+
+    const gen = orderOptimistic.beginMutation(record.id, record)
+
+    upsertOrder(nextRecord)
+
+    orderRepository
+      .toggleStep(record.id, 'meat', record)
+      .then((serverRecord) => {
+        if (orderOptimistic.endMutation(record.id, gen)) {
+          upsertOrder(serverRecord)
+        }
+      })
+      .catch((error) => {
+        if (orderOptimistic.endMutation(record.id, gen)) {
+          upsertOrder(record)
+          setMutationError(getMutationErrorMessage(error))
+        }
+      })
   }
 
   const handleServeMeal = () => {
-    void persistRecord(() => orderRepository.toggleServed(record.id, record))
+    const now = Date.now()
+
+    if (now - lastActionAtRef.current < DEBOUNCE_MS) {
+      return
+    }
+
+    lastActionAtRef.current = now
+    setMutationError(null)
+
+    const nextRecord = toggleOrderServed(record, new Date().toISOString())
+
+    if (nextRecord === record) {
+      return
+    }
+
+    const gen = orderOptimistic.beginMutation(record.id, record)
+
+    upsertOrder(nextRecord)
+
+    orderRepository
+      .toggleServed(record.id, record)
+      .then((serverRecord) => {
+        if (orderOptimistic.endMutation(record.id, gen)) {
+          upsertOrder(serverRecord)
+        }
+      })
+      .catch((error) => {
+        if (orderOptimistic.endMutation(record.id, gen)) {
+          upsertOrder(record)
+          setMutationError(getMutationErrorMessage(error))
+        }
+      })
   }
 
   const handleRemove = async () => {
@@ -296,7 +379,6 @@ const OrderItem: React.FC<OrderItemProps> = ({
             <div className='flex shrink-0 gap-2 self-start'>
               <Button.Root
                 isIconOnly
-                isDisabled={isMutating}
                 data-quick-calc-ignore='true'
                 className='size-12 rounded-2xl border border-border/70 bg-background/95 shadow-sm touch-manipulation transition-[background-color,border-color,box-shadow] duration-200 data-[hovered=true]:border-border-secondary data-[hovered=true]:bg-background data-[hovered=true]:shadow-md md:size-14'
                 variant='secondary'
@@ -357,7 +439,6 @@ const OrderItem: React.FC<OrderItemProps> = ({
           <div className='flex flex-wrap gap-2'>
             {shouldShowStapleStepButton ? (
               <Button.Root
-                isDisabled={isMutating}
                 data-quick-calc-ignore='true'
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${stapleStepButton.className}`}
                 variant={stapleStepButton.variant}
@@ -368,7 +449,6 @@ const OrderItem: React.FC<OrderItemProps> = ({
             ) : null}
             {record.meatStepStatusCode !== STEP_STATUS.unrequired ? (
               <Button.Root
-                isDisabled={isMutating}
                 data-quick-calc-ignore='true'
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${meatStepButton.className}`}
                 variant={meatStepButton.variant}
@@ -380,7 +460,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
             <Button.Root
               data-quick-calc-ignore='true'
               className={`h-14 min-w-24 px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${serveMealButton.className}`}
-              isDisabled={isServeMealDisabled || isMutating}
+              isDisabled={isServeMealDisabled}
               variant={serveMealButton.variant}
               onPress={handleServeMeal}
             >
