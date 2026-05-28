@@ -113,8 +113,8 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
         className='h-full border border-border/70 p-0 shadow-surface'
       >
         <Card.Content className='h-full p-4 md:p-6'>
-          <EmptyState.Root className='flex h-full items-center justify-center rounded-2xl border border-dashed border-border/70 bg-background-secondary/40 px-6 py-10 text-center leading-6 text-muted'>
-            当前筛选条件下暂无今日订单
+          <EmptyState.Root className='flex h-full items-center justify-center rounded-2xl border border-dashed border-border/70 bg-background-secondary/40 px-6 py-10 text-center leading-6 text-muted text-base'>
+            暂无相关订单
           </EmptyState.Root>
         </Card.Content>
       </Card.Root>
