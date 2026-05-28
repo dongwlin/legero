@@ -272,6 +272,7 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
 
 const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const upsertOrder = useOrderStore((state) => state.upsertOrder)
+  const upsertOrders = useOrderStore((state) => state.upsertOrders)
   const updateTargetID = useOrderStore((state) => state.updateTargetID)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
   const findOrder = useOrderStore((state) => state.findOrder)
@@ -329,7 +330,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
           formValue,
           quantity,
         )
-        persistedRecords.forEach(upsertOrder)
+        upsertOrders(persistedRecords)
       } else {
         const activeRecord = activeItem ?? null
 

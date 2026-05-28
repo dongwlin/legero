@@ -37,6 +37,7 @@ interface OrderState {
   errorMessage: string | null
   setOrders: (orders: OrderRecord[]) => void
   upsertOrder: (item: OrderRecord) => void
+  upsertOrders: (items: OrderRecord[]) => void
   removeOrder: (id: string) => void
   clearOrders: () => void
   resetSyncState: () => void
@@ -96,6 +97,25 @@ export const useOrderStore = create<OrderState>()(
 
           return {
             orders: sortOrdersByTimeline(nextOrders),
+            lastHydratedAt: new Date().toISOString(),
+            status: 'ready' as const,
+            errorMessage: null,
+          }
+        }),
+      upsertOrders: (items) =>
+        set((state) => {
+          if (items.length === 0) {
+            return state
+          }
+
+          const byId = new Map(state.orders.map((order) => [order.id, order]))
+
+          items.forEach((item) => {
+            byId.set(item.id, item)
+          })
+
+          return {
+            orders: sortOrdersByTimeline([...byId.values()]),
             lastHydratedAt: new Date().toISOString(),
             status: 'ready' as const,
             errorMessage: null,
