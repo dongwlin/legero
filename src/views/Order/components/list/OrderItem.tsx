@@ -13,7 +13,7 @@ import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
 import { AlertDialog, Button, Card } from '@heroui/react'
 import dayjs from 'dayjs'
-import { useNow } from './NowContext'
+import OrderWaitTime from './OrderWaitTime'
 
 type OrderItemProps = {
   record: OrderRecord
@@ -82,15 +82,6 @@ const getServeMealButtonProps = ({
   }
 }
 
-const SEVERE_TIMEOUT_SECONDS = 60 * 60
-
-const formatWaitTime = (seconds: number): string => {
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-
-  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-}
-
 const renderHighlightedForbiddenText = (text: string): React.ReactNode => {
   if (!text.includes('不要')) {
     return text
@@ -119,7 +110,6 @@ const OrderItem: React.FC<OrderItemProps> = ({
   onEnterQuickCalc,
   onToggleQuickCalcSelection,
 }) => {
-  const now = useNow()
   const removeOrder = useOrderStore((state) => state.removeOrder)
   const upsertOrder = useOrderStore((state) => state.upsertOrder)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
@@ -130,29 +120,12 @@ const OrderItem: React.FC<OrderItemProps> = ({
   const lastTouchEndAtRef = useRef<number | null>(null)
   const suppressNextQuickCalcToggleRef = useRef(false)
 
-  // 计算等待时间（秒）
-  const waitTime = record.completedAt
-    ? 0
-    : Math.floor((now - new Date(record.createdAt).getTime()) / 1000)
-
-  // 判断等待时间是否超时（分钟）
-  const isWaitTimeOverThreshold =
-    waitTime > 0 &&
-    waitTimeThresholdMinutes > 0 &&
-    waitTime / 60 >= waitTimeThresholdMinutes
-  const isSevereTimeout =
-    record.completedAt === null && waitTime >= SEVERE_TIMEOUT_SECONDS
-
   const stapleStepButton = getStepButtonProps(record.stapleStepStatusCode)
   const meatStepButton = getStepButtonProps(record.meatStepStatusCode)
   const shouldShowStapleStepButton = needsStapleStep(record)
-  const waitTimeToneClass =
-    isSevereTimeout || isWaitTimeOverThreshold ? 'text-danger' : 'text-warning'
   const orderCardToneClass = record.completedAt
     ? 'border-success/25'
-    : isSevereTimeout || isWaitTimeOverThreshold
-      ? 'border-warning/35'
-      : 'border-border/70'
+    : 'border-border/70'
   const quickCalcSelectionClassName = isQuickCalcSelected
     ? 'ring-2 ring-accent/45 ring-offset-2 ring-offset-background bg-accent/5 shadow-lg'
     : ''
@@ -420,25 +393,11 @@ const OrderItem: React.FC<OrderItemProps> = ({
               {dayjs(record.createdAt).format('YYYY-MM-DD HH:mm:ss')}
             </span>
             {record.completedAt === null ? (
-              <span className='inline-flex items-center gap-2 whitespace-nowrap'>
-                <span
-                  aria-hidden='true'
-                  className='inline-block h-[1em] w-px shrink-0 rounded-full bg-current opacity-60'
-                />
-                {isSevereTimeout ? (
-                  <span
-                    className={`font-mono tabular-nums ${waitTimeToneClass}`}
-                  >
-                    --:--
-                  </span>
-                ) : (
-                  <span
-                    className={`font-mono tabular-nums ${waitTimeToneClass}`}
-                  >
-                    {formatWaitTime(waitTime)}
-                  </span>
-                )}
-              </span>
+              <OrderWaitTime
+                createdAt={record.createdAt}
+                completedAt={record.completedAt}
+                waitTimeThresholdMinutes={waitTimeThresholdMinutes}
+              />
             ) : null}
           </div>
           {mutationError ? (
