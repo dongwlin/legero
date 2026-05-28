@@ -46,7 +46,7 @@ const getStepButtonProps = (stepStatusCode: StepStatusCode) => {
     case STEP_STATUS.completed:
       return {
         className:
-          'border-success/40 bg-success/12 text-success hover:bg-success/18',
+          'border-success/40 bg-success/24 text-success hover:bg-success/18',
         variant: 'secondary' as const,
       }
     default:
