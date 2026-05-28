@@ -4,8 +4,9 @@ import {
   type OrderViewModel,
   type StepStatusCode,
 } from '@/types'
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
+import { registerAndroidBackInterceptor } from '@/hooks/useAndroidBackButton'
 import { orderRepository } from '@/services/orderRepository'
 import { needsStapleStep } from '@/services/orderStatus'
 import { useOrderStore } from '@/store/order'
@@ -160,6 +161,18 @@ const OrderItem: React.FC<OrderItemProps> = ({
     completedAt: record.completedAt,
     isDisabled: isServeMealDisabled,
   })
+
+  useEffect(() => {
+    if (!isDeleteOpen) {
+      return
+    }
+
+    return registerAndroidBackInterceptor(() => {
+      setIsDeleteOpen(false)
+
+      return true
+    })
+  }, [isDeleteOpen])
 
   const persistRecord = async (mutate: () => Promise<OrderRecord>) => {
     setIsMutating(true)

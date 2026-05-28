@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { CarbonAdd } from '@/components/Icon'
 import { Button, CloseButton, Modal, Separator, TextArea } from '@heroui/react'
+import { registerAndroidBackInterceptor } from '@/hooks/useAndroidBackButton'
 import { type OrderFormValue, type OrderRecord } from '@/types'
 import { rebuildOrderRecord } from '@/services/orderFactories'
 import { orderRepository } from '@/services/orderRepository'
@@ -279,21 +280,24 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const handleDialogClose = (force = false) => {
-    if (isSubmitting && !force) {
-      return
-    }
+  const handleDialogClose = useCallback(
+    (force = false) => {
+      if (isSubmitting && !force) {
+        return
+      }
 
-    setIsSubmitting(false)
-    setSubmitError(null)
+      setIsSubmitting(false)
+      setSubmitError(null)
 
-    if (mode === 'create') {
-      setIsCreateOpen(false)
-      setCreateSessionId((prev) => prev + 1)
-    } else {
-      setUpdateTargetID('')
-    }
-  }
+      if (mode === 'create') {
+        setIsCreateOpen(false)
+        setCreateSessionId((prev) => prev + 1)
+      } else {
+        setUpdateTargetID('')
+      }
+    },
+    [isSubmitting, mode, setUpdateTargetID],
+  )
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSubmitting && !nextOpen) {
@@ -359,6 +363,18 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const formSessionKey = isCreateMode
     ? `create-${createSessionId}`
     : updateTargetID
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    return registerAndroidBackInterceptor(() => {
+      handleDialogClose()
+
+      return true
+    })
+  }, [handleDialogClose, isOpen])
 
   return (
     <>

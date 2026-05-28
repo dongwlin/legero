@@ -7,6 +7,38 @@ type BrowserHistoryState = {
   idx?: number
 }
 
+type AndroidBackInterceptor = () => boolean
+
+const androidBackInterceptors: AndroidBackInterceptor[] = []
+
+const consumeAndroidBackPress = (): boolean => {
+  for (let index = androidBackInterceptors.length - 1; index >= 0; index -= 1) {
+    const interceptor = androidBackInterceptors[index]
+
+    if (interceptor()) {
+      return true
+    }
+  }
+
+  return false
+}
+
+export const registerAndroidBackInterceptor = (
+  interceptor: AndroidBackInterceptor,
+): (() => void) => {
+  androidBackInterceptors.push(interceptor)
+
+  return () => {
+    const interceptorIndex = androidBackInterceptors.lastIndexOf(interceptor)
+
+    if (interceptorIndex === -1) {
+      return
+    }
+
+    androidBackInterceptors.splice(interceptorIndex, 1)
+  }
+}
+
 const hasHistoryEntry = (): boolean => {
   const historyState = window.history.state as BrowserHistoryState | null
 
@@ -27,6 +59,10 @@ const useAndroidBackButton = () => {
 
     const registerBackButtonListener = async () => {
       const listener = await CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+        if (consumeAndroidBackPress()) {
+          return
+        }
+
         if (canGoBack || hasHistoryEntry()) {
           void router.navigate(-1)
           return
