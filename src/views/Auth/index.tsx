@@ -215,9 +215,12 @@ const Auth: React.FC = () => {
   }
 
   return (
-    <AuthSurface>
-      <div className='space-y-6'>
-        <h2 className='text-2xl font-semibold tracking-tight'>账号认证</h2>
+    <div className='min-h-screen flex flex-col justify-center items-center p-6'>
+      <div className='space-y-6 w-full max-w-95 flex flex-col'>
+        {/* 顶部 */}
+        <div className='flex flex-col items-center'>
+          <h2 className='text-2xl font-semibold tracking-tight'>账号认证</h2>
+        </div>
 
         <div className='rounded-2xl border border-border/60 bg-background px-4 py-4 md:px-5'>
           <div className='mt-4'>
@@ -227,7 +230,6 @@ const Auth: React.FC = () => {
 
         <div className='space-y-4'>
           <label className='block space-y-2'>
-            <span className='text-sm font-medium text-foreground'>手机号</span>
             <input
               autoComplete='tel'
               className={inputClassName}
@@ -240,7 +242,6 @@ const Auth: React.FC = () => {
           </label>
 
           <label className='block space-y-2'>
-            <span className='text-sm font-medium text-foreground'>密码</span>
             <input
               autoComplete='current-password'
               className={inputClassName}
@@ -275,7 +276,7 @@ const Auth: React.FC = () => {
               : '请先配置 API 地址'}
         </Button.Root>
       </div>
-    </AuthSurface>
+    </div>
   )
 }
 
