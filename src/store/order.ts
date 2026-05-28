@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { Filter, type OrderRecord } from '@/types'
-import { sortOrdersByTimeline } from '@/services/orderSorting'
+import {
+  compareOrderRecordsByTimeline,
+  sortOrdersByTimeline,
+} from '@/services/orderSorting'
 
 export type OrderStoreStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -20,6 +23,11 @@ const createQuickCalcState = (selectedOrderIds: string[]) => ({
   isQuickCalcMode: selectedOrderIds.length > 0,
   quickCalcSelectedOrderIds: selectedOrderIds,
 })
+
+const hasSameTimelinePosition = (
+  current: OrderRecord,
+  next: OrderRecord,
+): boolean => compareOrderRecordsByTimeline(current, next) === 0
 
 type HydrationStateInput = {
   status: OrderStoreStatus
@@ -91,12 +99,14 @@ export const useOrderStore = create<OrderState>()(
             }
           }
 
-          const nextOrders = state.orders.map((order) =>
-            order.id === item.id ? item : order,
-          )
+          const current = state.orders[existingIndex]
+          const nextOrders = [...state.orders]
+          nextOrders[existingIndex] = item
 
           return {
-            orders: sortOrdersByTimeline(nextOrders),
+            orders: hasSameTimelinePosition(current, item)
+              ? nextOrders
+              : sortOrdersByTimeline(nextOrders),
             lastHydratedAt: new Date().toISOString(),
             status: 'ready' as const,
             errorMessage: null,
