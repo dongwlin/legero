@@ -124,7 +124,9 @@ const OrderItem: React.FC<OrderItemProps> = ({
   const [mutationError, setMutationError] = useState<string | null>(null)
   const lastTouchEndAtRef = useRef<number | null>(null)
   const suppressNextQuickCalcToggleRef = useRef(false)
-  const lastActionAtRef = useRef<number>(0)
+  const lastStapleActionAtRef = useRef<number>(0)
+  const lastMeatActionAtRef = useRef<number>(0)
+  const lastServeActionAtRef = useRef<number>(0)
 
   const stapleStepButton = getStepButtonProps(record.stapleStepStatusCode)
   const meatStepButton = getStepButtonProps(record.meatStepStatusCode)
@@ -158,11 +160,11 @@ const OrderItem: React.FC<OrderItemProps> = ({
   const handleToggleStapleStep = () => {
     const now = Date.now()
 
-    if (now - lastActionAtRef.current < DEBOUNCE_MS) {
+    if (now - lastStapleActionAtRef.current < DEBOUNCE_MS) {
       return
     }
 
-    lastActionAtRef.current = now
+    lastStapleActionAtRef.current = now
     setMutationError(null)
 
     const nextRecord = toggleOrderStepStatus(record, 'staple')
@@ -193,11 +195,11 @@ const OrderItem: React.FC<OrderItemProps> = ({
   const handleToggleMeatStep = () => {
     const now = Date.now()
 
-    if (now - lastActionAtRef.current < DEBOUNCE_MS) {
+    if (now - lastMeatActionAtRef.current < DEBOUNCE_MS) {
       return
     }
 
-    lastActionAtRef.current = now
+    lastMeatActionAtRef.current = now
     setMutationError(null)
 
     const nextRecord = toggleOrderStepStatus(record, 'meat')
@@ -228,11 +230,11 @@ const OrderItem: React.FC<OrderItemProps> = ({
   const handleServeMeal = () => {
     const now = Date.now()
 
-    if (now - lastActionAtRef.current < DEBOUNCE_MS) {
+    if (now - lastServeActionAtRef.current < DEBOUNCE_MS) {
       return
     }
 
-    lastActionAtRef.current = now
+    lastServeActionAtRef.current = now
     setMutationError(null)
 
     const nextRecord = toggleOrderServed(record, new Date().toISOString())
