@@ -144,7 +144,7 @@ const PasswordLockScreen: React.FC<PasswordLockScreenProps> = ({
 
               return (
                 <Button.Root
-                  key={num}
+                  key={index}
                   className='mx-auto size-14 rounded-full p-0 text-2xl font-semibold'
                   aria-label={`数字 ${num}`}
                   isDisabled={success}
