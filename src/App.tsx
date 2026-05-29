@@ -3,6 +3,7 @@ import AppBootstrap from '@/components/AppBootstrap'
 import { useThemeStore } from '@/store/theme'
 import { RouterProvider } from 'react-router/dom'
 import { useEffect } from 'react'
+import { Toast } from '@heroui/react'
 import router from './routes'
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
 
   return (
     <AppBootstrap>
+      <Toast.Provider placement='top' />
       <RouterProvider router={router} />
     </AppBootstrap>
   )

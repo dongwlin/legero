@@ -1,12 +1,16 @@
-import { Button, Card, Spinner } from '@heroui/react'
+import { Button, Card, Spinner, toast } from '@heroui/react'
 import React, { useState } from 'react'
-import ApiBaseUrlForm from '@/components/ApiBaseUrlForm'
+import ApiBaseUrlForm, {
+  type ResolvedServerChange,
+  type ServerHealthStatus,
+} from '@/components/ApiBaseUrlForm'
 import { useApiBaseUrl } from '@/hooks/useApiBaseUrl'
 import { useRefreshWorkspaceAccess } from '@/hooks/useAuthSessionBootstrap'
 import { authService } from '@/services/authService'
 import { API_CONFIGURATION_ERROR } from '@/services/apiClient'
 import { getRememberedPhone, rememberPhone } from '@/services/rememberedPhone'
 import { orderDtoToOrderRecord } from '@/services/orderRecordMapper'
+import { findSavedServer, upsertSavedServer } from '@/services/savedServers'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 
@@ -72,37 +76,52 @@ const Auth: React.FC = () => {
   const refreshWorkspaceAccess = useRefreshWorkspaceAccess()
   const resetSyncState = useOrderStore((state) => state.resetSyncState)
   const setOrders = useOrderStore((state) => state.setOrders)
-  const [phone, setPhone] = useState(() => getRememberedPhone())
+  const [phone, setPhone] = useState(
+    () => findSavedServer(apiBaseUrl)?.phone ?? getRememberedPhone(),
+  )
   const [password, setPassword] = useState('')
-  const [formError, setFormError] = useState<string | null>(null)
-  const [formInfo, setFormInfo] = useState<string | null>(null)
+  const [serverHealthStatus, setServerHealthStatus] =
+    useState<ServerHealthStatus>(() => (apiBaseUrl ? 'reachable' : 'idle'))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   const isApiConfigured = apiBaseUrl !== null
   const isApiConfigurationMissing = errorMessage === API_CONFIGURATION_ERROR
   const canSubmit =
-    isApiConfigured && phone.trim() !== '' && password.trim() !== ''
+    serverHealthStatus === 'reachable' &&
+    phone.trim() !== '' &&
+    password.trim() !== ''
+
+  const handleResolvedServerChange = (change: ResolvedServerChange) => {
+    if (change.replacedCurrentServer) {
+      setPassword('')
+    }
+
+    if (change.reason === 'selected' || change.reason === 'cleared') {
+      setPhone(change.server?.phone ?? '')
+      return
+    }
+
+    if (change.server?.phone && phone.trim() === '') {
+      setPhone(change.server.phone)
+    }
+  }
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
-    setFormError(null)
-    setFormInfo(null)
 
     try {
       await authService.signOut()
       setAnonymous()
       resetSyncState()
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : '退出登录失败。')
+      toast.danger(error instanceof Error ? error.message : '退出登录失败。')
     } finally {
       setIsSigningOut(false)
     }
   }
 
   const handleSubmit = async () => {
-    setFormError(null)
-    setFormInfo(null)
     setIsSubmitting(true)
 
     try {
@@ -111,11 +130,16 @@ const Auth: React.FC = () => {
         password,
       )
       rememberPhone(result.user.phone)
+      if (apiBaseUrl) {
+        upsertSavedServer({
+          baseUrl: apiBaseUrl,
+          phone: result.user.phone,
+        })
+      }
       setAuthenticatedContext(result)
       setOrders(result.activeOrders.map(orderDtoToOrderRecord))
-      setFormInfo('登录成功，正在进入工作区。')
     } catch (error) {
-      setFormError(
+      toast.danger(
         error instanceof Error ? error.message : '登录失败，请稍后重试。',
       )
     } finally {
@@ -196,7 +220,7 @@ const Auth: React.FC = () => {
           description={errorMessage ?? '请检查后端 API 配置或网络状态。'}
           actions={
             <div className='space-y-4'>
-              <ApiBaseUrlForm submitLabel='更新 API 地址' />
+              <ApiBaseUrlForm />
               <Button.Root
                 variant='secondary'
                 onPress={() => {
@@ -224,7 +248,10 @@ const Auth: React.FC = () => {
 
         <div className='rounded-2xl border border-border/60 bg-background px-4 py-4 md:px-5'>
           <div className='mt-4'>
-            <ApiBaseUrlForm />
+            <ApiBaseUrlForm
+              onHealthStatusChange={setServerHealthStatus}
+              onResolvedServerChange={handleResolvedServerChange}
+            />
           </div>
         </div>
 
@@ -253,14 +280,6 @@ const Auth: React.FC = () => {
           </label>
         </div>
 
-        {!isApiConfigured ? (
-          <p className='text-sm text-warning'>
-            请先保存 API base URL，然后再使用手机号和密码登录。
-          </p>
-        ) : null}
-        {formError ? <p className='text-sm text-danger'>{formError}</p> : null}
-        {formInfo ? <p className='text-sm text-success'>{formInfo}</p> : null}
-
         <Button.Root
           className='w-full'
           isDisabled={!canSubmit || isSubmitting}
@@ -271,9 +290,9 @@ const Auth: React.FC = () => {
         >
           {isSubmitting
             ? '登录中...'
-            : isApiConfigured
+            : serverHealthStatus === 'reachable' && isApiConfigured
               ? '登录'
-              : '请先配置 API 地址'}
+              : '请先验证服务器'}
         </Button.Root>
       </div>
     </div>

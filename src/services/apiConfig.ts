@@ -119,6 +119,21 @@ export const setStoredApiBaseUrl = (value: string): string => {
   return normalized
 }
 
+export const clearStoredApiBaseUrl = () => {
+  const storage = getStorage()
+
+  if (storage) {
+    try {
+      storage.removeItem(API_BASE_URL_STORAGE_KEY)
+    } catch {
+      // Persist best effort only; keep the in-memory copy for this session.
+    }
+  }
+
+  cachedApiBaseUrl = null
+  dispatchApiBaseUrlChange()
+}
+
 export const subscribeToApiBaseUrlChanges = (listener: () => void): (() => void) => {
   if (typeof window === 'undefined') {
     return () => {}

@@ -1,0 +1,2 @@
+export const apiBaseUrlInputClassName =
+  'w-full rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors duration-200 placeholder:text-muted focus:border-accent/50'
