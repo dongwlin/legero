@@ -84,7 +84,7 @@ const DataManagement: React.FC = () => {
                 <AlertDialog.Trigger
                   className={`${buttonVariants({
                     variant: 'danger',
-                  })} w-full md:w-auto`}
+                  })} w-full md:w-auto flex justify-center`}
                 >
                   {action.triggerLabel}
                 </AlertDialog.Trigger>
