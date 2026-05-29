@@ -23,7 +23,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
           <Card.Description className='leading-6'>{description}</Card.Description>
         ) : null}
       </Card.Header>
-      <Card.Content className='px-6 pb-6 pt-4'>{children}</Card.Content>
+      <Card.Content className='px-6 pb-6'>{children}</Card.Content>
     </Card.Root>
   )
 }
