@@ -71,9 +71,6 @@ const DataManagement: React.FC = () => {
       description='谨慎执行高风险操作，删除的数据无法恢复。'
     >
       <div className='space-y-4'>
-        <p className='text-sm leading-6 text-muted'>
-          可按需清空历史订单，或移除当前工作区中的全部订单记录。删除的数据无法恢复。
-        </p>
         {clearError ? (
           <p className='text-sm text-danger'>{clearError}</p>
         ) : null}
