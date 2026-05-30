@@ -6,34 +6,34 @@ import { Card, ListBox, Select } from '@heroui/react'
 import React, { useMemo } from 'react'
 
 const OrderControls: React.FC = () => {
-  const orders = useOrderStore((state) => state.orders)
+  const ordersById = useOrderStore((state) => state.ordersById)
+  const orderDisplayIds = useOrderStore((state) => state.orderDisplayIds)
   const filter = useOrderStore((state) => state.filter)
   const setFilter = useOrderStore((state) => state.setFilter)
-
-  const todayOrders = useMemo(
-    () => orders.filter((record) => isOrderCreatedToday(record)),
-    [orders],
-  )
 
   const { todayCompletedCount, uncompletedCount } = useMemo(() => {
     let todayCompleted = 0
     let uncompleted = 0
 
-    todayOrders.forEach((record) => {
-      if (record.completedAt === null) {
-        uncompleted++
+    for (const id of orderDisplayIds) {
+      const record = ordersById[id]
+
+      if (!isOrderCreatedToday(record)) {
+        continue
       }
 
-      if (record.completedAt !== null) {
+      if (record.completedAt === null) {
+        uncompleted++
+      } else {
         todayCompleted++
       }
-    })
+    }
 
     return {
       todayCompletedCount: todayCompleted,
       uncompletedCount: uncompleted,
     }
-  }, [todayOrders])
+  }, [ordersById, orderDisplayIds])
 
   return (
     <Card.Root

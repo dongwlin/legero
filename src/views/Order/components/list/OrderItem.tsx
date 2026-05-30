@@ -1,8 +1,9 @@
-import { STEP_STATUS, type OrderRecord, type OrderViewModel } from '@/types'
-import React, { useEffect, useRef } from 'react'
+import { STEP_STATUS } from '@/types'
+import React, { useEffect, useMemo, useRef } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import { registerAndroidBackInterceptor } from '@/hooks/useAndroidBackButton'
 import { needsStapleStep } from '@/services/orderStatus'
+import { orderRecordToOrderViewModel } from '@/services/orderRecordAdapter'
 import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
 import { AlertDialog, Button, Card } from '@heroui/react'
@@ -18,8 +19,7 @@ import {
 } from './orderItemHelpers'
 
 type OrderItemProps = {
-  record: OrderRecord
-  view: OrderViewModel
+  id: string
   isQuickCalcMode: boolean
   isQuickCalcSelected: boolean
   onEnterQuickCalc: (id: string) => void
@@ -27,13 +27,14 @@ type OrderItemProps = {
 }
 
 const OrderItem: React.FC<OrderItemProps> = ({
-  record,
-  view,
+  id,
   isQuickCalcMode,
   isQuickCalcSelected,
   onEnterQuickCalc,
   onToggleQuickCalcSelection,
 }) => {
+  const record = useOrderStore((state) => state.ordersById[id])!
+  const view = useMemo(() => orderRecordToOrderViewModel(record), [record])
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
   const { waitTimeThresholdMinutes } = useOrderSettingsStore()
 
@@ -81,7 +82,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
 
   const handleEnterQuickCalc = () => {
     clearMutationError()
-    onEnterQuickCalc(record.id)
+    onEnterQuickCalc(id)
   }
 
   const handleCardDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -128,7 +129,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
     }
 
     clearMutationError()
-    onToggleQuickCalcSelection(record.id)
+    onToggleQuickCalcSelection(id)
   }
 
   return (
@@ -189,7 +190,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
                 aria-label='编辑订单'
                 onPress={() => {
                   clearMutationError()
-                  setUpdateTargetID(record.id)
+                  setUpdateTargetID(id)
                 }}
               >
                 <CarbonEdit className='size-5 md:size-6' />
@@ -300,8 +301,7 @@ const areOrderItemPropsEqual = (
   nextProps: OrderItemProps,
 ) => {
   return (
-    prevProps.record === nextProps.record &&
-    prevProps.view === nextProps.view &&
+    prevProps.id === nextProps.id &&
     prevProps.isQuickCalcMode === nextProps.isQuickCalcMode &&
     prevProps.isQuickCalcSelected === nextProps.isQuickCalcSelected
   )

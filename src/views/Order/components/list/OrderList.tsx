@@ -3,8 +3,6 @@ import OrderItem from './OrderItem'
 import { useOrderStore } from '@/store/order'
 import { List, RowComponentProps, useDynamicRowHeight } from 'react-window'
 import { AutoSizer } from 'react-virtualized-auto-sizer'
-import { type OrderRecord, type OrderViewModel } from '@/types'
-import { orderRecordToOrderViewModel } from '@/services/orderRecordAdapter'
 import { isOrderCreatedToday } from '@/services/orderDomainUtils'
 import { formatPriceCents } from '@/services/orderPricing'
 import { CarbonArrowUp } from '@/components/Icon'
@@ -13,13 +11,8 @@ import { NowProvider } from './NowContext'
 
 const DEFAULT_ORDER_ROW_HEIGHT = 280
 
-type OrderListEntry = {
-  record: OrderRecord
-  view: OrderViewModel
-}
-
 type RowProps = {
-  orders: OrderListEntry[]
+  orderIds: string[]
   isQuickCalcMode: boolean
   selectedOrderIdSet: Set<string>
   onEnterQuickCalc: (id: string) => void
@@ -27,7 +20,7 @@ type RowProps = {
 }
 
 type VirtualOrderListProps = {
-  filteredOrders: OrderListEntry[]
+  filteredOrderIds: string[]
   rowHeightCacheKey: string
   isQuickCalcMode: boolean
   selectedOrderCount: number
@@ -41,20 +34,19 @@ type VirtualOrderListProps = {
 const Row = ({
   index,
   style,
-  orders,
+  orderIds,
   isQuickCalcMode,
   selectedOrderIdSet,
   onEnterQuickCalc,
   onToggleQuickCalcSelection,
 }: RowComponentProps<RowProps>) => {
-  const order = orders[index]
+  const id = orderIds[index]
   return (
     <div style={style} className='px-1 py-1 md:px-2'>
       <OrderItem
-        record={order.record}
-        view={order.view}
+        id={id}
         isQuickCalcMode={isQuickCalcMode}
-        isQuickCalcSelected={selectedOrderIdSet.has(order.record.id)}
+        isQuickCalcSelected={selectedOrderIdSet.has(id)}
         onEnterQuickCalc={onEnterQuickCalc}
         onToggleQuickCalcSelection={onToggleQuickCalcSelection}
       />
@@ -63,7 +55,7 @@ const Row = ({
 }
 
 const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
-  filteredOrders,
+  filteredOrderIds,
   rowHeightCacheKey,
   isQuickCalcMode,
   selectedOrderCount,
@@ -91,14 +83,14 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
 
   const rowProps = useMemo(
     () => ({
-      orders: filteredOrders,
+      orderIds: filteredOrderIds,
       isQuickCalcMode,
       selectedOrderIdSet,
       onEnterQuickCalc,
       onToggleQuickCalcSelection,
     }),
     [
-      filteredOrders,
+      filteredOrderIds,
       isQuickCalcMode,
       selectedOrderIdSet,
       onEnterQuickCalc,
@@ -106,7 +98,7 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
     ],
   )
 
-  if (filteredOrders.length === 0) {
+  if (filteredOrderIds.length === 0) {
     return (
       <Card.Root
         variant='secondary'
@@ -131,7 +123,7 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
           renderProp={({ height, width }) => (
             <List
               style={{ height: height ?? 0, width: width ?? 0 }}
-              rowCount={filteredOrders.length}
+              rowCount={filteredOrderIds.length}
               rowHeight={dynamicRowHeight}
               rowProps={rowProps}
               rowComponent={Row}
@@ -187,7 +179,8 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
 }
 
 const OrderList: React.FC = () => {
-  const orders = useOrderStore((state) => state.orders)
+  const ordersById = useOrderStore((state) => state.ordersById)
+  const orderDisplayIds = useOrderStore((state) => state.orderDisplayIds)
   const filter = useOrderStore((state) => state.filter)
   const isQuickCalcMode = useOrderStore((state) => state.isQuickCalcMode)
   const quickCalcSelectedOrderIds = useOrderStore(
@@ -201,66 +194,48 @@ const OrderList: React.FC = () => {
   const pruneQuickCalcSelection = useOrderStore(
     (state) => state.pruneQuickCalcSelection,
   )
-  const todayOrders = useMemo(
-    () => orders.filter((order) => isOrderCreatedToday(order)),
-    [orders],
-  )
 
-  const orderEntries = useMemo(
-    () =>
-      todayOrders.map((order) => {
-        return {
-          record: order,
-          view: orderRecordToOrderViewModel(order),
-        }
-      }),
-    [todayOrders],
-  )
+  const filteredOrderIds = useMemo(() => {
+    const todayIds = orderDisplayIds.filter((id) =>
+      isOrderCreatedToday(ordersById[id]),
+    )
 
-  const filteredOrders = useMemo(() => {
     switch (filter) {
-      case 'all':
-        return orderEntries
       case 'uncompleted':
-        return orderEntries.filter((order) => order.record.completedAt === null)
+        return todayIds.filter((id) => ordersById[id].completedAt === null)
       case 'completed':
-        return orderEntries
-          .filter((order) => order.record.completedAt !== null)
+        return todayIds
+          .filter((id) => ordersById[id].completedAt !== null)
           .sort(
             (a, b) =>
-              new Date(b.record.completedAt ?? 0).getTime() -
-              new Date(a.record.completedAt ?? 0).getTime(),
+              new Date(ordersById[b].completedAt ?? 0).getTime() -
+              new Date(ordersById[a].completedAt ?? 0).getTime(),
           )
       default:
-        return orderEntries
+        return todayIds
     }
-  }, [orderEntries, filter])
+  }, [ordersById, orderDisplayIds, filter])
 
-  const filteredOrderIdsKey = useMemo(
-    () => filteredOrders.map((order) => order.record.id).join('|'),
-    [filteredOrders],
-  )
   const selectedOrderIdSet = useMemo(
     () => new Set(quickCalcSelectedOrderIds),
     [quickCalcSelectedOrderIds],
   )
-  const selectedQuickCalcOrders = useMemo(
-    () =>
-      filteredOrders.filter((order) => selectedOrderIdSet.has(order.record.id)),
-    [filteredOrders, selectedOrderIdSet],
-  )
   const selectedOrderTotalPriceCents = useMemo(
     () =>
-      selectedQuickCalcOrders.reduce(
-        (totalPriceCents, order) =>
-          totalPriceCents + order.record.totalPriceCents,
+      quickCalcSelectedOrderIds.reduce(
+        (total, id) => total + (ordersById[id]?.totalPriceCents ?? 0),
         0,
       ),
-    [selectedQuickCalcOrders],
+    [quickCalcSelectedOrderIds, ordersById],
   )
   const hasActiveOrders = useMemo(
-    () => filteredOrders.some((order) => order.record.completedAt === null),
-    [filteredOrders],
+    () => filteredOrderIds.some((id) => ordersById[id]?.completedAt === null),
+    [filteredOrderIds, ordersById],
+  )
+
+  const filteredOrderIdsKey = useMemo(
+    () => filteredOrderIds.join('|'),
+    [filteredOrderIds],
   )
 
   useEffect(() => {
@@ -268,22 +243,17 @@ const OrderList: React.FC = () => {
       return
     }
 
-    pruneQuickCalcSelection(filteredOrders.map((order) => order.record.id))
-  }, [
-    filteredOrderIdsKey,
-    filteredOrders,
-    isQuickCalcMode,
-    pruneQuickCalcSelection,
-  ])
+    pruneQuickCalcSelection(filteredOrderIds)
+  }, [filteredOrderIdsKey, filteredOrderIds, isQuickCalcMode, pruneQuickCalcSelection])
 
   return (
     <NowProvider active={hasActiveOrders}>
       <VirtualOrderList
         key={filter}
-        filteredOrders={filteredOrders}
+        filteredOrderIds={filteredOrderIds}
         rowHeightCacheKey={filteredOrderIdsKey}
         isQuickCalcMode={isQuickCalcMode}
-        selectedOrderCount={selectedQuickCalcOrders.length}
+        selectedOrderCount={quickCalcSelectedOrderIds.length}
         selectedOrderTotalPriceCents={selectedOrderTotalPriceCents}
         selectedOrderIdSet={selectedOrderIdSet}
         onEnterQuickCalc={enterQuickCalcWith}

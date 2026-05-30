@@ -29,13 +29,50 @@ const hasSameTimelinePosition = (
   next: OrderRecord,
 ): boolean => compareOrderRecordsByTimeline(current, next) === 0
 
+const insertSorted = (
+  ids: string[],
+  newOrder: OrderRecord,
+  ordersById: Record<string, OrderRecord>,
+): string[] => {
+  let low = 0
+  let high = ids.length
+
+  while (low < high) {
+    const mid = (low + high) >>> 1
+
+    if (compareOrderRecordsByTimeline(ordersById[ids[mid]], newOrder) < 0) {
+      low = mid + 1
+    } else {
+      high = mid
+    }
+  }
+
+  const next = [...ids]
+  next.splice(low, 0, newOrder.id)
+
+  return next
+}
+
+const buildOrdersById = (
+  orders: OrderRecord[],
+): Record<string, OrderRecord> => {
+  const result: Record<string, OrderRecord> = {}
+
+  for (const order of orders) {
+    result[order.id] = order
+  }
+
+  return result
+}
+
 type HydrationStateInput = {
   status: OrderStoreStatus
   errorMessage?: string | null
 }
 
 interface OrderState {
-  orders: OrderRecord[]
+  ordersById: Record<string, OrderRecord>
+  orderDisplayIds: string[]
   filter: Filter
   updateTargetID: string
   isQuickCalcMode: boolean
@@ -62,7 +99,8 @@ interface OrderState {
 export const useOrderStore = create<OrderState>()(
   persist(
     (set, get) => ({
-      orders: [],
+      ordersById: {},
+      orderDisplayIds: [],
       filter: 'all',
       updateTargetID: '',
       isQuickCalcMode: false,
@@ -72,14 +110,15 @@ export const useOrderStore = create<OrderState>()(
       errorMessage: null,
       setOrders: (orders) =>
         set((state) => {
-          const nextOrders = sortOrdersByTimeline(orders)
+          const sorted = sortOrdersByTimeline(orders)
           const nextSelectedOrderIds = pruneQuickCalcIds(
             state.quickCalcSelectedOrderIds,
-            nextOrders.map((order) => order.id),
+            sorted.map((order) => order.id),
           )
 
           return {
-            orders: nextOrders,
+            ordersById: buildOrdersById(sorted),
+            orderDisplayIds: sorted.map((order) => order.id),
             lastHydratedAt: new Date().toISOString(),
             status: 'ready' as const,
             errorMessage: null,
@@ -88,25 +127,35 @@ export const useOrderStore = create<OrderState>()(
         }),
       upsertOrder: (item) =>
         set((state) => {
-          const existingIndex = state.orders.findIndex((order) => order.id === item.id)
+          const existing = state.ordersById[item.id]
+          const newOrdersById = { ...state.ordersById, [item.id]: item }
 
-          if (existingIndex === -1) {
+          if (!existing) {
             return {
-              orders: sortOrdersByTimeline([...state.orders, item]),
+              ordersById: newOrdersById,
+              orderDisplayIds: insertSorted(state.orderDisplayIds, item, newOrdersById),
               lastHydratedAt: new Date().toISOString(),
               status: 'ready' as const,
               errorMessage: null,
             }
           }
 
-          const current = state.orders[existingIndex]
-          const nextOrders = [...state.orders]
-          nextOrders[existingIndex] = item
+          if (hasSameTimelinePosition(existing, item)) {
+            return {
+              ordersById: newOrdersById,
+              lastHydratedAt: new Date().toISOString(),
+              status: 'ready' as const,
+              errorMessage: null,
+            }
+          }
+
+          const newOrderDisplayIds = [...state.orderDisplayIds].sort(
+            (a, b) => compareOrderRecordsByTimeline(newOrdersById[a], newOrdersById[b]),
+          )
 
           return {
-            orders: hasSameTimelinePosition(current, item)
-              ? nextOrders
-              : sortOrdersByTimeline(nextOrders),
+            ordersById: newOrdersById,
+            orderDisplayIds: newOrderDisplayIds,
             lastHydratedAt: new Date().toISOString(),
             status: 'ready' as const,
             errorMessage: null,
@@ -118,96 +167,105 @@ export const useOrderStore = create<OrderState>()(
             return state
           }
 
-          const byId = new Map(state.orders.map((order) => [order.id, order]))
+          const newOrdersById = { ...state.ordersById }
 
-          items.forEach((item) => {
-            byId.set(item.id, item)
-          })
+          for (const item of items) {
+            newOrdersById[item.id] = item
+          }
+
+          const newOrderDisplayIds = sortOrdersByTimeline(
+            Object.values(newOrdersById),
+          ).map((order) => order.id)
 
           return {
-            orders: sortOrdersByTimeline([...byId.values()]),
+            ordersById: newOrdersById,
+            orderDisplayIds: newOrderDisplayIds,
             lastHydratedAt: new Date().toISOString(),
             status: 'ready' as const,
             errorMessage: null,
           }
         }),
       removeOrder: (id) =>
-                set((state) => {
-                  const nextOrders = state.orders.filter((item) => item.id !== id)
-                  const nextSelectedOrderIds = state.quickCalcSelectedOrderIds.filter(
-                    (orderId) => orderId !== id,
-                  )
+        set((state) => {
+          const newOrdersById = { ...state.ordersById }
+          delete newOrdersById[id]
+          const nextSelectedOrderIds = state.quickCalcSelectedOrderIds.filter(
+            (orderId) => orderId !== id,
+          )
 
-                  return {
-                    orders: nextOrders,
-                    lastHydratedAt: new Date().toISOString(),
-                    status: 'ready' as const,
-                    errorMessage: null,
-                    ...createQuickCalcState(nextSelectedOrderIds),
-                  }
-                }),
+          return {
+            ordersById: newOrdersById,
+            orderDisplayIds: state.orderDisplayIds.filter((orderId) => orderId !== id),
+            lastHydratedAt: new Date().toISOString(),
+            status: 'ready' as const,
+            errorMessage: null,
+            ...createQuickCalcState(nextSelectedOrderIds),
+          }
+        }),
       clearOrders: () =>
         set({
-          orders: [],
+          ordersById: {},
+          orderDisplayIds: [],
           lastHydratedAt: new Date().toISOString(),
           status: 'ready',
           errorMessage: null,
           updateTargetID: '',
-                  ...createQuickCalcState(EMPTY_QUICK_CALC_SELECTION),
+          ...createQuickCalcState(EMPTY_QUICK_CALC_SELECTION),
         }),
       resetSyncState: () =>
         set({
-          orders: [],
+          ordersById: {},
+          orderDisplayIds: [],
           lastHydratedAt: null,
           status: 'idle',
           errorMessage: null,
           updateTargetID: '',
-                  ...createQuickCalcState(EMPTY_QUICK_CALC_SELECTION),
+          ...createQuickCalcState(EMPTY_QUICK_CALC_SELECTION),
         }),
       setFilter: (filter) => set({ filter }),
       setUpdateTargetID: (id) => set({ updateTargetID: id }),
-              enterQuickCalcWith: (id) =>
-                set({
-                  ...createQuickCalcState([id]),
-                }),
-              toggleQuickCalcSelection: (id) =>
-                set((state) => {
-                  const hasSelectedOrder = state.quickCalcSelectedOrderIds.includes(id)
-                  const nextSelectedOrderIds = hasSelectedOrder
-                    ? state.quickCalcSelectedOrderIds.filter((orderId) => orderId !== id)
-                    : [...state.quickCalcSelectedOrderIds, id]
+      enterQuickCalcWith: (id) =>
+        set({
+          ...createQuickCalcState([id]),
+        }),
+      toggleQuickCalcSelection: (id) =>
+        set((state) => {
+          const hasSelectedOrder = state.quickCalcSelectedOrderIds.includes(id)
+          const nextSelectedOrderIds = hasSelectedOrder
+            ? state.quickCalcSelectedOrderIds.filter((orderId) => orderId !== id)
+            : [...state.quickCalcSelectedOrderIds, id]
 
-                  return createQuickCalcState(nextSelectedOrderIds)
-                }),
-              exitQuickCalc: () =>
-                set({
-                  ...createQuickCalcState(EMPTY_QUICK_CALC_SELECTION),
-                }),
-              pruneQuickCalcSelection: (availableOrderIds) =>
-                set((state) => {
-                  const nextSelectedOrderIds = pruneQuickCalcIds(
-                    state.quickCalcSelectedOrderIds,
-                    availableOrderIds,
-                  )
+          return createQuickCalcState(nextSelectedOrderIds)
+        }),
+      exitQuickCalc: () =>
+        set({
+          ...createQuickCalcState(EMPTY_QUICK_CALC_SELECTION),
+        }),
+      pruneQuickCalcSelection: (availableOrderIds) =>
+        set((state) => {
+          const nextSelectedOrderIds = pruneQuickCalcIds(
+            state.quickCalcSelectedOrderIds,
+            availableOrderIds,
+          )
 
-                  if (
-                    nextSelectedOrderIds.length === state.quickCalcSelectedOrderIds.length &&
-                    nextSelectedOrderIds.every(
-                      (orderId, index) => orderId === state.quickCalcSelectedOrderIds[index],
-                    )
-                  ) {
-                    return state
-                  }
+          if (
+            nextSelectedOrderIds.length === state.quickCalcSelectedOrderIds.length &&
+            nextSelectedOrderIds.every(
+              (orderId, index) => orderId === state.quickCalcSelectedOrderIds[index],
+            )
+          ) {
+            return state
+          }
 
-                  return createQuickCalcState(nextSelectedOrderIds)
-                }),
+          return createQuickCalcState(nextSelectedOrderIds)
+        }),
       setHydrationState: ({ status, errorMessage = null }) =>
         set(() => ({
           status,
           errorMessage,
         })),
       findOrder: (id: string): OrderRecord => {
-        const order = get().orders.find((item) => item.id === id)
+        const order = get().ordersById[id]
 
         if (!order) {
           throw new Error('Order not found')
