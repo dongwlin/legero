@@ -1,24 +1,21 @@
-import {
-  STEP_STATUS,
-  type OrderRecord,
-  type OrderViewModel,
-  type StepStatusCode,
-} from '@/types'
-import React, { useEffect, useRef, useState } from 'react'
+import { STEP_STATUS, type OrderRecord, type OrderViewModel } from '@/types'
+import React, { useEffect, useRef } from 'react'
 import { CarbonEdit, CarbonTrashCan } from '@/components/Icon'
 import { registerAndroidBackInterceptor } from '@/hooks/useAndroidBackButton'
-import { orderRepository } from '@/services/orderRepository'
-import {
-  needsStapleStep,
-  toggleOrderServed,
-  toggleOrderStepStatus,
-} from '@/services/orderStatus'
-import { orderOptimistic } from '@/services/orderOptimistic'
+import { needsStapleStep } from '@/services/orderStatus'
 import { useOrderStore } from '@/store/order'
 import { useOrderSettingsStore } from '@/store/orderSettings'
 import { AlertDialog, Button, Card } from '@heroui/react'
 import dayjs from 'dayjs'
 import OrderWaitTime from './OrderWaitTime'
+import { useOrderItemActions } from './useOrderItemActions'
+import {
+  getServeMealButtonProps,
+  getStepButtonProps,
+  isQuickCalcIgnoredTarget,
+  QUICK_CALC_DOUBLE_TAP_THRESHOLD_MS,
+  renderHighlightedForbiddenText,
+} from './orderItemHelpers'
 
 type OrderItemProps = {
   record: OrderRecord
@@ -29,84 +26,6 @@ type OrderItemProps = {
   onToggleQuickCalcSelection: (id: string) => void
 }
 
-const QUICK_CALC_DOUBLE_TAP_THRESHOLD_MS = 280
-
-const isQuickCalcIgnoredTarget = (target: EventTarget | null): boolean =>
-  target instanceof Element &&
-  target.closest('[data-quick-calc-ignore="true"]') !== null
-
-const getStepButtonProps = (stepStatusCode: StepStatusCode) => {
-  switch (stepStatusCode) {
-    case STEP_STATUS.notStarted:
-      return {
-        className:
-          'border-border/60 text-foreground hover:bg-background-secondary',
-        variant: 'outline' as const,
-      }
-    case STEP_STATUS.completed:
-      return {
-        className:
-          'border-success/40 bg-success/24 text-success hover:bg-success/18',
-        variant: 'secondary' as const,
-      }
-    default:
-      return {
-        className:
-          'border-border/60 text-foreground hover:bg-background-secondary',
-        variant: 'outline' as const,
-      }
-  }
-}
-
-const getServeMealButtonProps = ({
-  completedAt,
-  isDisabled,
-}: {
-  completedAt: string | null
-  isDisabled: boolean
-}) => {
-  if (isDisabled) {
-    return {
-      className:
-        'rounded-2xl border-dashed border-border/80 bg-background-secondary/80 font-bold text-muted shadow-none',
-      variant: 'outline' as const,
-    }
-  }
-
-  if (!completedAt) {
-    return {
-      className: 'rounded-2xl font-bold',
-      variant: 'primary' as const,
-    }
-  }
-
-  return {
-    className:
-      'rounded-2xl border-success/40 bg-success/12 font-bold text-success hover:bg-success/18',
-    variant: 'secondary' as const,
-  }
-}
-
-const renderHighlightedForbiddenText = (text: string): React.ReactNode => {
-  if (!text.includes('不要')) {
-    return text
-  }
-
-  return text.split('不要').map((part, index) => (
-    <React.Fragment key={`${part}-${index}`}>
-      {index > 0 && (
-        <span className='mx-0.5 inline-block rounded bg-red-100 px-1 text-red-700'>
-          不要
-        </span>
-      )}
-      {part}
-    </React.Fragment>
-  ))
-}
-
-const getMutationErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : '订单同步失败，请稍后重试。'
-
 const OrderItem: React.FC<OrderItemProps> = ({
   record,
   view,
@@ -115,18 +34,23 @@ const OrderItem: React.FC<OrderItemProps> = ({
   onEnterQuickCalc,
   onToggleQuickCalcSelection,
 }) => {
-  const removeOrder = useOrderStore((state) => state.removeOrder)
-  const upsertOrder = useOrderStore((state) => state.upsertOrder)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
   const { waitTimeThresholdMinutes } = useOrderSettingsStore()
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [isMutating, setIsMutating] = useState(false)
-  const [mutationError, setMutationError] = useState<string | null>(null)
+
+  const {
+    mutationError,
+    clearMutationError,
+    handleToggleStapleStep,
+    handleToggleMeatStep,
+    handleServeMeal,
+    handleRemove,
+    isDeleteOpen,
+    setIsDeleteOpen,
+    isMutating,
+  } = useOrderItemActions(record)
+
   const lastTouchEndAtRef = useRef<number | null>(null)
   const suppressNextQuickCalcToggleRef = useRef(false)
-  const lastStapleActionAtRef = useRef<number>(0)
-  const lastMeatActionAtRef = useRef<number>(0)
-  const lastServeActionAtRef = useRef<number>(0)
 
   const stapleStepButton = getStepButtonProps(record.stapleStepStatusCode)
   const meatStepButton = getStepButtonProps(record.meatStepStatusCode)
@@ -153,132 +77,10 @@ const OrderItem: React.FC<OrderItemProps> = ({
 
       return true
     })
-  }, [isDeleteOpen])
-
-  const DEBOUNCE_MS = 300
-
-  const handleToggleStapleStep = () => {
-    const now = Date.now()
-
-    if (now - lastStapleActionAtRef.current < DEBOUNCE_MS) {
-      return
-    }
-
-    lastStapleActionAtRef.current = now
-    setMutationError(null)
-
-    const nextRecord = toggleOrderStepStatus(record, 'staple')
-
-    if (nextRecord === record) {
-      return
-    }
-
-    const gen = orderOptimistic.beginMutation(record.id, record)
-
-    upsertOrder(nextRecord)
-
-    orderRepository
-      .toggleStep(record.id, 'staple', record)
-      .then((serverRecord) => {
-        if (orderOptimistic.endMutation(record.id, gen)) {
-          upsertOrder(serverRecord)
-        }
-      })
-      .catch((error) => {
-        if (orderOptimistic.endMutation(record.id, gen)) {
-          upsertOrder(record)
-          setMutationError(getMutationErrorMessage(error))
-        }
-      })
-  }
-
-  const handleToggleMeatStep = () => {
-    const now = Date.now()
-
-    if (now - lastMeatActionAtRef.current < DEBOUNCE_MS) {
-      return
-    }
-
-    lastMeatActionAtRef.current = now
-    setMutationError(null)
-
-    const nextRecord = toggleOrderStepStatus(record, 'meat')
-
-    if (nextRecord === record) {
-      return
-    }
-
-    const gen = orderOptimistic.beginMutation(record.id, record)
-
-    upsertOrder(nextRecord)
-
-    orderRepository
-      .toggleStep(record.id, 'meat', record)
-      .then((serverRecord) => {
-        if (orderOptimistic.endMutation(record.id, gen)) {
-          upsertOrder(serverRecord)
-        }
-      })
-      .catch((error) => {
-        if (orderOptimistic.endMutation(record.id, gen)) {
-          upsertOrder(record)
-          setMutationError(getMutationErrorMessage(error))
-        }
-      })
-  }
-
-  const handleServeMeal = () => {
-    const now = Date.now()
-
-    if (now - lastServeActionAtRef.current < DEBOUNCE_MS) {
-      return
-    }
-
-    lastServeActionAtRef.current = now
-    setMutationError(null)
-
-    const nextRecord = toggleOrderServed(record, new Date().toISOString())
-
-    if (nextRecord === record) {
-      return
-    }
-
-    const gen = orderOptimistic.beginMutation(record.id, record)
-
-    upsertOrder(nextRecord)
-
-    orderRepository
-      .toggleServed(record.id, record)
-      .then((serverRecord) => {
-        if (orderOptimistic.endMutation(record.id, gen)) {
-          upsertOrder(serverRecord)
-        }
-      })
-      .catch((error) => {
-        if (orderOptimistic.endMutation(record.id, gen)) {
-          upsertOrder(record)
-          setMutationError(getMutationErrorMessage(error))
-        }
-      })
-  }
-
-  const handleRemove = async () => {
-    setIsMutating(true)
-    setMutationError(null)
-
-    try {
-      await orderRepository.remove(record.id)
-      removeOrder(record.id)
-      setIsDeleteOpen(false)
-    } catch (error) {
-      setMutationError(getMutationErrorMessage(error))
-    } finally {
-      setIsMutating(false)
-    }
-  }
+  }, [isDeleteOpen, setIsDeleteOpen])
 
   const handleEnterQuickCalc = () => {
-    setMutationError(null)
+    clearMutationError()
     onEnterQuickCalc(record.id)
   }
 
@@ -325,7 +127,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
       return
     }
 
-    setMutationError(null)
+    clearMutationError()
     onToggleQuickCalcSelection(record.id)
   }
 
@@ -386,7 +188,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
                 variant='secondary'
                 aria-label='编辑订单'
                 onPress={() => {
-                  setMutationError(null)
+                  clearMutationError()
                   setUpdateTargetID(record.id)
                 }}
               >
