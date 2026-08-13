@@ -100,10 +100,23 @@ jobs:
       - name: Rename APK
         run: |
           cd android/app/build/outputs/apk/release
-          mv app-release-unsigned-signed.apk legero-${{ env.VERSION_NAME }}.apk
+          mv app-release-unsigned-signed.apk legero-universal-${{ env.VERSION_NAME }}.apk
 
       - uses: actions/upload-artifact@v7
         with:
-          name: legero-${{ env.VERSION_NAME }}
-          path: "android/app/build/outputs/apk/release/legero-${{ env.VERSION_NAME }}.apk"
+          name: legero-universal-${{ env.VERSION_NAME }}
+          path: "android/app/build/outputs/apk/release/legero-universal-${{ env.VERSION_NAME }}.apk"
+
+      - name: Create GitHub Release
+        # Only publish a release when a version tag (v*) is pushed.
+        # gh CLI is pre-installed on GitHub-hosted runners; GITHUB_TOKEN is
+        # automatically provisioned with contents: write permissions.
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd android/app/build/outputs/apk/release
+          gh release create "${{ github.ref_name }}" \
+            "legero-universal-${{ env.VERSION_NAME }}.apk" \
+            --generate-notes
       
