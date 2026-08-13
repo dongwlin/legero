@@ -44,7 +44,7 @@ export const authService = {
       })
     } catch (error) {
       if (isTransportFailure(error)) {
-        throw new Error(LOGIN_CONNECTION_ERROR)
+        throw new Error(LOGIN_CONNECTION_ERROR, { cause: error })
       }
 
       if (isInvalidCredentialsError(error)) {

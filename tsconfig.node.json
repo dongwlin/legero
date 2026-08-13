@@ -20,10 +20,12 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
+    /* Node globals (TS 6 types default to []) */
+    "types": ["node"],
+
     /* path alias */
-    "baseUrl": ".",
-      "paths": {
-      "@/*": ["src/*"]
+    "paths": {
+      "@/*": ["./src/*"]
     }
   },
   "include": ["vite.config.ts"]
