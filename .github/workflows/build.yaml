@@ -68,21 +68,34 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      - name: Sign
-        # r0adkll/sign-android-release cannot be upgraded: v1 is the only published
-        # release (runs on Node 12 and uses the deprecated set-output command inside).
-        # Its unreleased master branch still calls core.setOutput, so the set-output
-        # deprecation warning cannot be eliminated; keep @v1.
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: android/app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: ${{ secrets.ALIAS }}
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
+      - name: Sign APK
+        # Manual replacement for r0adkll/sign-android-release@v1 (last release 2019,
+        # its master branch still uses the deprecated set-output command, so the
+        # action cannot be used warning-free). Equivalent flow: zipalign check ->
+        # apksigner sign -> apksigner verify, producing the same output filename.
         env:
-          BUILD_TOOLS_VERSION: "35.0.0"
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cd android/app/build/outputs/apk/release
+          echo "$SIGNING_KEY" | base64 -d > signingKey.jks
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          "$BUILD_TOOLS/zipalign" -c -v 4 app-release-unsigned.apk
+          KEY_PASS_ARGS=()
+          if [ -n "$KEY_PASSWORD" ]; then
+            KEY_PASS_ARGS=(--key-pass "pass:$KEY_PASSWORD")
+          fi
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks signingKey.jks \
+            --ks-key-alias "$ALIAS" \
+            --ks-pass "pass:$KEY_STORE_PASSWORD" \
+            "${KEY_PASS_ARGS[@]}" \
+            --out app-release-unsigned-signed.apk \
+            app-release-unsigned.apk
+          "$BUILD_TOOLS/apksigner" verify app-release-unsigned-signed.apk
+          rm -f signingKey.jks
 
       - name: Rename APK
         run: |
