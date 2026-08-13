@@ -1,4 +1,4 @@
-onlyBuiltDependencies:
-  - '@swc/core'
-  - esbuild
-  - sharp
+allowBuilds:
+  '@swc/core': true
+  esbuild: true
+  sharp: true
