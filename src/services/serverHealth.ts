@@ -24,7 +24,9 @@ export const probeServerHealth = async (
       throw error
     }
 
-    throw new Error('无法连接到该服务器，请检查地址或网络。')
+    throw new Error('无法连接到该服务器，请检查地址或网络。', {
+      cause: error,
+    })
   }
 
   if (!response.ok) {

@@ -60,14 +60,18 @@ const ApiBaseUrlForm: React.FC<ApiBaseUrlFormProps> = ({
   const [healthStatus, setHealthStatus] = useState<ServerHealthStatus>(() =>
     currentApiBaseUrl ? 'reachable' : 'idle',
   )
+  const [prevApiBaseUrl, setPrevApiBaseUrl] = useState(currentApiBaseUrl)
   const [isSavedServerListOpen, setIsSavedServerListOpen] = useState(false)
   const probeAbortControllerRef = useRef<AbortController | null>(null)
   const probeRequestIdRef = useRef(0)
 
-  useEffect(() => {
+  // Adjust state in render when the resolved base URL changes, per React docs
+  // (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes)
+  if (prevApiBaseUrl !== currentApiBaseUrl) {
+    setPrevApiBaseUrl(currentApiBaseUrl)
     setValue(currentApiBaseUrl ?? '')
     setHealthStatus(currentApiBaseUrl ? 'reachable' : 'idle')
-  }, [currentApiBaseUrl])
+  }
 
   useEffect(() => {
     onHealthStatusChange?.(healthStatus)
