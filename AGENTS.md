@@ -89,3 +89,15 @@ Read and follow [`docs/agents/skills.md`](docs/agents/skills.md) for skill disco
 ## Sub-agents
 
 Read and follow [`docs/agents/subagents.md`](docs/agents/subagents.md) for sub-agent delegation, orchestration, and model-selection rules.
+
+## Local Environment
+
+Before starting task work, after reading this file, check whether
+`AGENTS.local.md` exists in the repository root.
+
+If present, read it as additional machine-local context for local paths,
+services, commands, debugging, and other environment-specific details.
+If absent, continue normally.
+
+`AGENTS.local.md` supplements this file and must not override repository-wide
+requirements unless explicitly permitted here.
