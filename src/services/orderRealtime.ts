@@ -4,6 +4,7 @@ import type {
   OrderDTO,
   OrderDeletedEvent,
   OrdersClearedEvent,
+  RealtimeSessionResponse,
 } from './apiTypes'
 import { orderDtoToOrderRecord } from './orderRecordMapper'
 import { realtimeSession } from './realtimeSession'
@@ -30,6 +31,12 @@ type WorkspaceOrderRealtimeOptions = {
   onUpsert: (order: ReturnType<typeof orderDtoToOrderRecord>) => void
 }
 
+// Connection lifecycle. The realtime channel is meant to run for as long as
+// the user is signed in: transient failures (network loss, server restart,
+// weak signal) move the machine back to reconnecting and keep retrying, and
+// only an explicit close() reaches the terminal 'closed' state.
+type RealtimeState = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'closed'
+
 const normalizeClearMode = (mode: unknown): ClearWorkspaceMode =>
   mode === 'before_today' ? 'before_today' : 'all'
 
@@ -37,9 +44,30 @@ export type OrderRealtimeSubscription = {
   close: () => void
 }
 
-const INITIAL_RECONNECT_DELAY_MS = 1_000
-const MAX_INITIAL_RECONNECT_ATTEMPTS = 3
-const MAX_RECONNECT_DELAY_MS = 10_000
+// The session ticket request and the WS 'ready' handshake must complete
+// within these windows; a hung request would otherwise stall recovery
+// forever.
+export const SESSION_TIMEOUT_MS = 5_000
+export const READY_TIMEOUT_MS = 8_000
+
+// A connection is only considered stable after staying online for this long;
+// only then is the failure counter reset. Resetting on 'ready' would turn a
+// flapping connection into a fixed high-frequency reconnect loop.
+export const STABLE_CONNECTION_MS = 30_000
+
+export const INITIAL_RECONNECT_DELAY_MS = 1_000
+export const MAX_RECONNECT_DELAY_MS = 30_000
+
+// Exponential backoff with full jitter: after failureCount consecutive
+// failures the delay is uniform in [0, min(cap, base * 2^(failureCount-1))).
+export const getReconnectDelayMs = (failureCount: number): number => {
+  const ceiling = Math.min(
+    MAX_RECONNECT_DELAY_MS,
+    INITIAL_RECONNECT_DELAY_MS * 2 ** Math.max(failureCount - 1, 0),
+  )
+
+  return Math.floor(Math.random() * ceiling)
+}
 
 const dispatchEvent = (
   eventType: string,
@@ -114,12 +142,6 @@ const buildWebSocketUrl = (ticket: string): string => {
   return url.toString()
 }
 
-const getReconnectDelayMs = (attempt: number): number =>
-  Math.min(
-    INITIAL_RECONNECT_DELAY_MS * 2 ** Math.max(attempt - 1, 0),
-    MAX_RECONNECT_DELAY_MS,
-  )
-
 export const orderRealtime = {
   subscribeToWorkspaceOrders(
     options: WorkspaceOrderRealtimeOptions,
@@ -128,8 +150,12 @@ export const orderRealtime = {
     let reconnectTimer: number | null = null
     let reconnectAttempts = 0
     let generation = 0
-    let closedByUser = false
-    let hasEverSubscribed = false
+    let state: RealtimeState = 'idle'
+    let stableConnectionTimer: number | null = null
+    let sessionAbortController: AbortController | null = null
+    let readyTimer: number | null = null
+
+    const isClosed = (): boolean => state === 'closed'
 
     const clearReconnectTimer = () => {
       if (reconnectTimer !== null) {
@@ -138,21 +164,67 @@ export const orderRealtime = {
       }
     }
 
+    const clearStableConnectionTimer = () => {
+      if (stableConnectionTimer !== null) {
+        window.clearTimeout(stableConnectionTimer)
+        stableConnectionTimer = null
+      }
+    }
+
+    const clearReadyTimer = () => {
+      if (readyTimer !== null) {
+        window.clearTimeout(readyTimer)
+        readyTimer = null
+      }
+    }
+
+    const startStableConnectionTimer = () => {
+      clearStableConnectionTimer()
+      stableConnectionTimer = window.setTimeout(() => {
+        stableConnectionTimer = null
+
+        if (state === 'online') {
+          reconnectAttempts = 0
+        }
+      }, STABLE_CONNECTION_MS)
+    }
+
+    const startReadyTimer = (
+      attemptSocket: WebSocket,
+      attemptGeneration: number,
+    ) => {
+      clearReadyTimer()
+      readyTimer = window.setTimeout(() => {
+        readyTimer = null
+
+        if (
+          isClosed() ||
+          attemptGeneration !== generation ||
+          socket !== attemptSocket
+        ) {
+          return
+        }
+
+        // The socket opened but never sent 'ready' within the window.
+        // Invalidate this attempt first: a late 'ready' or message from the
+        // closing socket must not move the state machine (in a real browser
+        // close() -> onclose is asynchronous). Then close the socket and
+        // fall through to the next reconnect ourselves, since onclose will
+        // now be rejected by the generation guard.
+        generation += 1
+        closeSocket(1000, 'ready_timeout')
+        scheduleReconnect()
+      }, READY_TIMEOUT_MS)
+    }
+
     const scheduleReconnect = () => {
-      if (closedByUser) {
+      if (isClosed()) {
         return
       }
 
+      state = 'reconnecting'
       reconnectAttempts += 1
-
-      if (
-        !hasEverSubscribed &&
-        reconnectAttempts > MAX_INITIAL_RECONNECT_ATTEMPTS
-      ) {
-        options.onSubscriptionStatus?.('CHANNEL_ERROR')
-        return
-      }
-
+      clearStableConnectionTimer()
       clearReconnectTimer()
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null
@@ -177,25 +249,55 @@ export const orderRealtime = {
     }
 
     const connect = async () => {
+      if (isClosed()) {
+        return
+      }
+
+      state = 'connecting'
       clearReconnectTimer()
+      clearReadyTimer()
 
       const currentGeneration = ++generation
 
       try {
-        if (!(await ensureFreshAuthTokens())?.accessToken) {
+        const tokens = await ensureFreshAuthTokens()
+
+        // close() can land while the auth refresh is in flight: every await
+        // boundary must re-check the generation before starting the next
+        // async stage, or a closed subscription would still create a session.
+        if (isClosed() || currentGeneration !== generation) {
+          return
+        }
+
+        if (!tokens?.accessToken) {
           throw new ApiError(401, 'unauthorized', 'Not authenticated.')
         }
 
-        const session = await realtimeSession.create()
-        if (closedByUser || currentGeneration !== generation) {
+        const abortController = new AbortController()
+        sessionAbortController = abortController
+        const sessionTimeout = window.setTimeout(() => {
+          abortController.abort()
+        }, SESSION_TIMEOUT_MS)
+
+        let session: RealtimeSessionResponse
+
+        try {
+          session = await realtimeSession.create(abortController.signal)
+        } finally {
+          window.clearTimeout(sessionTimeout)
+          sessionAbortController = null
+        }
+
+        if (isClosed() || currentGeneration !== generation) {
           return
         }
 
         const nextSocket = new WebSocket(buildWebSocketUrl(session.ticket))
         socket = nextSocket
+        startReadyTimer(nextSocket, currentGeneration)
 
         nextSocket.onmessage = (event) => {
-          if (closedByUser || currentGeneration !== generation) {
+          if (isClosed() || currentGeneration !== generation) {
             return
           }
 
@@ -205,9 +307,14 @@ export const orderRealtime = {
           }
 
           if (parsed.eventType === 'ready') {
-            reconnectAttempts = 0
-            hasEverSubscribed = true
-            options.onSubscriptionStatus?.('SUBSCRIBED')
+            clearReadyTimer()
+
+            if (state !== 'online') {
+              state = 'online'
+              options.onSubscriptionStatus?.('SUBSCRIBED')
+              startStableConnectionTimer()
+            }
+
             return
           }
 
@@ -219,18 +326,23 @@ export const orderRealtime = {
         }
 
         nextSocket.onclose = () => {
+          // Only the active socket may clear the ready timer: a stale onclose
+          // from a previous attempt (close() -> onclose is asynchronous in a
+          // real browser) must not cancel the new attempt's timer, or a
+          // failing handshake would stall forever.
           if (socket === nextSocket) {
             socket = null
+            clearReadyTimer()
           }
 
-          if (closedByUser || currentGeneration !== generation) {
+          if (isClosed() || currentGeneration !== generation) {
             return
           }
 
           scheduleReconnect()
         }
       } catch (error) {
-        if (closedByUser || currentGeneration !== generation) {
+        if (isClosed() || currentGeneration !== generation) {
           return
         }
 
@@ -244,6 +356,8 @@ export const orderRealtime = {
           return
         }
 
+        // Network errors, aborts (session timeout), and 5xx are transient:
+        // back off and retry instead of giving up.
         scheduleReconnect()
       }
     }
@@ -252,9 +366,17 @@ export const orderRealtime = {
 
     return {
       close: () => {
-        closedByUser = true
+        if (isClosed()) {
+          return
+        }
+
+        state = 'closed'
         generation += 1
         clearReconnectTimer()
+        clearStableConnectionTimer()
+        clearReadyTimer()
+        sessionAbortController?.abort()
+        sessionAbortController = null
         closeSocket(1000, 'client_closed')
         options.onSubscriptionStatus?.('CLOSED')
       },
