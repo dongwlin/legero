@@ -202,6 +202,11 @@ export const useAuthSessionBootstrap = () => {
 
     return () => {
       cancelled = true
+      // A changed apiBaseUrl means any in-flight workspace refresh belongs to
+      // the previous server: bump the generation so a stale outcome cannot
+      // restore user/workspace/order state from a server that is no longer
+      // current (e.g. after probing, selecting, or deleting another server).
+      workspaceRefreshGeneration += 1
     }
   }, [
     apiBaseUrl,

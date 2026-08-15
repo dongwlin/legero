@@ -19,6 +19,7 @@ const bootstrapResult = {
 }
 
 const mocks = vi.hoisted(() => ({
+  apiBaseUrl: 'http://server-a.test',
   bootstrap: vi.fn(),
   hasStoredAuthTokens: vi.fn(),
 }))
@@ -38,7 +39,7 @@ vi.mock('@/services/apiClient', async (importOriginal) => {
 })
 
 vi.mock('@/hooks/useApiBaseUrl', () => ({
-  useApiBaseUrl: () => 'http://localhost:8080',
+  useApiBaseUrl: () => mocks.apiBaseUrl,
 }))
 
 const resetAuthStore = () => {
@@ -56,6 +57,7 @@ const resetAuthStore = () => {
 describe('useAuthSessionBootstrap', () => {
   beforeEach(() => {
     resetAuthStore()
+    mocks.apiBaseUrl = 'http://server-a.test'
     mocks.bootstrap.mockReset()
     mocks.hasStoredAuthTokens.mockReset().mockReturnValue(true)
   })
@@ -203,5 +205,43 @@ describe('useAuthSessionBootstrap', () => {
     expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
     expect(useAuthStore.getState().status).toBe('authenticated')
     expect(useAuthStore.getState().workspaceStatus).toBe('ready')
+  })
+
+  it('discards an in-flight bootstrap outcome when the api base URL changes', async () => {
+    let resolveAuto: ((result: typeof bootstrapResult) => void) | undefined
+    mocks.bootstrap.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveAuto = resolve
+        }),
+    )
+
+    const { rerender } = renderHook(() => useAuthSessionBootstrap())
+
+    await waitFor(() => {
+      expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
+    })
+
+    // Switch to another server: ApiBaseUrlForm.resetSession clears the
+    // session, and the old server's in-flight bootstrap must become stale.
+    mocks.hasStoredAuthTokens.mockReturnValue(false)
+    mocks.apiBaseUrl = 'http://server-b.test'
+
+    await act(async () => {
+      rerender()
+    })
+
+    expect(useAuthStore.getState().status).toBe('anonymous')
+
+    // The old server's request finally succeeds — it must not restore its
+    // authenticated context under the now-current server.
+    await act(async () => {
+      resolveAuto?.(bootstrapResult)
+      await Promise.resolve()
+    })
+
+    expect(useAuthStore.getState().status).toBe('anonymous')
+    expect(useAuthStore.getState().activeWorkspace).toBeNull()
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
   })
 })
