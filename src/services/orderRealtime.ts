@@ -189,18 +189,31 @@ export const orderRealtime = {
       }, STABLE_CONNECTION_MS)
     }
 
-    const startReadyTimer = () => {
+    const startReadyTimer = (
+      attemptSocket: WebSocket,
+      attemptGeneration: number,
+    ) => {
       clearReadyTimer()
       readyTimer = window.setTimeout(() => {
         readyTimer = null
 
-        if (isClosed()) {
+        if (
+          isClosed() ||
+          attemptGeneration !== generation ||
+          socket !== attemptSocket
+        ) {
           return
         }
 
-        // The socket opened but never sent 'ready'; closing it routes back
-        // through onclose into the next reconnect.
+        // The socket opened but never sent 'ready' within the window.
+        // Invalidate this attempt first: a late 'ready' or message from the
+        // closing socket must not move the state machine (in a real browser
+        // close() -> onclose is asynchronous). Then close the socket and
+        // fall through to the next reconnect ourselves, since onclose will
+        // now be rejected by the generation guard.
+        generation += 1
         closeSocket(1000, 'ready_timeout')
+        scheduleReconnect()
       }, READY_TIMEOUT_MS)
     }
 
@@ -281,7 +294,7 @@ export const orderRealtime = {
 
         const nextSocket = new WebSocket(buildWebSocketUrl(session.ticket))
         socket = nextSocket
-        startReadyTimer()
+        startReadyTimer(nextSocket, currentGeneration)
 
         nextSocket.onmessage = (event) => {
           if (isClosed() || currentGeneration !== generation) {

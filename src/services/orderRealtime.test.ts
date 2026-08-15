@@ -312,7 +312,8 @@ describe('orderRealtime connection lifecycle', () => {
 
   it('closes the socket and retries when the ready handshake never arrives', async () => {
     const onSubscriptionStatus = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus })
+    const onRemove = vi.fn()
+    const subscription = subscribe({ onSubscriptionStatus, onRemove })
 
     await flushAsync()
     const socket = latestSocket()
@@ -326,6 +327,14 @@ describe('orderRealtime connection lifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'ready_timeout' }])
+
+    // A late 'ready' or message from the timed-out socket must not move the
+    // state machine (in a real browser close() -> onclose is asynchronous,
+    // so this window exists in production).
+    socket.emit('ready', { serverTime: '2099-01-01T00:00:00.000Z' })
+    socket.emit('order.deleted', { id: 'o1' })
+    expect(onSubscriptionStatus).not.toHaveBeenCalled()
+    expect(onRemove).not.toHaveBeenCalled()
 
     await flushAsync()
     await vi.advanceTimersByTimeAsync(500)
@@ -415,25 +424,29 @@ describe('orderRealtime connection lifecycle', () => {
   })
 
   it('does not create a session when closed while the auth refresh is pending', async () => {
-    let resolveAuth: ((value: { accessToken: string }) => void) | null = null
-    mocks.ensureFreshAuthTokens.mockReturnValue(
-      new Promise((resolve) => {
-        resolveAuth = resolve
-      }),
+    const pendingAuth: {
+      resolve: ((value: { accessToken: string }) => void) | null
+    } = { resolve: null }
+
+    mocks.ensureFreshAuthTokens.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pendingAuth.resolve = resolve
+        }),
     )
 
     const onSubscriptionStatus = vi.fn()
     const subscription = subscribe({ onSubscriptionStatus })
 
     await flushAsync()
-    expect(resolveAuth).not.toBeNull()
+    expect(pendingAuth.resolve).not.toBeNull()
 
     subscription.close()
     expect(onSubscriptionStatus).toHaveBeenCalledWith('CLOSED')
 
     // The refresh resolves after close: the attempt must be abandoned before
     // any session request is started.
-    resolveAuth?.({ accessToken: 'access-1' })
+    pendingAuth.resolve?.({ accessToken: 'access-1' })
 
     await flushAsync()
     expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
