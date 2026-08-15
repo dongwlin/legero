@@ -84,12 +84,15 @@ const buildApiError = (status: number, payload: string): ApiError => {
 }
 
 // Backend contract for POST /api/auth/refresh: every 401 response means the
-// refresh token is definitively invalid — the codes are exactly
-// 'refresh_token_expired' and 'refresh_token_reused' (see auth.go Refresh in
-// legero-backend). Everything else — network errors, aborts, timeouts,
-// non-401 responses, 5xx — is transient and must keep the stored tokens so
-// the session can be restored once connectivity returns.
+// refresh token is definitively invalid. parseToken (auth.go in
+// legero-backend) yields 'unauthorized' for malformed, tampered, wrong-type,
+// or invalid-claim refresh tokens, while 'refresh_token_expired' and
+// 'refresh_token_reused' cover expiry, revocation, and reuse. Everything
+// else — network errors, aborts, timeouts, non-401 responses, 5xx — is
+// transient and must keep the stored tokens so the session can be restored
+// once connectivity returns.
 const INVALID_REFRESH_TOKEN_CODES = new Set([
+  'unauthorized',
   'refresh_token_expired',
   'refresh_token_reused',
 ])
@@ -97,9 +100,9 @@ const INVALID_REFRESH_TOKEN_CODES = new Set([
 // Codes that definitively invalidate the stored session. The auth middleware
 // uses 'unauthorized' (invalid access token) and 'token_expired'; the refresh
 // endpoint uses the refresh-token codes above. Other 401 codes (e.g. realtime
-// session problems) are not credential failures and must not clear the tokens.
+// session problems, gateway denials) are not credential failures and must not
+// clear the tokens.
 const INVALID_SESSION_CODES = new Set([
-  'unauthorized',
   'token_expired',
   ...INVALID_REFRESH_TOKEN_CODES,
 ])

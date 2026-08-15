@@ -75,6 +75,19 @@ describe('refreshAuthTokens error classification', () => {
     expect(getStoredAuthTokens()).toBeNull()
   })
 
+  it('clears stored tokens when the refresh endpoint rejects a malformed refresh token with 401 unauthorized', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse(401, { error: { code: 'unauthorized', message: 'invalid token' } }),
+    )
+
+    await expect(refreshAuthTokens()).rejects.toMatchObject({
+      status: 401,
+      code: 'unauthorized',
+    })
+
+    expect(getStoredAuthTokens()).toBeNull()
+  })
+
   it('keeps stored tokens when the refresh endpoint returns an unrelated 401', async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse(401, { error: { code: 'access_denied', message: 'denied by gateway' } }),
@@ -158,6 +171,24 @@ describe('apiRequest token_expired refresh flow', () => {
     await expect(
       apiRequest({ path: '/api/bootstrap', auth: true }),
     ).rejects.toMatchObject({ status: 401 })
+
+    expect(getStoredAuthTokens()).toBeNull()
+  })
+
+  it('clears stored tokens when the retry refresh rejects a malformed refresh token with 401 unauthorized', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        jsonResponse(401, {
+          error: { code: 'token_expired', message: 'access token has expired' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(401, { error: { code: 'unauthorized', message: 'invalid token' } }),
+      )
+
+    await expect(
+      apiRequest({ path: '/api/bootstrap', auth: true }),
+    ).rejects.toMatchObject({ status: 401, code: 'unauthorized' })
 
     expect(getStoredAuthTokens()).toBeNull()
   })
