@@ -3,6 +3,7 @@ import {
   API_CONFIGURATION_ERROR,
   ApiError,
   hasStoredAuthTokens,
+  isInvalidSessionError,
 } from '@/services/apiClient'
 import type { BootstrapResponse } from '@/services/apiTypes'
 import { useApiBaseUrl } from '@/hooks/useApiBaseUrl'
@@ -30,9 +31,6 @@ type WorkspaceRefreshOutcome =
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Failed to resolve workspace access.'
 
-const isUnauthorizedError = (error: unknown): boolean =>
-  error instanceof ApiError && error.status === 401
-
 const isMissingWorkspaceError = (error: unknown): boolean =>
   error instanceof ApiError && error.code === 'workspace_not_found'
 
@@ -55,7 +53,10 @@ const runWorkspaceRefresh = async (): Promise<WorkspaceRefreshOutcome> => {
       const result = await authService.bootstrap()
       return { kind: 'authenticated', result }
     } catch (error) {
-      if (isUnauthorizedError(error)) {
+      // Only credential-invalid 401s (same rule as apiClient's token
+      // clearing) mean the session is definitively dead; any other 401 is a
+      // transient error that must not downgrade the user to anonymous.
+      if (isInvalidSessionError(error)) {
         return { kind: 'unauthorized' }
       }
 

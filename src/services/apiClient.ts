@@ -107,10 +107,15 @@ const INVALID_SESSION_CODES = new Set([
   ...INVALID_REFRESH_TOKEN_CODES,
 ])
 
-const isInvalidRefreshTokenError = (error: unknown): boolean =>
+// Shared credential-invalid classification. apiClient uses it to decide
+// whether to clear stored tokens, and the session bootstrap uses it to decide
+// whether a failure means the session is definitively dead (anonymous) rather
+// than transient. One rule in one place keeps the two layers consistent for
+// the same 401.
+export const isInvalidSessionError = (error: unknown): boolean =>
   error instanceof ApiError &&
   error.status === 401 &&
-  INVALID_REFRESH_TOKEN_CODES.has(error.code)
+  INVALID_SESSION_CODES.has(error.code)
 
 const tokensNeedRefresh = (tokens: AuthTokens): boolean => {
   const expiresAtMs = Date.parse(tokens.accessTokenExpiresAt)
@@ -292,8 +297,8 @@ export const refreshAuthTokens = async (): Promise<AuthTokens> => {
       // Transient failures (network errors, aborts, timeouts, server 5xx)
       // must not clear the stored tokens: doing so turns a temporary network
       // problem into a forced logout. Only a definitive rejection of the
-      // refresh token (HTTP 401) invalidates the stored session.
-      if (isInvalidRefreshTokenError(error)) {
+      // refresh token (credential-invalid 401) invalidates the stored session.
+      if (isInvalidSessionError(error)) {
         clearStoredAuthTokens()
       }
       throw error
@@ -359,12 +364,7 @@ export const apiRequest = async <T>(
       )
     }
 
-    if (
-      requestOptions.auth &&
-      error instanceof ApiError &&
-      error.status === 401 &&
-      INVALID_SESSION_CODES.has(error.code)
-    ) {
+    if (requestOptions.auth && isInvalidSessionError(error)) {
       clearStoredAuthTokens()
     }
 

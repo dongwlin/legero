@@ -29,21 +29,13 @@ vi.mock('@/services/authService', () => ({
   },
 }))
 
-vi.mock('@/services/apiClient', () => ({
-  API_CONFIGURATION_ERROR: 'api configuration error',
-  ApiError: class ApiError extends Error {
-    status: number
-    code: string
-
-    constructor(status: number, code: string, message: string) {
-      super(message)
-      this.name = 'ApiError'
-      this.status = status
-      this.code = code
-    }
-  },
-  hasStoredAuthTokens: mocks.hasStoredAuthTokens,
-}))
+vi.mock('@/services/apiClient', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/services/apiClient')>()
+  return {
+    ...mod,
+    hasStoredAuthTokens: mocks.hasStoredAuthTokens,
+  }
+})
 
 vi.mock('@/hooks/useApiBaseUrl', () => ({
   useApiBaseUrl: () => 'http://localhost:8080',
@@ -103,6 +95,41 @@ describe('useAuthSessionBootstrap', () => {
     })
 
     expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to anonymous on 401 unauthorized', async () => {
+    mocks.bootstrap.mockRejectedValue(
+      new ApiError(401, 'unauthorized', 'invalid token'),
+    )
+
+    renderHook(() => useAuthSessionBootstrap())
+
+    await waitFor(() => {
+      expect(useAuthStore.getState().status).toBe('anonymous')
+    })
+
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not fall back to anonymous on a non-credential 401', async () => {
+    mocks.bootstrap.mockRejectedValue(
+      new ApiError(401, 'access_denied', 'denied by gateway'),
+    )
+
+    renderHook(() => useAuthSessionBootstrap())
+
+    await waitFor(
+      () => {
+        expect(mocks.bootstrap).toHaveBeenCalledTimes(3)
+      },
+      { timeout: 5_000 },
+    )
+
+    // The token stays in place and the session stays retryable: a
+    // non-credential 401 must not downgrade the user to anonymous.
+    expect(useAuthStore.getState().status).toBe('loading')
+    expect(useAuthStore.getState().workspaceStatus).toBe('error')
+    expect(useAuthStore.getState().errorMessage).toBe('denied by gateway')
   })
 
   it('lets a manual re-check supersede the pending automatic retries', async () => {
