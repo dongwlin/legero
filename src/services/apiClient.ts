@@ -83,6 +83,14 @@ const buildApiError = (status: number, payload: string): ApiError => {
   return new ApiError(status, code, message)
 }
 
+// A refresh attempt only definitively invalidates the session when the
+// refresh endpoint explicitly rejects the refresh token (HTTP 401 with codes
+// like refresh_token_expired / refresh_token_reused). Everything else —
+// network errors, aborts, timeouts, server 5xx — is transient and must keep
+// the stored tokens so the session can be restored once connectivity returns.
+const isInvalidRefreshTokenError = (error: unknown): boolean =>
+  error instanceof ApiError && error.status === 401
+
 const tokensNeedRefresh = (tokens: AuthTokens): boolean => {
   const expiresAtMs = Date.parse(tokens.accessTokenExpiresAt)
 
@@ -260,7 +268,13 @@ export const refreshAuthTokens = async (): Promise<AuthTokens> => {
       return merged
     })
     .catch((error) => {
-      clearStoredAuthTokens()
+      // Transient failures (network errors, aborts, timeouts, server 5xx)
+      // must not clear the stored tokens: doing so turns a temporary network
+      // problem into a forced logout. Only a definitive rejection of the
+      // refresh token (HTTP 401) invalidates the stored session.
+      if (isInvalidRefreshTokenError(error)) {
+        clearStoredAuthTokens()
+      }
       throw error
     })
     .finally(() => {
