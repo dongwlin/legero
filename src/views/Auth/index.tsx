@@ -148,7 +148,7 @@ const Auth: React.FC = () => {
   }
 
   if (
-    authStatus === 'loading' ||
+    (authStatus === 'loading' && workspaceStatus !== 'error') ||
     (authStatus === 'authenticated' &&
       (workspaceStatus === 'loading' || workspaceStatus === 'idle'))
   ) {
@@ -224,9 +224,7 @@ const Auth: React.FC = () => {
               <Button.Root
                 variant='secondary'
                 onPress={() => {
-                  if (authStatus === 'authenticated') {
-                    void refreshWorkspaceAccess()
-                  }
+                  void refreshWorkspaceAccess()
                 }}
               >
                 重新检查

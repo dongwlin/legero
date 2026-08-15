@@ -115,8 +115,10 @@ export const useAuthSessionBootstrap = () => {
         }
 
         if (attempt === SESSION_BOOTSTRAP_MAX_ATTEMPTS) {
-          setAnonymous()
-          resetSyncState()
+          // Transient failures must not log the user out: stored tokens are
+          // still valid, and the workspace error state exposes a retry path
+          // once connectivity returns. Only a definitive auth failure
+          // (result 'anonymous') clears the session.
           return
         }
 
