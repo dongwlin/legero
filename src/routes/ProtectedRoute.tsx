@@ -53,7 +53,7 @@ const ProtectedRoute: React.FC = () => {
   const workspaceStatus = useAuthStore((state) => state.workspaceStatus)
   const { status, errorMessage, retrySync } = useOrderWorkspaceSync()
 
-  if (authStatus === 'loading') {
+  if (authStatus === 'loading' && workspaceStatus !== 'error') {
     return (
       <ProtectedRouteState
         isLoading

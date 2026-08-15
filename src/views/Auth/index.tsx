@@ -5,7 +5,10 @@ import ApiBaseUrlForm, {
   type ServerHealthStatus,
 } from '@/components/ApiBaseUrlForm'
 import { useApiBaseUrl } from '@/hooks/useApiBaseUrl'
-import { useRefreshWorkspaceAccess } from '@/hooks/useAuthSessionBootstrap'
+import {
+  cancelPendingWorkspaceRefresh,
+  useRefreshWorkspaceAccess,
+} from '@/hooks/useAuthSessionBootstrap'
 import { authService } from '@/services/authService'
 import { API_CONFIGURATION_ERROR } from '@/services/apiClient'
 import { getRememberedPhone, rememberPhone } from '@/services/rememberedPhone'
@@ -148,7 +151,7 @@ const Auth: React.FC = () => {
   }
 
   if (
-    authStatus === 'loading' ||
+    (authStatus === 'loading' && workspaceStatus !== 'error') ||
     (authStatus === 'authenticated' &&
       (workspaceStatus === 'loading' || workspaceStatus === 'idle'))
   ) {
@@ -224,9 +227,10 @@ const Auth: React.FC = () => {
               <Button.Root
                 variant='secondary'
                 onPress={() => {
-                  if (authStatus === 'authenticated') {
-                    void refreshWorkspaceAccess()
-                  }
+                  // Supersede any pending automatic bootstrap retries so a
+                  // stale failure cannot clobber this manual re-check.
+                  cancelPendingWorkspaceRefresh()
+                  void refreshWorkspaceAccess()
                 }}
               >
                 重新检查

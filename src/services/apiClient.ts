@@ -83,6 +83,40 @@ const buildApiError = (status: number, payload: string): ApiError => {
   return new ApiError(status, code, message)
 }
 
+// Backend contract for POST /api/auth/refresh: every 401 response means the
+// refresh token is definitively invalid. parseToken (auth.go in
+// legero-backend) yields 'unauthorized' for malformed, tampered, wrong-type,
+// or invalid-claim refresh tokens, while 'refresh_token_expired' and
+// 'refresh_token_reused' cover expiry, revocation, and reuse. Everything
+// else — network errors, aborts, timeouts, non-401 responses, 5xx — is
+// transient and must keep the stored tokens so the session can be restored
+// once connectivity returns.
+const INVALID_REFRESH_TOKEN_CODES = new Set([
+  'unauthorized',
+  'refresh_token_expired',
+  'refresh_token_reused',
+])
+
+// Codes that definitively invalidate the stored session. The auth middleware
+// uses 'unauthorized' (invalid access token) and 'token_expired'; the refresh
+// endpoint uses the refresh-token codes above. Other 401 codes (e.g. realtime
+// session problems, gateway denials) are not credential failures and must not
+// clear the tokens.
+const INVALID_SESSION_CODES = new Set([
+  'token_expired',
+  ...INVALID_REFRESH_TOKEN_CODES,
+])
+
+// Shared credential-invalid classification. apiClient uses it to decide
+// whether to clear stored tokens, and the session bootstrap uses it to decide
+// whether a failure means the session is definitively dead (anonymous) rather
+// than transient. One rule in one place keeps the two layers consistent for
+// the same 401.
+export const isInvalidSessionError = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  error.status === 401 &&
+  INVALID_SESSION_CODES.has(error.code)
+
 const tokensNeedRefresh = (tokens: AuthTokens): boolean => {
   const expiresAtMs = Date.parse(tokens.accessTokenExpiresAt)
 
@@ -260,7 +294,13 @@ export const refreshAuthTokens = async (): Promise<AuthTokens> => {
       return merged
     })
     .catch((error) => {
-      clearStoredAuthTokens()
+      // Transient failures (network errors, aborts, timeouts, server 5xx)
+      // must not clear the stored tokens: doing so turns a temporary network
+      // problem into a forced logout. Only a definitive rejection of the
+      // refresh token (credential-invalid 401) invalidates the stored session.
+      if (isInvalidSessionError(error)) {
+        clearStoredAuthTokens()
+      }
       throw error
     })
     .finally(() => {
@@ -324,11 +364,7 @@ export const apiRequest = async <T>(
       )
     }
 
-    if (
-      requestOptions.auth &&
-      error instanceof ApiError &&
-      error.status === 401
-    ) {
+    if (requestOptions.auth && isInvalidSessionError(error)) {
       clearStoredAuthTokens()
     }
 
