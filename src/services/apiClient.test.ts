@@ -67,9 +67,25 @@ describe('refreshAuthTokens error classification', () => {
       }),
     )
 
-    await expect(refreshAuthTokens()).rejects.toMatchObject({ status: 401 })
+    await expect(refreshAuthTokens()).rejects.toMatchObject({
+      status: 401,
+      code: 'refresh_token_expired',
+    })
 
     expect(getStoredAuthTokens()).toBeNull()
+  })
+
+  it('keeps stored tokens when the refresh endpoint returns an unrelated 401', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse(401, { error: { code: 'access_denied', message: 'denied by gateway' } }),
+    )
+
+    await expect(refreshAuthTokens()).rejects.toMatchObject({
+      status: 401,
+      code: 'access_denied',
+    })
+
+    expect(getStoredAuthTokens()).toEqual(TOKENS)
   })
 
   it('persists the rotated token pair on success', async () => {
@@ -144,6 +160,37 @@ describe('apiRequest token_expired refresh flow', () => {
     ).rejects.toMatchObject({ status: 401 })
 
     expect(getStoredAuthTokens()).toBeNull()
+  })
+
+  it('keeps stored tokens when an in-flight refresh returns an unrelated 401', async () => {
+    localStorage.clear()
+    persistAuthTokens({
+      ...TOKENS,
+      accessTokenExpiresAt: '2000-01-01T00:00:00.000Z',
+    })
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse(401, { error: { code: 'access_denied', message: 'denied by gateway' } }),
+    )
+
+    await expect(
+      apiRequest({ path: '/api/bootstrap', auth: true }),
+    ).rejects.toMatchObject({ status: 401, code: 'access_denied' })
+
+    expect(getStoredAuthTokens()).not.toBeNull()
+  })
+
+  it('keeps stored tokens when a protected request returns a non-credential 401', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse(401, {
+        error: { code: 'realtime_session_invalid', message: 'realtime session is invalid' },
+      }),
+    )
+
+    await expect(
+      apiRequest({ path: '/api/realtime/session', auth: true, method: 'POST' }),
+    ).rejects.toMatchObject({ status: 401, code: 'realtime_session_invalid' })
+
+    expect(getStoredAuthTokens()).toEqual(TOKENS)
   })
 
   it('retries the original request with the fresh access token after a successful refresh', async () => {

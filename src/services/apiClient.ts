@@ -83,13 +83,31 @@ const buildApiError = (status: number, payload: string): ApiError => {
   return new ApiError(status, code, message)
 }
 
-// A refresh attempt only definitively invalidates the session when the
-// refresh endpoint explicitly rejects the refresh token (HTTP 401 with codes
-// like refresh_token_expired / refresh_token_reused). Everything else —
-// network errors, aborts, timeouts, server 5xx — is transient and must keep
-// the stored tokens so the session can be restored once connectivity returns.
+// Backend contract for POST /api/auth/refresh: every 401 response means the
+// refresh token is definitively invalid — the codes are exactly
+// 'refresh_token_expired' and 'refresh_token_reused' (see auth.go Refresh in
+// legero-backend). Everything else — network errors, aborts, timeouts,
+// non-401 responses, 5xx — is transient and must keep the stored tokens so
+// the session can be restored once connectivity returns.
+const INVALID_REFRESH_TOKEN_CODES = new Set([
+  'refresh_token_expired',
+  'refresh_token_reused',
+])
+
+// Codes that definitively invalidate the stored session. The auth middleware
+// uses 'unauthorized' (invalid access token) and 'token_expired'; the refresh
+// endpoint uses the refresh-token codes above. Other 401 codes (e.g. realtime
+// session problems) are not credential failures and must not clear the tokens.
+const INVALID_SESSION_CODES = new Set([
+  'unauthorized',
+  'token_expired',
+  ...INVALID_REFRESH_TOKEN_CODES,
+])
+
 const isInvalidRefreshTokenError = (error: unknown): boolean =>
-  error instanceof ApiError && error.status === 401
+  error instanceof ApiError &&
+  error.status === 401 &&
+  INVALID_REFRESH_TOKEN_CODES.has(error.code)
 
 const tokensNeedRefresh = (tokens: AuthTokens): boolean => {
   const expiresAtMs = Date.parse(tokens.accessTokenExpiresAt)
@@ -341,7 +359,8 @@ export const apiRequest = async <T>(
     if (
       requestOptions.auth &&
       error instanceof ApiError &&
-      error.status === 401
+      error.status === 401 &&
+      INVALID_SESSION_CODES.has(error.code)
     ) {
       clearStoredAuthTokens()
     }
