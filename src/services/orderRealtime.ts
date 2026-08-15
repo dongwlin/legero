@@ -326,10 +326,13 @@ export const orderRealtime = {
         }
 
         nextSocket.onclose = () => {
-          clearReadyTimer()
-
+          // Only the active socket may clear the ready timer: a stale onclose
+          // from a previous attempt (close() -> onclose is asynchronous in a
+          // real browser) must not cancel the new attempt's timer, or a
+          // failing handshake would stall forever.
           if (socket === nextSocket) {
             socket = null
+            clearReadyTimer()
           }
 
           if (isClosed() || currentGeneration !== generation) {

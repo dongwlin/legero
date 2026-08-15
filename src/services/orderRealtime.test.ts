@@ -344,6 +344,49 @@ describe('orderRealtime connection lifecycle', () => {
     subscription.close()
   })
 
+  it('ignores a stale onclose so the new attempt keeps its ready timer', async () => {
+    const onSubscriptionStatus = vi.fn()
+    const subscription = subscribe({ onSubscriptionStatus })
+
+    await flushAsync()
+    const socket1 = latestSocket()
+    socket1.open()
+
+    // socket1 never sends 'ready' -> its attempt times out and reconnects.
+    await vi.advanceTimersByTimeAsync(READY_TIMEOUT_MS)
+    expect(socket1.closeCalls).toEqual([{ code: 1000, reason: 'ready_timeout' }])
+
+    // Wait for the backoff; attempt 2 creates socket2 with its own timer.
+    await flushAsync()
+    await vi.advanceTimersByTimeAsync(500)
+    await flushAsync()
+
+    const socket2 = latestSocket()
+    expect(socket2).not.toBe(socket1)
+    socket2.open()
+
+    // The browser delivers socket1's onclose only now (close() -> onclose is
+    // asynchronous). It must not cancel socket2's ready timer.
+    socket1.onclose?.(new Event('close'))
+
+    const attemptsAfterStaleClose = mocks.realtimeSessionCreate.mock.calls.length
+
+    await vi.advanceTimersByTimeAsync(READY_TIMEOUT_MS - 1)
+    expect(mocks.realtimeSessionCreate.mock.calls.length).toBe(attemptsAfterStaleClose)
+
+    // socket2's own ready timeout still fires 8s after its open.
+    await vi.advanceTimersByTimeAsync(1)
+    expect(socket2.closeCalls).toEqual([{ code: 1000, reason: 'ready_timeout' }])
+
+    // ...and the next retry is scheduled (attempt 3 -> 0.5 * 2s = 1000ms).
+    await flushAsync()
+    await vi.advanceTimersByTimeAsync(1000)
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate.mock.calls.length).toBe(attemptsAfterStaleClose + 1)
+
+    subscription.close()
+  })
+
   it('reports TIMED_OUT on 401 and never retries', async () => {
     mocks.realtimeSessionCreate.mockRejectedValue(
       new mocks.MockApiError(401, 'unauthorized', 'Not authenticated.'),
