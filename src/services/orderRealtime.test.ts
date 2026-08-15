@@ -414,6 +414,34 @@ describe('orderRealtime connection lifecycle', () => {
     expect(onSubscriptionStatus).not.toHaveBeenCalledWith('SUBSCRIBED')
   })
 
+  it('does not create a session when closed while the auth refresh is pending', async () => {
+    let resolveAuth: ((value: { accessToken: string }) => void) | null = null
+    mocks.ensureFreshAuthTokens.mockReturnValue(
+      new Promise((resolve) => {
+        resolveAuth = resolve
+      }),
+    )
+
+    const onSubscriptionStatus = vi.fn()
+    const subscription = subscribe({ onSubscriptionStatus })
+
+    await flushAsync()
+    expect(resolveAuth).not.toBeNull()
+
+    subscription.close()
+    expect(onSubscriptionStatus).toHaveBeenCalledWith('CLOSED')
+
+    // The refresh resolves after close: the attempt must be abandoned before
+    // any session request is started.
+    resolveAuth?.({ accessToken: 'access-1' })
+
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 10)
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+  })
+
   it('aborts an in-flight session request on close and stays closed', async () => {
     mocks.realtimeSessionCreate.mockImplementation((signal?: AbortSignal) => {
       return new Promise((_resolve, reject) => {

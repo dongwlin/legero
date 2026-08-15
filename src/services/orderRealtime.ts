@@ -247,7 +247,16 @@ export const orderRealtime = {
       const currentGeneration = ++generation
 
       try {
-        if (!(await ensureFreshAuthTokens())?.accessToken) {
+        const tokens = await ensureFreshAuthTokens()
+
+        // close() can land while the auth refresh is in flight: every await
+        // boundary must re-check the generation before starting the next
+        // async stage, or a closed subscription would still create a session.
+        if (isClosed() || currentGeneration !== generation) {
+          return
+        }
+
+        if (!tokens?.accessToken) {
           throw new ApiError(401, 'unauthorized', 'Not authenticated.')
         }
 
