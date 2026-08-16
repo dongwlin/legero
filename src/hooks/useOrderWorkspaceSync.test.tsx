@@ -2118,4 +2118,116 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     expect(useOrderStore.getState().ordersById['f']).toEqual(fresh)
     expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
   })
+
+  it('does not let a delayed upsert resurrect an old order after a before_today clear in the normal path', async () => {
+    // Review blocker P1: a before_today clear applies immediately with no
+    // reconciliation in flight. The client-known old ids must become terminal
+    // tombstones before the store drops them, so a delayed stale upsert of
+    // one of them — arriving while the follow-up snapshot is in flight — can
+    // never resurrect an order the server already cleared.
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const today = todayOrder('today')
+    const oldOrder = makeOrder('a', '2020-01-01T10:00:00+08:00', { version: 11 })
+
+    await act(async () => {
+      first.resolve([today, oldOrder])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeDefined()
+
+    // The clear applies immediately: known non-today ids are tombstoned
+    // first, today's orders are kept.
+    act(() => {
+      ws.onClear({ clearedCount: 1, mode: 'before_today' })
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+    expect(orderTombstones.has('a')).toBe(true)
+
+    // A stale delayed upsert of the old id arrives while the follow-up
+    // snapshot is in flight: the receipt-time tombstone drops it at the
+    // onUpsert gate before it can enter the buffer.
+    act(() => {
+      ws.onUpsert(oldOrder)
+    })
+
+    await act(async () => {
+      second.resolve([])
+      await flushAsync()
+    })
+
+    // The tombstone — not just the empty post-clear snapshot — keeps the old
+    // order absent.
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+  })
+
+  it('does not let a delayed upsert resurrect a snapshot-only old order after a before_today clear', async () => {
+    // Review blocker P1, reconciliation path: the old order was never in the
+    // store when the (buffered) clear arrived, so no id tombstone exists —
+    // only the session-wide date guard knows it. A delayed stale upsert of
+    // that id in a LATER window carries a `createdAt` on a previous day and
+    // must be rejected at the gate, so the per-window replay can never bring
+    // the order back either.
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    expect(mocks.listOrders).toHaveBeenCalledTimes(1)
+
+    const today = todayOrder('today')
+    const oldOrder = makeOrder('a', '2020-01-01T10:00:00+08:00', { version: 11 })
+
+    // The clear arrives while snapshot #1 is in flight: it is buffered, and
+    // the session-wide before_today guard is registered at receipt.
+    act(() => {
+      ws.onClear({ clearedCount: 1, mode: 'before_today' })
+    })
+    expect(orderTombstones.isBeforeTodayCleared()).toBe(true)
+
+    // Snapshot #1 (read before the clear) still contains the old order; the
+    // reconciled replay drops it. 'a' was never in the store, so nothing was
+    // id-tombstoned at receipt — the date guard is all that blocks it.
+    await act(async () => {
+      first.resolve([today, oldOrder])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+    expect(mocks.listOrders).toHaveBeenCalledTimes(2)
+
+    // A delayed upsert of the old id arrives during the follow-up snapshot:
+    // its createdAt predates today, so the session-wide guard rejects it even
+    // though its id never joined the tombstone registry.
+    act(() => {
+      ws.onUpsert(oldOrder)
+    })
+
+    await act(async () => {
+      second.resolve([today])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+  })
 })

@@ -100,11 +100,12 @@ export const useOrderWorkspaceSync = () => {
 
       pendingUpserts.clear()
       // A remove that confirmed while the upsert was already queued — via a
-      // realtime event or a local DELETE — tombstones the id session-wide,
-      // so the queued event is stale and must not resurrect it from an empty
-      // store slot.
+      // realtime event, a clear event or a local DELETE — tombstones the id
+      // session-wide (or, for a before_today clear, the creation date marks
+      // it stale), so the queued event is dropped instead of resurrecting
+      // the order from an empty store slot.
       const upserts = Array.from(upsertsById.values()).filter(
-        (order) => !orderTombstones.has(order.id),
+        (order) => !orderTombstones.rejectsUpsert(order),
       )
       const removes = Array.from(pendingRemoves.values())
       pendingRemoves.clear()
@@ -170,38 +171,45 @@ export const useOrderWorkspaceSync = () => {
       return [...ordersById.values()]
     }
 
-    // A full clear is a terminal delete of the whole workspace at the moment
-    // it is received: ids the client currently knows are tombstoned so a
-    // delayed stale upsert of any of them — arriving via the batch queue, the
+    // A clear is a terminal delete of the orders it removes at the moment it
+    // is received: ids the client currently knows are tombstoned so a delayed
+    // stale upsert of any of them — arriving via the batch queue, the
     // reconciliation buffer or a late HTTP response — can never resurrect an
     // order the server already deleted (the backend never reuses an order
     // id). The clear payload carries no deleted-id list, so only the
-    // client-known ids can be covered here; the reconciliation-window
-    // compaction closes the rest of the resurrection window (see
+    // client-known ids can be covered here; 'all' tombstones every known id,
+    // 'before_today' only those not created today (the server keeps today's
+    // orders). The reconciliation-window compaction and the date-based
+    // before_today guard close the rest of the resurrection window (see
     // compactRealtimeEvents).
-    const tombstoneClearedIds = () => {
+    const tombstoneClearedIds = (mode: ClearWorkspaceMode) => {
       const store = useOrderStore.getState()
 
-      for (const id of Object.keys(store.ordersById)) {
-        orderTombstones.markRemoved(id)
+      for (const [id, order] of Object.entries(store.ordersById)) {
+        if (mode === 'all' || !isOrderCreatedToday(order)) {
+          orderTombstones.markRemoved(id)
+        }
       }
     }
 
     // Applies a clear event's semantics to the store: 'all' empties the
     // workspace, 'before_today' keeps only orders created on the current
-    // business day (the server deleted everything older).
+    // business day (the server deleted everything older). Both register the
+    // terminal deletion barrier for the ids the client knows before the
+    // store is touched, so a later stale statement for any of them is
+    // dropped at the gates instead of being applied to the (now empty or
+    // filtered) store slots.
     const applyClearToStore = (mode: ClearWorkspaceMode) => {
       const store = useOrderStore.getState()
 
       if (mode === 'all') {
-        // Tombstone the client-known ids before emptying the store, so the
-        // clear itself becomes the deletion barrier: every later statement
-        // for those ids is stale and is dropped at the gates above instead of
-        // being applied to the (now empty) store slots.
-        tombstoneClearedIds()
+        tombstoneClearedIds('all')
         store.clearOrders()
         return
       }
+
+      tombstoneClearedIds('before_today')
+      orderTombstones.markBeforeTodayClear()
 
       store.setOrders(
         Object.values(store.ordersById).filter((order) => isOrderCreatedToday(order)),
@@ -223,10 +231,11 @@ export const useOrderWorkspaceSync = () => {
       for (const event of events) {
         switch (event.type) {
           case 'upsert':
-            // A tombstoned id is terminally deleted for the whole session: a
-            // buffered stale upsert must not resurrect it during failure
-            // replay either.
-            if (!orderTombstones.has(event.order.id)) {
+            // A tombstoned id (or a not-created-today order after a
+            // before_today clear) is terminally deleted for the whole
+            // session: a buffered stale upsert must not resurrect it during
+            // failure replay either.
+            if (!orderTombstones.rejectsUpsert(event.order)) {
               store.upsertIfNewer(event.order)
             }
             break
@@ -314,7 +323,7 @@ export const useOrderWorkspaceSync = () => {
               effects,
             ),
             orderOptimistic.idsToProtect(snapshotMarker),
-          ).filter((order) => !orderTombstones.has(order.id)),
+          ).filter((order) => !orderTombstones.rejectsUpsert(order)),
         )
       } catch (error) {
         if (isDisposed) {
@@ -385,12 +394,13 @@ export const useOrderWorkspaceSync = () => {
         subscription = orderRealtime.subscribeToWorkspaceOrders({
           onUpsert: (order) => {
             if (!isDisposed) {
-              // Same-id remove is terminal for the whole sync session, not
-              // just inside a reconciliation window: an upsert of a
-              // tombstoned id (the backend never reuses an order id) is
-              // always a stale/delayed event and is dropped before it can
-              // enter the buffer or the batch queue.
-              if (orderTombstones.has(order.id)) {
+              // Same-id remove and clear are terminal for the whole sync
+              // session — not just inside a reconciliation window: an upsert
+              // of a tombstoned id (the backend never reuses an order id) is
+              // always a stale/delayed event; after a before_today clear the
+              // same holds for any not-created-today upsert. Both are dropped
+              // before they can enter the buffer or the batch queue.
+              if (orderTombstones.rejectsUpsert(order)) {
                 return
               }
 
@@ -448,7 +458,10 @@ export const useOrderWorkspaceSync = () => {
                 // cleared id that arrives later in the window is dropped at
                 // the onUpsert gate instead of entering the buffer.
                 if (event.mode === 'all') {
-                  tombstoneClearedIds()
+                  tombstoneClearedIds('all')
+                } else {
+                  tombstoneClearedIds('before_today')
+                  orderTombstones.markBeforeTodayClear()
                 }
 
                 eventBuffer.push({ type: 'clear', mode: event.mode })

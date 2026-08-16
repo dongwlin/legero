@@ -180,11 +180,21 @@ export const reconcileSnapshotWithEvents = (
   // reuses an order id, so a later upsert of any of them is stale and must
   // not resurrect the order.
   const tombstonedByClear = new Set<string>()
+  // True once a before_today clear was replayed: the server dropped every
+  // order created before the current business day. An upsert arriving after
+  // it with a `createdAt` on a previous day cannot be a legitimate fresh
+  // creation (the server never recreates a deleted id), so it is dropped —
+  // only upserts of genuinely today-created orders survive the clear.
+  let beforeTodayClearedInWindow = false
 
   for (const event of compactRealtimeEvents(events)) {
     switch (event.type) {
       case 'upsert': {
         if (tombstonedByClear.has(event.order.id)) {
+          break
+        }
+
+        if (beforeTodayClearedInWindow && !isOrderCreatedToday(event.order)) {
           break
         }
 
@@ -215,6 +225,8 @@ export const reconcileSnapshotWithEvents = (
         } else {
           // before_today: the server keeps only orders created on the
           // current business day (Asia/Shanghai), so drop everything older.
+          beforeTodayClearedInWindow = true
+
           for (const [id, order] of ordersById) {
             if (!isOrderCreatedToday(order)) {
               ordersById.delete(id)

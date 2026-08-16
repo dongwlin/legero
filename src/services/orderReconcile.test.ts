@@ -365,6 +365,40 @@ describe('reconcileSnapshotWithEvents', () => {
 
     expect(result).toEqual([])
   })
+
+  it('does not let a delayed upsert resurrect an old order after a before_today clear', () => {
+    // Review blocker P1: a before_today clear is a terminal delete of every
+    // order created before the current business day. An upsert arriving after
+    // the clear whose `createdAt` is on a previous day cannot be a legitimate
+    // fresh creation (the backend never recreates a deleted id), so it must
+    // not resurrect the order from the snapshot base — regardless of how high
+    // its server version is.
+    const snapshot = [yesterdayOrder('yesterday', { version: 5 })]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      clearBeforeToday,
+      {
+        type: 'upsert',
+        order: yesterdayOrder('yesterday', { version: 20, note: 'stale-delayed' }),
+      },
+    ])
+
+    expect(result).toEqual([])
+  })
+
+  it('keeps an upsert of a genuinely today-created order after a before_today clear', () => {
+    // The date-based guard must not over-block: an order created today after
+    // the clear (fresh business-day work) survives it.
+    const snapshot = [yesterdayOrder('yesterday')]
+    const fresh = todayOrder('fresh')
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      clearBeforeToday,
+      { type: 'upsert', order: fresh },
+    ])
+
+    expect(result).toEqual([fresh])
+  })
 })
 
 describe('version ordering primitives', () => {
