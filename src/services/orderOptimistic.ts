@@ -71,11 +71,12 @@ export const orderOptimistic = {
    * after the start (the snapshot read predates the mutation itself).
    *
    * The set only names the candidates: the caller decides at commit time how
-   * each one is protected. A still-pending mutation always wins (its
-   * completion or rollback owns the authoritative state), while a settled
-   * mutation only wins over the stale snapshot itself — a buffered realtime
-   * event with a strictly newer server version supersedes it. A plain
-   * Set<orderId> cannot express that distinction on its own.
+   * each one is protected. The optimistic record of a mutation — pending or
+   * settled — keeps the pre-mutation server version, so it wins over the
+   * stale snapshot itself, while a buffered realtime event with a strictly
+   * newer server version supersedes it even while the mutation is still
+   * pending. A plain Set<orderId> cannot express that distinction on its
+   * own.
    */
   idsToProtect(marker: MutationSnapshotMarker): Set<string> {
     const ids = new Set(marker.pendingIds)

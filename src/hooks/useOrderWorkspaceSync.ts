@@ -84,19 +84,12 @@ export const useOrderWorkspaceSync = () => {
 
       const store = useOrderStore.getState()
 
-      if (upserts.length > 0) {
-        // A realtime upsert is applied only when it is strictly newer than
-        // the store's record: a duplicate echo (same version) or a delayed
-        // stale event (lower version) must not overwrite authoritative state.
-        const toApply = upserts.filter((order) => {
-          const existing = store.ordersById[order.id]
-          return !existing || order.version > existing.version
-        })
-
-        if (toApply.length > 0) {
-          store.upsertOrders(toApply)
-        }
-      }
+      // Authoritative merge: only a strictly newer server version is applied
+      // (an equal version is the same commit and a lower one is stale). The
+      // optimistic record of a pending mutation keeps the pre-mutation server
+      // version, so it is version-comparable too and cannot shield a newer
+      // authoritative event from another client.
+      store.upsertOrdersIfNewer(upserts)
 
       for (const id of removes) {
         store.removeOrder(id)
@@ -113,12 +106,13 @@ export const useOrderWorkspaceSync = () => {
 
     // Re-applies the store's records for protected ids on top of a reconciled
     // list, so a stale snapshot cannot overwrite a mutation that overlaps its
-    // lifetime. Pending mutations always win: their completion (or rollback)
-    // owns the authoritative state, and the optimistic record predates the
-    // server versions any event would carry. Settled mutations only win over
-    // the snapshot itself — a buffered realtime event with a strictly higher
-    // server version (e.g. another client's update committed after ours)
-    // supersedes the local result. Orders the events themselves removed
+    // lifetime. The optimistic record of a mutation — pending or settled —
+    // keeps the pre-mutation server version, so it only wins over the
+    // snapshot itself: a buffered realtime event with a strictly higher
+    // server version (e.g. another client's update committed after ours) is
+    // authoritative state the mutation's completion or rollback cannot
+    // supersede, and wins even while the mutation is still pending. Settled
+    // mutations follow the same rule. Orders the events themselves removed
     // (remove/clear) stay removed.
     const overlayOptimisticRecords = (
       orders: OrderRecord[],
@@ -137,11 +131,6 @@ export const useOrderWorkspaceSync = () => {
         const optimistic = store.ordersById[id]
 
         if (!optimistic || !ordersById.has(id)) {
-          continue
-        }
-
-        if (orderOptimistic.hasPending(id)) {
-          ordersById.set(id, optimistic)
           continue
         }
 
@@ -178,35 +167,19 @@ export const useOrderWorkspaceSync = () => {
     // dropped — apply them as ordinary updates on top of whatever the store
     // currently holds, then surface the error. The next successful
     // reconciliation (retry or reconnect) restores the full server state.
-    // Upserts are skipped only when the store already owns a state at least
-    // as new: while a mutation is still pending (its completion or rollback
-    // owns the authoritative state, and the optimistic record is not
-    // version-comparable), or when the event carries no strictly higher
-    // server version than the store's record (the echo of a settled local
-    // mutation, a duplicate, or an older event). A strictly newer event —
-    // another client's update — must win even over a completed local
-    // mutation.
+    // Upserts go through the authoritative merge: only a strictly higher
+    // server version than the store's record is applied. The optimistic
+    // record of a still-pending mutation keeps the pre-mutation server
+    // version, so it cannot shield a newer authoritative event — a client
+    // that committed after ours must win even while our mutation is pending.
     const applyBufferedEvents = (events: RealtimeOrderEvent[]) => {
       const store = useOrderStore.getState()
 
       for (const event of events) {
         switch (event.type) {
-          case 'upsert': {
-            const { id } = event.order
-
-            if (orderOptimistic.hasPending(id)) {
-              continue
-            }
-
-            const current = store.ordersById[id]
-
-            if (current && current.version >= event.order.version) {
-              continue
-            }
-
-            store.upsertOrder(event.order)
+          case 'upsert':
+            store.upsertIfNewer(event.order)
             break
-          }
           case 'remove':
             store.removeOrder(event.id)
             break
@@ -324,19 +297,17 @@ export const useOrderWorkspaceSync = () => {
           onUpsert: (order) => {
             if (!isDisposed) {
               if (eventBuffer.isReconciling) {
-                // Buffer the server event even when the order has an
-                // in-flight optimistic mutation: dropping it here would let
-                // a stale snapshot overwrite the optimistically-applied
-                // state. At commit time the event is replayed unless the
-                // mutation is still pending.
+                // Buffer the server event: at commit time it is replayed over
+                // the snapshot with version-aware merges, so it survives even
+                // when the order has an in-flight optimistic mutation.
                 eventBuffer.push({ type: 'upsert', order })
                 return
               }
 
-              if (orderOptimistic.hasPending(order.id)) {
-                return
-              }
-
+              // No pending gate: while a mutation is pending the optimistic
+              // record keeps the pre-mutation server version, so the flush's
+              // version comparison still accepts a strictly newer event
+              // (another client's commit) and rejects echoes/stale events.
               // Batched upserts for the same id consolidate on the highest
               // version at insertion: within one batch a delayed stale event
               // must not displace the newer event it trails.
