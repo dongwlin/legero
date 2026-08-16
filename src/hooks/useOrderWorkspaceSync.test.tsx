@@ -22,6 +22,8 @@ const mocks = vi.hoisted(() => ({
   unsubscribe: vi.fn(),
   listOrders: vi.fn(),
   hasPending: vi.fn(),
+  captureSnapshotMarker: vi.fn(),
+  idsToProtect: vi.fn(),
 }))
 
 vi.mock('@/services/orderRealtime', () => ({
@@ -36,7 +38,11 @@ vi.mock('@/services/orderRepository', () => ({
 }))
 
 vi.mock('@/services/orderOptimistic', () => ({
-  orderOptimistic: { hasPending: mocks.hasPending },
+  orderOptimistic: {
+    hasPending: mocks.hasPending,
+    captureSnapshotMarker: mocks.captureSnapshotMarker,
+    idsToProtect: mocks.idsToProtect,
+  },
 }))
 
 type SubscriptionCallbacks = {
@@ -126,6 +132,10 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     mocks.unsubscribe.mockReset().mockResolvedValue(undefined)
     mocks.listOrders.mockReset().mockResolvedValue([])
     mocks.hasPending.mockReset().mockReturnValue(false)
+    mocks.captureSnapshotMarker
+      .mockReset()
+      .mockReturnValue({ seq: 0, pendingIds: [] })
+    mocks.idsToProtect.mockReset().mockReturnValue(new Set())
   })
 
   afterEach(() => {
@@ -206,6 +216,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     const snapshot = deferred<OrderRecord[]>()
     mocks.listOrders.mockReturnValue(snapshot.promise)
     mocks.hasPending.mockReturnValue(true)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
 
     renderHook(() => useOrderWorkspaceSync())
     const ws = subscriptionCallbacks!
@@ -235,6 +246,83 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     // Neither the stale snapshot nor the server echo may clobber the
     // optimistic record: the pending mutation's completion owns the
     // authoritative state.
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('optimistic')
+  })
+
+  it('keeps the optimistic record when no WS echo arrives before the snapshot lands', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(true)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The user toggles order a while the snapshot is in flight: the
+    // optimistic record lands in the store, but the WS echo has not arrived,
+    // so no realtime event mentions a. The marker captured at snapshot start
+    // must still protect it at commit.
+    const optimisticA = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      note: 'optimistic',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(optimisticA)
+    })
+
+    expect(mocks.captureSnapshotMarker).toHaveBeenCalledTimes(1)
+    expect(mocks.captureSnapshotMarker.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.listOrders.mock.invocationCallOrder[0],
+    )
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'stale' }),
+      ])
+      await flushAsync()
+    })
+
+    // The stale snapshot must not clobber the optimistic record.
+    expect(mocks.idsToProtect).toHaveBeenCalledTimes(1)
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('optimistic')
+  })
+
+  it('does not let a failed snapshot replay clobber a protected optimistic record', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(true)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const optimisticA = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      note: 'optimistic',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(optimisticA)
+    })
+
+    // The WS echo arrives while the snapshot is in flight and the mutation
+    // is still pending.
+    act(() => {
+      ws.onUpsert(makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'server-echo' }))
+    })
+
+    await act(async () => {
+      snapshot.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    // The buffered echo replay must not clobber the optimistic record: the
+    // pending mutation's completion owns the authoritative state.
     expect(useOrderStore.getState().ordersById['a']?.note).toBe('optimistic')
   })
 

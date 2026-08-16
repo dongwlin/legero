@@ -87,24 +87,8 @@ export const useOrderWorkspaceSync = () => {
       flushRafId = window.requestAnimationFrame(flushBatched)
     }
 
-    // Buffered upserts whose id still has an in-flight optimistic mutation at
-    // commit time are deferred: the snapshot must not clobber the optimistic
-    // record, and the mutation's own completion (or rollback) delivers the
-    // authoritative server state.
-    const collectPendingUpsertIds = (events: RealtimeOrderEvent[]): Set<string> => {
-      const pendingIds = new Set<string>()
-
-      for (const event of events) {
-        if (event.type === 'upsert' && orderOptimistic.hasPending(event.order.id)) {
-          pendingIds.add(event.order.id)
-        }
-      }
-
-      return pendingIds
-    }
-
-    // Re-applies the store's current (optimistic) records for deferred ids on
-    // top of a reconciled list, so a stale snapshot cannot overwrite an
+    // Re-applies the store's current (optimistic) records for protected ids
+    // on top of a reconciled list, so a stale snapshot cannot overwrite an
     // in-flight mutation. Orders the events themselves removed (remove/clear)
     // stay removed.
     const overlayOptimisticRecords = (
@@ -149,16 +133,17 @@ export const useOrderWorkspaceSync = () => {
     // dropped — apply them as ordinary updates on top of whatever the store
     // currently holds, then surface the error. The next successful
     // reconciliation (retry or reconnect) restores the full server state.
-    const applyBufferedEvents = (events: RealtimeOrderEvent[]) => {
+    // Upserts for orders whose mutations overlap the failed snapshot are
+    // deferred: their completion (or rollback) owns the authoritative state.
+    const applyBufferedEvents = (
+      events: RealtimeOrderEvent[],
+      pendingIds: ReadonlySet<string>,
+    ) => {
       const store = useOrderStore.getState()
-      const pendingIds = collectPendingUpsertIds(events)
 
       for (const event of events) {
         switch (event.type) {
           case 'upsert':
-            // Defer upserts for orders with an in-flight optimistic
-            // mutation: their completion (or rollback) owns the
-            // authoritative state.
             if (!pendingIds.has(event.order.id)) {
               store.upsertOrder(event.order)
             }
@@ -202,8 +187,12 @@ export const useOrderWorkspaceSync = () => {
       // clear events are buffered in arrival order instead of being applied,
       // so the snapshot cannot overwrite them. Flush anything received
       // before the reconciliation started first (those events predate the
-      // snapshot read and are already covered by it).
+      // snapshot read and are already covered by it). The mutation marker
+      // records which optimistic mutations may span the snapshot's lifetime:
+      // their records must survive the commit even when no realtime event
+      // mentions them (e.g. the WS echo has not arrived yet).
       flushBatched()
+      const snapshotMarker = orderOptimistic.captureSnapshotMarker()
       eventBuffer.beginReconciliation()
 
       try {
@@ -214,14 +203,14 @@ export const useOrderWorkspaceSync = () => {
         }
 
         // The snapshot is the base state; buffered events are newer and win.
-        // Upserts for still-pending optimistic mutations are deferred: keep
-        // the store's optimistic record so the snapshot cannot clobber it
-        // (the HTTP response settles the authoritative state afterwards).
+        // Optimistic records for mutations that overlap this snapshot's
+        // lifetime are kept so the snapshot cannot clobber them (the HTTP
+        // response settles the authoritative state afterwards).
         const events = eventBuffer.endReconciliation()
         setOrders(
           overlayOptimisticRecords(
             reconcileSnapshotWithEvents(nextOrders, events),
-            collectPendingUpsertIds(events),
+            orderOptimistic.idsToProtect(snapshotMarker),
           ),
         )
       } catch (error) {
@@ -229,7 +218,10 @@ export const useOrderWorkspaceSync = () => {
           return
         }
 
-        applyBufferedEvents(eventBuffer.endReconciliation())
+        applyBufferedEvents(
+          eventBuffer.endReconciliation(),
+          orderOptimistic.idsToProtect(snapshotMarker),
+        )
 
         if (shouldBlock) {
           setHydrationState({
