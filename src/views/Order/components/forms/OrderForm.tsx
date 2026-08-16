@@ -291,11 +291,32 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const upsertOrdersIfNewer = useOrderStore((state) => state.upsertOrdersIfNewer)
   const updateTargetID = useOrderStore((state) => state.updateTargetID)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
-  const findOrder = useOrderStore((state) => state.findOrder)
+  // The live record the edit session is editing, or undefined while the
+  // target is missing (deleted) or no session is open. Used both to render
+  // the form and to detect when the resynced record supersedes a conflicted
+  // version below.
+  const activeRecordFromStore = useOrderStore((state) =>
+    mode === 'edit' && updateTargetID
+      ? state.ordersById[updateTargetID]
+      : undefined,
+  )
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createSessionId, setCreateSessionId] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // Bumped to remount OrderFormContent (re-initializing both the form
+  // values and the pinned baseVersion) inside a live edit session, e.g. when
+  // a 409 conflict is resolved by a resync.
+  const [editSessionKey, setEditSessionKey] = useState(0)
+  // Set after a 409 order_conflict: the edit session must restart against
+  // the resynced record instead of re-submitting the stale pinned version
+  // forever. The restart waits until the store record is strictly newer than
+  // the version that conflicted — the resync commit — so the fresh session
+  // pins the authoritative base.
+  const [pendingConflictRefresh, setPendingConflictRefresh] = useState(false)
+  const [conflictedVersion, setConflictedVersion] = useState<number | null>(
+    null,
+  )
 
   const handleDialogClose = useCallback(
     (force = false) => {
@@ -397,6 +418,17 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
       // authoritative state so the list no longer shows the stale version.
       if (isOrderConflictError(error)) {
         requestOrdersResync()
+
+        // Also restart the edit session once the resync lands: staying in
+        // the modal and submitting again must carry the fresh
+        // expectedVersion, otherwise every retry re-409s on the stale pin.
+        // The restart re-initializes the form content from the fresh record
+        // — never a blend of the old content with a new base version, which
+        // would reintroduce the lost update OCC prevents.
+        if (mode === 'edit' && !pendingConflictRefresh) {
+          setConflictedVersion(baseVersion)
+          setPendingConflictRefresh(true)
+        }
       }
 
       setSubmitError(getErrorMessage(error))
@@ -407,12 +439,49 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const formTitle = isCreateMode ? '创建订单' : '修改订单'
   const submitButtonText = isCreateMode ? '创建' : '修改'
   const activeItem =
-    !isCreateMode && updateTargetID ? findOrder(updateTargetID) : initialItem
+    !isCreateMode && updateTargetID ? activeRecordFromStore : initialItem
   const isOpen = isCreateMode ? isCreateOpen : Boolean(updateTargetID)
   const shouldRenderModal = isCreateMode || Boolean(updateTargetID)
   const formSessionKey = isCreateMode
     ? `create-${createSessionId}`
     : updateTargetID
+      ? `${updateTargetID}:${editSessionKey}`
+      : ''
+
+  // Conflict recovery inside a live edit session: once the store record is
+  // strictly newer than the version that got the 409 (the resync commit
+  // landed), remount OrderFormContent so both the form values and the pinned
+  // baseVersion re-initialize from the authoritative record. The session
+  // never blends the old form content with a new base version.
+  useEffect(() => {
+    if (!pendingConflictRefresh) {
+      return
+    }
+
+    if (!activeRecordFromStore) {
+      // The order was deleted while the conflict was being resolved: there is
+      // nothing left to edit, so close the session instead of showing a
+      // stale form.
+      setPendingConflictRefresh(false)
+      setConflictedVersion(null)
+      handleDialogClose()
+      return
+    }
+
+    if (
+      conflictedVersion !== null &&
+      activeRecordFromStore.version > conflictedVersion
+    ) {
+      setPendingConflictRefresh(false)
+      setConflictedVersion(null)
+      setEditSessionKey((key) => key + 1)
+    }
+  }, [
+    activeRecordFromStore,
+    conflictedVersion,
+    handleDialogClose,
+    pendingConflictRefresh,
+  ])
 
   useEffect(() => {
     if (!isOpen) {

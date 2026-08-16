@@ -358,6 +358,76 @@ describe('OrderForm edit-session optimistic concurrency', () => {
     stopResync()
   })
 
+  it('re-pins expectedVersion to the resynced record after a 409 without closing the modal', async () => {
+    // Review blocker: after a 409 the form must not stay pinned to the stale
+    // opening version forever. Sticking with the modal open, a retry after
+    // the resync carries the fresh authoritative version instead of
+    // re-409ing on the old pin.
+    useOrderStore.getState().upsertOrder(
+      makeOrder('a', { version: 10, note: 'original' }),
+    )
+    useOrderStore.getState().setUpdateTargetID('a')
+
+    const resync = vi.fn()
+    const stopResync = subscribeOrdersResync(resync)
+
+    openEditForm()
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'local edit' },
+    })
+
+    mocks.update
+      .mockRejectedValueOnce(
+        new ApiError(409, 'order_conflict', '订单已被其他操作修改。'),
+      )
+      .mockResolvedValueOnce(
+        makeOrder('a', { version: 12, note: 'retried edit' }),
+      )
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: '修改' }))
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    // The first submit carried the pinned v10 and got the conflict; the
+    // resync was requested while the modal stayed open and the store still
+    // holds v10.
+    expect(mocks.update).toHaveBeenCalledTimes(1)
+    expect(mocks.update.mock.calls[0][2]).toBe(10)
+    expect(resync).toHaveBeenCalledTimes(1)
+    expect(useOrderStore.getState().ordersById['a']?.version).toBe(10)
+
+    // The resync commit lands: the store advances to the authoritative v11.
+    // The edit session restarts against it instead of keeping the v10 pin.
+    act(() => {
+      useOrderStore.getState().upsertOrder(
+        makeOrder('a', { version: 11, note: 'resynced' }),
+      )
+    })
+    await act(async () => {
+      await flushAsync()
+    })
+
+    // Submitting again — without closing the modal — must now carry v11.
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: '修改' }))
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    expect(mocks.update).toHaveBeenCalledTimes(2)
+    expect(mocks.update.mock.calls[1][2]).toBe(11)
+    expect(mocks.update.mock.calls[1][2]).not.toBe(10)
+
+    stopResync()
+  })
+
   it('re-pins expectedVersion when the edit session is reopened after the store advanced', async () => {
     useOrderStore.getState().upsertOrder(
       makeOrder('a', { version: 10, note: 'original' }),
