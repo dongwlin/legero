@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { orderRepository } from '@/services/orderRepository'
 import {
   orderRealtime,
@@ -33,6 +33,9 @@ export const useOrderWorkspaceSync = () => {
   const resetSyncState = useOrderStore((state) => state.resetSyncState)
   const setHydrationState = useOrderStore((state) => state.setHydrationState)
   const [refreshKey, setRefreshKey] = useState(0)
+  // Workspace the last sync session was opened for, so a switch to another
+  // workspace is detected and the session-wide registries are reset.
+  const lastActiveWorkspaceIdRef = useRef<string | null>(null)
 
   const retrySync = useCallback(() => {
     setRefreshKey((current) => current + 1)
@@ -41,11 +44,22 @@ export const useOrderWorkspaceSync = () => {
   useEffect(() => {
     if (authStatus !== 'authenticated' || !activeWorkspaceId) {
       resetSyncState()
-      // The sync session is over: drop terminal tombstones so a later
-      // session starts from a clean registry (ids are never reused, so this
-      // only bounds memory — it cannot reopen a resurrection window).
+      // The sync session is over: drop the session-wide registries so a
+      // later session starts clean (ids are never reused, so this only
+      // bounds memory — it cannot reopen a resurrection window).
       orderTombstones.reset()
+      orderOptimistic.reset()
+      lastActiveWorkspaceIdRef.current = null
       return
+    }
+
+    // A workspace switch is a new sync session: drop the terminally-deleted
+    // id registry and the local mutation journal of the previous workspace
+    // (ids are never reused, so this only bounds memory).
+    if (lastActiveWorkspaceIdRef.current !== activeWorkspaceId) {
+      orderTombstones.reset()
+      orderOptimistic.reset()
+      lastActiveWorkspaceIdRef.current = activeWorkspaceId
     }
 
     let isDisposed = false
@@ -330,6 +344,13 @@ export const useOrderWorkspaceSync = () => {
         }
       } finally {
         syncInFlight = false
+        // The snapshot settled: effects and protection stamps older than
+        // its marker can never overlap a future snapshot (every later
+        // marker is >= this one), so prune them to bound the mutation
+        // journal to the current snapshot window instead of the whole
+        // session. No snapshot is in flight here — the follow-up
+        // reconciliation, if any, captures a fresh marker afterwards.
+        orderOptimistic.prune(snapshotMarker)
       }
 
       if (pendingReconcile) {

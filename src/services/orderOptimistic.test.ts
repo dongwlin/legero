@@ -76,6 +76,67 @@ describe('orderOptimistic snapshot markers', () => {
   })
 })
 
+describe('orderOptimistic journal lifecycle', () => {
+  it('prunes entries that can no longer overlap any in-flight snapshot', () => {
+    orderOptimistic.reset()
+
+    orderOptimistic.recordUpsert(makeOrder('old', { version: 4 }))
+    // Snapshot N settles with this marker: everything stamped at or before
+    // it can never be replayed for a later snapshot.
+    const settledMarker = orderOptimistic.captureSnapshotMarker()
+
+    orderOptimistic.recordUpsert(makeOrder('fresh', { version: 5 }))
+    orderOptimistic.recordRemove('deleted')
+
+    orderOptimistic.prune(settledMarker)
+
+    const all = orderOptimistic.effectsAfter({ seq: -1, pendingIds: [] })
+    expect(all.map((effect) => (effect.type === 'upsert' ? effect.order.id : effect.id))).toEqual([
+      'fresh',
+      'deleted',
+    ])
+
+    const protectedIds = orderOptimistic.idsToProtect({ seq: -1, pendingIds: [] })
+    expect(protectedIds.has('old')).toBe(false)
+    expect(protectedIds.has('fresh')).toBe(true)
+    expect(protectedIds.has('deleted')).toBe(true)
+  })
+
+  it('keeps a pending mutation protected after prune via future pendingIds', () => {
+    orderOptimistic.reset()
+
+    const generation = orderOptimistic.beginMutation('pending', makeOrder('pending'))
+    const settledMarker = orderOptimistic.captureSnapshotMarker()
+
+    // The mutation's stamp predates the settled snapshot, so pruning removes
+    // it — but the still-pending mutation is re-captured on every snapshot
+    // start through pendingIds, so it stays protected.
+    orderOptimistic.prune(settledMarker)
+
+    const futureMarker = orderOptimistic.captureSnapshotMarker()
+    expect(futureMarker.pendingIds).toContain('pending')
+    expect(orderOptimistic.idsToProtect(futureMarker).has('pending')).toBe(true)
+
+    orderOptimistic.endMutation('pending', generation)
+  })
+
+  it('reset() drops the whole journal (pending mutations, stamps and effects)', () => {
+    orderOptimistic.reset()
+
+    orderOptimistic.recordUpsert(makeOrder('a', { version: 1 }))
+    const generation = orderOptimistic.beginMutation('b', makeOrder('b'))
+
+    orderOptimistic.reset()
+
+    expect(orderOptimistic.hasPending('b')).toBe(false)
+    expect(orderOptimistic.effectsAfter({ seq: -1, pendingIds: [] })).toEqual([])
+    expect(orderOptimistic.idsToProtect({ seq: -1, pendingIds: [] }).size).toBe(0)
+
+    // endMutation of a post-reset pending entry is a no-op, not a crash.
+    expect(orderOptimistic.endMutation('b', generation)).toBe(false)
+  })
+})
+
 describe('orderOptimistic confirmed mutation journal', () => {
   it('recordUpsert protects the id against a snapshot that started before the confirmation', () => {
     const marker = orderOptimistic.captureSnapshotMarker()

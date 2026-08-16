@@ -304,19 +304,18 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const [createSessionId, setCreateSessionId] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  // Bumped to remount OrderFormContent (re-initializing both the form
-  // values and the pinned baseVersion) inside a live edit session, e.g. when
-  // a 409 conflict is resolved by a resync.
-  const [editSessionKey, setEditSessionKey] = useState(0)
-  // Set after a 409 order_conflict: the edit session must restart against
-  // the resynced record instead of re-submitting the stale pinned version
-  // forever. The restart waits until the store record is strictly newer than
-  // the version that conflicted — the resync commit — so the fresh session
-  // pins the authoritative base.
-  const [pendingConflictRefresh, setPendingConflictRefresh] = useState(false)
-  const [conflictedVersion, setConflictedVersion] = useState<number | null>(
-    null,
-  )
+  // A pending 409 conflict refresh: the version that conflicted, waiting for
+  // the resynced record to supersede it. Bumped into the session key below so
+  // OrderFormContent remounts (re-initializing form values AND the pinned
+  // baseVersion) from the fresh record once the store advances past it.
+  const [conflictRefresh, setConflictRefresh] = useState<{
+    conflictedVersion: number
+  } | null>(null)
+  // Monotonic per-completed-refresh counter: the edit session key advances
+  // only when a conflict refresh actually completes, so a normal open session
+  // and a waiting conflict keep a stable key (no premature remount that would
+  // drop in-progress edits).
+  const [editSessionGeneration, setEditSessionGeneration] = useState(0)
 
   const handleDialogClose = useCallback(
     (force = false) => {
@@ -326,6 +325,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
 
       setIsSubmitting(false)
       setSubmitError(null)
+      setConflictRefresh(null)
 
       if (mode === 'create') {
         setIsCreateOpen(false)
@@ -425,9 +425,8 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         // The restart re-initializes the form content from the fresh record
         // — never a blend of the old content with a new base version, which
         // would reintroduce the lost update OCC prevents.
-        if (mode === 'edit' && !pendingConflictRefresh) {
-          setConflictedVersion(baseVersion)
-          setPendingConflictRefresh(true)
+        if (mode === 'edit' && conflictRefresh === null && baseVersion !== undefined) {
+          setConflictRefresh({ conflictedVersion: baseVersion })
         }
       }
 
@@ -445,43 +444,44 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const formSessionKey = isCreateMode
     ? `create-${createSessionId}`
     : updateTargetID
-      ? `${updateTargetID}:${editSessionKey}`
+      ? `${updateTargetID}:${editSessionGeneration}`
       : ''
 
   // Conflict recovery inside a live edit session: once the store record is
   // strictly newer than the version that got the 409 (the resync commit
-  // landed), remount OrderFormContent so both the form values and the pinned
+  // landed), restart the edit session — the generation bumps, so
+  // OrderFormContent remounts and both the form values and the pinned
   // baseVersion re-initialize from the authoritative record. The session
-  // never blends the old form content with a new base version.
+  // never blends the old form content with a new base version. State is not
+  // touched synchronously in the effect body: the check runs on the store
+  // subscription (the resync commit setOrders) and in a microtask that
+  // catches an advance that already landed by the time the effect runs.
   useEffect(() => {
-    if (!pendingConflictRefresh) {
+    if (conflictRefresh === null) {
       return
     }
 
-    if (!activeRecordFromStore) {
-      // The order was deleted while the conflict was being resolved: there is
-      // nothing left to edit, so close the session instead of showing a
-      // stale form.
-      setPendingConflictRefresh(false)
-      setConflictedVersion(null)
-      handleDialogClose()
-      return
+    const restart = () => {
+      setConflictRefresh(null)
+      setEditSessionGeneration((generation) => generation + 1)
     }
 
-    if (
-      conflictedVersion !== null &&
-      activeRecordFromStore.version > conflictedVersion
-    ) {
-      setPendingConflictRefresh(false)
-      setConflictedVersion(null)
-      setEditSessionKey((key) => key + 1)
-    }
-  }, [
-    activeRecordFromStore,
-    conflictedVersion,
-    handleDialogClose,
-    pendingConflictRefresh,
-  ])
+    queueMicrotask(() => {
+      const record = useOrderStore.getState().ordersById[updateTargetID]
+
+      if (record && record.version > conflictRefresh.conflictedVersion) {
+        restart()
+      }
+    })
+
+    return useOrderStore.subscribe((state) => {
+      const record = state.ordersById[updateTargetID]
+
+      if (record && record.version > conflictRefresh.conflictedVersion) {
+        restart()
+      }
+    })
+  }, [conflictRefresh, updateTargetID])
 
   useEffect(() => {
     if (!isOpen) {

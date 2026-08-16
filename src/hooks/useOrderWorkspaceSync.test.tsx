@@ -28,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   captureSnapshotMarker: vi.fn(),
   idsToProtect: vi.fn(),
   effectsAfter: vi.fn(),
+  resetJournal: vi.fn(),
+  pruneJournal: vi.fn(),
 }))
 
 vi.mock('@/services/orderRealtime', () => ({
@@ -47,6 +49,8 @@ vi.mock('@/services/orderOptimistic', () => ({
     captureSnapshotMarker: mocks.captureSnapshotMarker,
     idsToProtect: mocks.idsToProtect,
     effectsAfter: mocks.effectsAfter,
+    reset: mocks.resetJournal,
+    prune: mocks.pruneJournal,
   },
 }))
 
@@ -144,6 +148,8 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
       .mockReturnValue({ seq: 0, pendingIds: [] })
     mocks.idsToProtect.mockReset().mockReturnValue(new Set())
     mocks.effectsAfter.mockReset().mockReturnValue([])
+    mocks.resetJournal.mockReset()
+    mocks.pruneJournal.mockReset()
   })
 
   afterEach(() => {
@@ -1660,6 +1666,87 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     expect(order?.version).toBe(12)
     expect(order?.note).toBe('remote-v12')
   })
+
+  it('prunes the mutation journal after each snapshot settles', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    expect(mocks.pruneJournal).not.toHaveBeenCalled()
+
+    // A successful reconciliation settles: the journal is pruned to the
+    // snapshot's marker so it never grows with the process lifetime.
+    await act(async () => {
+      snapshot.resolve([])
+      await flushAsync()
+    })
+
+    expect(mocks.pruneJournal).toHaveBeenCalledTimes(1)
+    expect(mocks.pruneJournal).toHaveBeenCalledWith({ seq: 0, pendingIds: [] })
+  })
+
+  it('prunes the mutation journal after a failed snapshot too', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      snapshot.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    // The failure path replays the buffered events and still prunes, so an
+    // unbounded journal cannot accumulate while errors keep the store
+    // un-reconciled.
+    expect(mocks.pruneJournal).toHaveBeenCalledTimes(1)
+  })
+
+  it('resets the session-wide registries when the workspace sync session ends', async () => {
+    renderHook(() => useOrderWorkspaceSync())
+
+    // The first run opens a session for the initial workspace (the ref
+    // starts empty) — one reset, no tombstones involved yet.
+    expect(mocks.resetJournal).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      orderTombstones.markRemoved('x')
+    })
+    expect(orderTombstones.has('x')).toBe(true)
+
+    // The session ends (sign-out): both session-wide registries are dropped.
+    act(() => {
+      useAuthStore.setState({ status: 'anonymous' })
+    })
+
+    expect(mocks.resetJournal).toHaveBeenCalledTimes(2)
+    expect(orderTombstones.has('x')).toBe(false)
+  })
+
+  it('resets the session-wide registries when the active workspace changes', async () => {
+    renderHook(() => useOrderWorkspaceSync())
+    expect(mocks.resetJournal).toHaveBeenCalledTimes(1)
+
+    // Switching to another workspace starts a fresh sync session: the
+    // previous workspace's tombstones and mutation journal are dropped.
+    act(() => {
+      useAuthStore.setState({
+        activeWorkspace: { id: 'w2', name: '其他门店', role: 'owner' },
+      })
+    })
+
+    expect(mocks.resetJournal).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
@@ -1681,6 +1768,8 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
       .mockReturnValue({ seq: 0, pendingIds: [] })
     mocks.idsToProtect.mockReset().mockReturnValue(new Set())
     mocks.effectsAfter.mockReset().mockReturnValue([])
+    mocks.resetJournal.mockReset()
+    mocks.pruneJournal.mockReset()
   })
 
   afterEach(() => {

@@ -26,9 +26,14 @@ const pendingMutations = new Map<string, PendingMutation>()
 // completes while the fetch is still in flight, because the snapshot still
 // predates its effect.
 // latestMutationSeq keeps the stamp of each order's most recent mutation so
-// reconciliation can tell which mutations overlap a snapshot's lifetime. It
-// only grows with distinct order ids (a bounded set in a workspace) and is
-// deliberately not pruned: pruning would reopen the window the stamp closes.
+// reconciliation can tell which mutations overlap a snapshot's lifetime.
+// Entries older than every in-flight snapshot are pruned after each snapshot
+// settles (see prune) and everything is dropped when the sync session ends
+// (see reset), so the journal tracks the mutations of the current workspace
+// session and snapshot window — not the process lifetime. Distinct order ids
+// are NOT a bounded set (creates mint fresh uuids and deleted orders stay in
+// the journal), so unbounded growth would leak memory and slow every
+// effectsAfter/idsToProtect scan down over time.
 const latestMutationSeq = new Map<string, number>()
 // The most recent confirmed effect per order id, stamped with the same
 // counter so a snapshot can replay exactly the effects that overlap it.
@@ -143,5 +148,46 @@ export const orderOptimistic = {
     }
 
     return ids
+  },
+
+  /**
+   * Drops the journal entries that can no longer overlap any in-flight
+   * snapshot: once a snapshot whose marker has sequence `seq` settles, every
+   * effect (and every latest-mutation stamp) with seq <= marker.seq will
+   * never be replayed or compared again — any later snapshot starts with a
+   * marker >= this one. Call right after a snapshot commit (success or
+   * failure replay), while no other reconciliation is in flight, to bound
+   * the journal to the mutations recorded since the last completed snapshot
+   * instead of the whole session. Pending mutations are unaffected: their
+   * ids are re-captured on every snapshot start via `pendingIds`, and their
+   * confirmations record a fresh (higher) stamp.
+   */
+  prune(marker: MutationSnapshotMarker): void {
+    const { seq } = marker
+
+    for (const [orderId, latestSeq] of latestMutationSeq) {
+      if (latestSeq <= seq) {
+        latestMutationSeq.delete(orderId)
+      }
+    }
+
+    for (const [orderId, effect] of effects) {
+      if (effect.seq <= seq) {
+        effects.delete(orderId)
+      }
+    }
+  },
+
+  /**
+   * Clears the whole mutation journal: pending mutations, protection stamps
+   * and confirmed effects. Called when the workspace sync session ends or
+   * the active workspace changes. Order ids are never reused, so dropping
+   * the journal only bounds memory — a future session cannot be affected by
+   * the protection/replay entries of a past one.
+   */
+  reset(): void {
+    pendingMutations.clear()
+    latestMutationSeq.clear()
+    effects.clear()
   },
 }
