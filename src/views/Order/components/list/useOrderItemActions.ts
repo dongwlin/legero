@@ -3,6 +3,7 @@ import { type OrderRecord } from '@/types'
 import { isOrderConflictError } from '@/services/apiClient'
 import { orderRepository } from '@/services/orderRepository'
 import { orderOptimistic } from '@/services/orderOptimistic'
+import { orderTombstones } from '@/services/orderTombstones'
 import { requestOrdersResync } from '@/services/orderResync'
 import {
   toggleOrderServed,
@@ -140,6 +141,11 @@ export const useOrderItemActions = (
       // Journal the confirmed delete so a snapshot that overlaps it cannot
       // resurrect the order when the WS remove event has not arrived yet.
       orderOptimistic.recordRemove(record.id)
+      // Register the session-wide terminal tombstone so the normal realtime
+      // path cannot resurrect the id either: a delayed realtime upsert that
+      // arrives after the delete must be dropped, not treated as a new record
+      // (the backend never reuses an order id).
+      orderTombstones.markRemoved(record.id)
       setIsDeleteOpen(false)
     } catch (error) {
       setMutationError(getMutationErrorMessage(error))

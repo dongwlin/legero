@@ -14,6 +14,7 @@ import {
 } from '@/services/orderReconcile'
 import { isOrderCreatedToday } from '@/services/orderDomainUtils'
 import { orderOptimistic } from '@/services/orderOptimistic'
+import { orderTombstones } from '@/services/orderTombstones'
 import { subscribeOrdersResync } from '@/services/orderResync'
 import type { ClearWorkspaceMode } from '@/services/apiTypes'
 import { useAuthStore } from '@/store/auth'
@@ -40,6 +41,10 @@ export const useOrderWorkspaceSync = () => {
   useEffect(() => {
     if (authStatus !== 'authenticated' || !activeWorkspaceId) {
       resetSyncState()
+      // The sync session is over: drop terminal tombstones so a later
+      // session starts from a clean registry (ids are never reused, so this
+      // only bounds memory — it cannot reopen a resurrection window).
+      orderTombstones.reset()
       return
     }
 
@@ -80,7 +85,13 @@ export const useOrderWorkspaceSync = () => {
       }
 
       pendingUpserts.clear()
-      const upserts = Array.from(upsertsById.values())
+      // A remove that confirmed while the upsert was already queued — via a
+      // realtime event or a local DELETE — tombstones the id session-wide,
+      // so the queued event is stale and must not resurrect it from an empty
+      // store slot.
+      const upserts = Array.from(upsertsById.values()).filter(
+        (order) => !orderTombstones.has(order.id),
+      )
       const removes = Array.from(pendingRemoves.values())
       pendingRemoves.clear()
 
@@ -176,7 +187,12 @@ export const useOrderWorkspaceSync = () => {
       for (const event of events) {
         switch (event.type) {
           case 'upsert':
-            store.upsertIfNewer(event.order)
+            // A tombstoned id is terminally deleted for the whole session: a
+            // buffered stale upsert must not resurrect it during failure
+            // replay either.
+            if (!orderTombstones.has(event.order.id)) {
+              store.upsertIfNewer(event.order)
+            }
             break
           case 'remove':
             store.removeOrder(event.id)
@@ -262,7 +278,7 @@ export const useOrderWorkspaceSync = () => {
               effects,
             ),
             orderOptimistic.idsToProtect(snapshotMarker),
-          ),
+          ).filter((order) => !orderTombstones.has(order.id)),
         )
       } catch (error) {
         if (isDisposed) {
@@ -326,6 +342,15 @@ export const useOrderWorkspaceSync = () => {
         subscription = orderRealtime.subscribeToWorkspaceOrders({
           onUpsert: (order) => {
             if (!isDisposed) {
+              // Same-id remove is terminal for the whole sync session, not
+              // just inside a reconciliation window: an upsert of a
+              // tombstoned id (the backend never reuses an order id) is
+              // always a stale/delayed event and is dropped before it can
+              // enter the buffer or the batch queue.
+              if (orderTombstones.has(order.id)) {
+                return
+              }
+
               if (eventBuffer.isReconciling) {
                 // Buffer the server event: at commit time it is replayed over
                 // the snapshot with version-aware merges, so it survives even
@@ -351,6 +376,14 @@ export const useOrderWorkspaceSync = () => {
           },
           onRemove: (id) => {
             if (!isDisposed) {
+              // Register the terminal tombstone immediately — before the
+              // event enters the buffer or the batch queue — so no later
+              // statement for the id can resurrect it: a queued upsert of
+              // the same id is dropped right here, and future upserts are
+              // rejected at the onUpsert gate.
+              orderTombstones.markRemoved(id)
+              pendingUpserts.delete(id)
+
               if (eventBuffer.isReconciling) {
                 eventBuffer.push({ type: 'remove', id })
                 return
