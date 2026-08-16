@@ -69,14 +69,25 @@ export const useOrderItemActions = (
       persist()
         .then((serverRecord) => {
           if (orderOptimistic.endMutation(record.id, gen)) {
-            // The response is authoritative, but it may arrive after a
-            // realtime update with an even higher server version (another
-            // client's commit). The version-aware merge keeps the higher
-            // version instead of overwriting the store blindly. The confirmed
-            // result is journaled too, so a snapshot that overlaps this
-            // mutation can never downgrade it even when the WS echo lags.
-            upsertIfNewer(serverRecord)
-            orderOptimistic.recordUpsert(serverRecord)
+            // A realtime remove of the same id (or a confirmed local DELETE)
+            // that landed while this mutation was in flight registered a
+            // session-wide terminal tombstone. HTTP responses and WebSocket
+            // events are independent transports and the backend never reuses
+            // an order id, so this late response is stale: it must not
+            // resurrect the deleted order, and it must not join the effect
+            // journal either (the tombstone keeps it absent at snapshot
+            // commit, and recording it would only mask future bugs).
+            if (!orderTombstones.has(record.id)) {
+              // The response is authoritative, but it may arrive after a
+              // realtime update with an even higher server version (another
+              // client's commit). The version-aware merge keeps the higher
+              // version instead of overwriting the store blindly. The
+              // confirmed result is journaled too, so a snapshot that
+              // overlaps this mutation can never downgrade it even when the
+              // WS echo lags.
+              upsertIfNewer(serverRecord)
+              orderOptimistic.recordUpsert(serverRecord)
+            }
           }
         })
         .catch((error) => {
@@ -85,10 +96,16 @@ export const useOrderItemActions = (
             // nothing newer: an authoritative realtime state with a higher
             // version (another client's commit) must not be downgraded by
             // this rollback, even when the rest of this mutation's outcome
-            // (e.g. a conflict resync) is still settling.
+            // (e.g. a conflict resync) is still settling. A tombstoned id
+            // never rolls back: re-inserting the pre-mutation record into an
+            // empty store slot would resurrect an order that was deleted
+            // while the mutation was in flight.
             const current = useOrderStore.getState().ordersById[record.id]
 
-            if (!current || current.version <= record.version) {
+            if (
+              !orderTombstones.has(record.id) &&
+              (!current || current.version <= record.version)
+            ) {
               upsertOrder(record)
             }
 

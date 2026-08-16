@@ -10,6 +10,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/services/apiClient'
+import { orderTombstones } from '@/services/orderTombstones'
 import { subscribeOrdersResync } from '@/services/orderResync'
 import { useOrderStore } from '@/store/order'
 import {
@@ -200,6 +201,16 @@ const flushAsync = async () => {
   }
 }
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 let view: RenderResult
 
 const openEditForm = () => {
@@ -234,6 +245,7 @@ const resetStores = () => {
 describe('OrderForm edit-session optimistic concurrency', () => {
   beforeEach(() => {
     resetStores()
+    orderTombstones.reset()
     mocks.update.mockReset()
   })
 
@@ -386,5 +398,40 @@ describe('OrderForm edit-session optimistic concurrency', () => {
 
     expect(mocks.update).toHaveBeenCalledTimes(1)
     expect(mocks.update).toHaveBeenCalledWith('a', expect.anything(), 11)
+  })
+
+  it('does not re-insert an order deleted while the edit was in flight when the PUT succeeds late', async () => {
+    useOrderStore.getState().upsertOrder(
+      makeOrder('a', { version: 10, note: 'original' }),
+    )
+    useOrderStore.getState().setUpdateTargetID('a')
+
+    openEditForm()
+
+    const pendingUpdate = deferred<OrderRecord>()
+    mocks.update.mockReturnValue(pendingUpdate.promise)
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: '修改' }))
+    })
+
+    // The order is deleted (another client) while the PUT is in flight: the
+    // realtime handler registers the session-wide terminal tombstone and the
+    // store empties.
+    act(() => {
+      orderTombstones.markRemoved('a')
+      useOrderStore.getState().removeOrder('a')
+    })
+
+    // The PUT response settles last: the authoritative merge must not treat
+    // it as a brand-new record and re-insert the deleted order.
+    await act(async () => {
+      pendingUpdate.resolve(
+        makeOrder('a', { version: 11, note: 'late-success' }),
+      )
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
   })
 })

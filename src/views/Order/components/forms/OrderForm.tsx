@@ -7,6 +7,7 @@ import { isOrderConflictError } from '@/services/apiClient'
 import { rebuildOrderRecord } from '@/services/orderFactories'
 import { orderRepository } from '@/services/orderRepository'
 import { orderOptimistic } from '@/services/orderOptimistic'
+import { orderTombstones } from '@/services/orderTombstones'
 import { requestOrdersResync } from '@/services/orderResync'
 import { useOrderStore } from '@/store/order'
 import { useOrderForm, FormMode } from './useOrderForm'
@@ -377,9 +378,14 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         // update with an even higher version (another client's commit): the
         // version-aware merge keeps the higher version. The confirmed update
         // is journaled so a snapshot overlapping this mutation cannot
-        // downgrade it when the WS echo has not arrived yet.
-        upsertIfNewer(persistedRecord)
-        orderOptimistic.recordUpsert(persistedRecord)
+        // downgrade it when the WS echo has not arrived yet. Both are skipped
+        // when the id was terminally deleted while the request was in flight:
+        // a late PUT response must not resurrect a removed order (the backend
+        // never reuses an order id).
+        if (!orderTombstones.has(persistedRecord.id)) {
+          upsertIfNewer(persistedRecord)
+          orderOptimistic.recordUpsert(persistedRecord)
+        }
       }
 
       handleDialogClose(true)

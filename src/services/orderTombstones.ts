@@ -8,7 +8,9 @@
  * stale, delayed event and must not resurrect the order. Tombstones are
  * therefore a session-wide invariant, not a reconciliation-window concept:
  * they guard the normal realtime path, the rAF batch queue, the snapshot
- * reconciliation buffer and the snapshot commit alike, so
+ * reconciliation buffer, the snapshot commit and the mutation HTTP
+ * completion/rollback paths alike (a late mutation response or a failure
+ * rollback must not resurrect a tombstoned id), so
  *
  *   remove -> upsert (any version) => absent
  *

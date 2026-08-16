@@ -353,4 +353,72 @@ describe('useOrderItemActions optimistic mutations', () => {
 
     stopResync()
   })
+
+  it('does not resurrect an order removed during the mutation when the HTTP success arrives late', async () => {
+    const record = makeOrder('a', { version: 10, note: 'original' })
+    useOrderStore.getState().upsertOrder(record)
+
+    const pendingResponse = deferred<OrderRecord>()
+    mocks.toggleStep.mockReturnValue(pendingResponse.promise)
+
+    const { result } = renderHook(() => useOrderItemActions(record))
+
+    act(() => {
+      result.current.handleToggleStapleStep()
+    })
+
+    // A realtime remove (another client deleted the order) lands while the
+    // mutation is still in flight: the session-wide terminal tombstone is
+    // registered exactly as the realtime handler does, and the store empties.
+    act(() => {
+      orderTombstones.markRemoved('a')
+      useOrderStore.getState().removeOrder('a')
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+
+    // The toggle HTTP response settles last: with no tombstone gate it would
+    // look like a brand-new record (empty store slot) and resurrect the
+    // deleted order.
+    await act(async () => {
+      pendingResponse.resolve(
+        makeOrder('a', { version: 11, note: 'late-success' }),
+      )
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(orderOptimistic.hasPending('a')).toBe(false)
+  })
+
+  it('does not resurrect an order removed during the mutation when it fails', async () => {
+    const record = makeOrder('a', { version: 10, note: 'original' })
+    useOrderStore.getState().upsertOrder(record)
+
+    const pendingFailure = deferred<OrderRecord>()
+    mocks.toggleStep.mockReturnValue(pendingFailure.promise)
+
+    const { result } = renderHook(() => useOrderItemActions(record))
+
+    act(() => {
+      result.current.handleToggleStapleStep()
+    })
+
+    // The order is removed via realtime while the mutation is in flight.
+    act(() => {
+      orderTombstones.markRemoved('a')
+      useOrderStore.getState().removeOrder('a')
+    })
+
+    // The mutation then fails: the rollback normally re-inserts the
+    // pre-mutation record into the (now empty) store slot. The tombstone gate
+    // must forbid that resurrection.
+    await act(async () => {
+      pendingFailure.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(orderOptimistic.hasPending('a')).toBe(false)
+    expect(result.current.mutationError).toBe('Failed to fetch')
+  })
 })
