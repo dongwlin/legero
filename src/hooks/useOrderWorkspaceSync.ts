@@ -85,16 +85,63 @@ export const useOrderWorkspaceSync = () => {
       flushRafId = window.requestAnimationFrame(flushBatched)
     }
 
+    // Buffered upserts whose id still has an in-flight optimistic mutation at
+    // commit time are deferred: the snapshot must not clobber the optimistic
+    // record, and the mutation's own completion (or rollback) delivers the
+    // authoritative server state.
+    const collectPendingUpsertIds = (events: RealtimeOrderEvent[]): Set<string> => {
+      const pendingIds = new Set<string>()
+
+      for (const event of events) {
+        if (event.type === 'upsert' && orderOptimistic.hasPending(event.order.id)) {
+          pendingIds.add(event.order.id)
+        }
+      }
+
+      return pendingIds
+    }
+
+    // Re-applies the store's current (optimistic) records for deferred ids on
+    // top of a reconciled list, so a stale snapshot cannot overwrite an
+    // in-flight mutation. Orders the events themselves removed (remove/clear)
+    // stay removed.
+    const overlayOptimisticRecords = (
+      orders: OrderRecord[],
+      pendingIds: ReadonlySet<string>,
+    ): OrderRecord[] => {
+      if (pendingIds.size === 0) {
+        return orders
+      }
+
+      const store = useOrderStore.getState()
+      const ordersById = new Map(orders.map((order) => [order.id, order]))
+
+      for (const id of pendingIds) {
+        const optimistic = store.ordersById[id]
+
+        if (optimistic && ordersById.has(id)) {
+          ordersById.set(id, optimistic)
+        }
+      }
+
+      return [...ordersById.values()]
+    }
+
     // Failure recovery for a failed snapshot: buffered events must not be
     // dropped — apply them as ordinary updates on top of whatever the store
     // currently holds, then surface the error. The next successful
     // reconciliation (retry or reconnect) restores the full server state.
     const applyBufferedEvents = (events: RealtimeOrderEvent[]) => {
       const store = useOrderStore.getState()
+      const pendingIds = collectPendingUpsertIds(events)
 
       for (const event of events) {
         if (event.type === 'upsert') {
-          store.upsertOrder(event.order)
+          // Defer upserts for orders with an in-flight optimistic mutation:
+          // their completion (or rollback) owns the authoritative state.
+          if (!pendingIds.has(event.order.id)) {
+            store.upsertOrder(event.order)
+          }
         } else if (event.type === 'remove') {
           store.removeOrder(event.id)
         } else {
@@ -138,10 +185,14 @@ export const useOrderWorkspaceSync = () => {
         }
 
         // The snapshot is the base state; buffered events are newer and win.
+        // Upserts for still-pending optimistic mutations are deferred: keep
+        // the store's optimistic record so the snapshot cannot clobber it
+        // (the HTTP response settles the authoritative state afterwards).
+        const events = eventBuffer.endReconciliation()
         setOrders(
-          reconcileSnapshotWithEvents(
-            nextOrders,
-            eventBuffer.endReconciliation(),
+          overlayOptimisticRecords(
+            reconcileSnapshotWithEvents(nextOrders, events),
+            collectPendingUpsertIds(events),
           ),
         )
       } catch (error) {
@@ -183,12 +234,17 @@ export const useOrderWorkspaceSync = () => {
         subscription = orderRealtime.subscribeToWorkspaceOrders({
           onUpsert: (order) => {
             if (!isDisposed) {
-              if (orderOptimistic.hasPending(order.id)) {
+              if (eventBuffer.isReconciling) {
+                // Buffer the server event even when the order has an
+                // in-flight optimistic mutation: dropping it here would let
+                // a stale snapshot overwrite the optimistically-applied
+                // state. At commit time the event is replayed unless the
+                // mutation is still pending.
+                eventBuffer.push({ type: 'upsert', order })
                 return
               }
 
-              if (eventBuffer.isReconciling) {
-                eventBuffer.push({ type: 'upsert', order })
+              if (orderOptimistic.hasPending(order.id)) {
                 return
               }
 

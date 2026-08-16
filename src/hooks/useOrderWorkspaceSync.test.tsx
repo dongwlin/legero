@@ -155,6 +155,75 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     expect(status).toBe('ready')
   })
 
+  it('does not drop the realtime upsert of an optimistically-pending order during the snapshot', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(true)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The user toggles order a: the mutation is pending, and the server
+    // echoes the change over WS while the snapshot is still in flight.
+    const serverA = makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'server' })
+    act(() => {
+      ws.onUpsert(serverA)
+    })
+
+    // The mutation finishes before the snapshot lands: the buffered server
+    // event is no longer deferred and must win over the stale snapshot.
+    mocks.hasPending.mockReturnValue(false)
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'stale' }),
+      ])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('server')
+  })
+
+  it('keeps the optimistic record when the mutation is still pending at snapshot commit', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(true)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The optimistic mutation applied its local record to the store.
+    const optimisticA = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      note: 'optimistic',
+    })
+    useOrderStore.getState().upsertOrder(optimisticA)
+
+    // The server echo arrives while the mutation is still pending.
+    act(() => {
+      ws.onUpsert(makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'server-echo' }))
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'stale' }),
+      ])
+      await flushAsync()
+    })
+
+    // Neither the stale snapshot nor the server echo may clobber the
+    // optimistic record: the pending mutation's completion owns the
+    // authoritative state.
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('optimistic')
+  })
+
   it('keeps the newest version of an order upserted during the snapshot', async () => {
     const snapshot = deferred<OrderRecord[]>()
     mocks.listOrders.mockReturnValue(snapshot.promise)
