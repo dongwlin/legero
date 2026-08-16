@@ -29,6 +29,7 @@ export const useOrderItemActions = (
   record: OrderRecord,
 ): UseOrderItemActionsResult => {
   const upsertOrder = useOrderStore((state) => state.upsertOrder)
+  const upsertIfNewer = useOrderStore((state) => state.upsertIfNewer)
   const removeOrder = useOrderStore((state) => state.removeOrder)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -67,14 +68,25 @@ export const useOrderItemActions = (
       persist()
         .then((serverRecord) => {
           if (orderOptimistic.endMutation(record.id, gen)) {
-            // The response is the authoritative record: it carries the new
-            // server version, so replace the optimistic copy wholesale.
-            upsertOrder(serverRecord)
+            // The response is authoritative, but it may arrive after a
+            // realtime update with an even higher server version (another
+            // client's commit). The version-aware merge keeps the higher
+            // version instead of overwriting the store blindly.
+            upsertIfNewer(serverRecord)
           }
         })
         .catch((error) => {
           if (orderOptimistic.endMutation(record.id, gen)) {
-            upsertOrder(record)
+            // Roll back to the pre-mutation record only when the store holds
+            // nothing newer: an authoritative realtime state with a higher
+            // version (another client's commit) must not be downgraded by
+            // this rollback, even when the rest of this mutation's outcome
+            // (e.g. a conflict resync) is still settling.
+            const current = useOrderStore.getState().ordersById[record.id]
+
+            if (!current || current.version <= record.version) {
+              upsertOrder(record)
+            }
 
             if (isOrderConflictError(error)) {
               // The server rejected a stale expectedVersion (another client
@@ -88,7 +100,7 @@ export const useOrderItemActions = (
           }
         })
     },
-    [record, upsertOrder],
+    [record, upsertIfNewer, upsertOrder],
   )
 
   const handleToggleStapleStep = useCallback(() => {

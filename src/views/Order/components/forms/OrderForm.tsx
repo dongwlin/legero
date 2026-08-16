@@ -273,8 +273,8 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
 }
 
 const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
-  const upsertOrder = useOrderStore((state) => state.upsertOrder)
-  const upsertOrders = useOrderStore((state) => state.upsertOrders)
+  const upsertIfNewer = useOrderStore((state) => state.upsertIfNewer)
+  const upsertOrdersIfNewer = useOrderStore((state) => state.upsertOrdersIfNewer)
   const updateTargetID = useOrderStore((state) => state.updateTargetID)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
   const findOrder = useOrderStore((state) => state.findOrder)
@@ -332,7 +332,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
           formValue,
           quantity,
         )
-        upsertOrders(persistedRecords)
+        // Authoritative merge: newly created records are absent from the
+        // store, so this applies them; it also guards the rare replay where
+        // the store somehow already holds the id at a higher version.
+        upsertOrdersIfNewer(persistedRecords)
       } else {
         const activeRecord = activeItem ?? null
 
@@ -350,7 +353,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
           activeRecord.version,
         )
 
-        upsertOrder(persistedRecord)
+        // The response is authoritative but may arrive after a realtime
+        // update with an even higher version (another client's commit): the
+        // version-aware merge keeps the higher version.
+        upsertIfNewer(persistedRecord)
       }
 
       handleDialogClose(true)
