@@ -8,6 +8,7 @@ import {
   screen,
   type RenderResult,
 } from '@testing-library/react'
+import { cloneElement, isValidElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/services/apiClient'
 import { orderTombstones } from '@/services/orderTombstones'
@@ -21,11 +22,13 @@ import {
 import OrderForm from './OrderForm'
 
 const mocks = vi.hoisted(() => ({
+  createMany: vi.fn(),
   update: vi.fn(),
 }))
 
 vi.mock('@/services/orderRepository', () => ({
   orderRepository: {
+    createMany: mocks.createMany,
     update: mocks.update,
   },
 }))
@@ -93,8 +96,44 @@ vi.mock('@heroui/react', () => {
       />
     ),
     Modal: {
-      Root: ({ isOpen, children, ...props }: Record<string, unknown>) =>
-        isOpen ? <div {...props}>{children as React.ReactNode}</div> : null,
+      Root: ({
+        isOpen,
+        onOpenChange,
+        children,
+        ...props
+      }: Record<string, unknown>) => {
+        if (!isOpen) {
+          // Closed modal: HeroUI keeps the trigger rendered (in this app a
+          // plain button that precedes the dialog) and opens the modal when
+          // it is pressed. Reproduce that wiring so the create modal can be
+          // opened in tests the way the app opens it.
+          const childArray = Array.isArray(children)
+            ? (children as React.ReactNode[])
+            : []
+          const trigger = childArray.find(
+            (child): child is React.ReactElement =>
+              isValidElement(child),
+          )
+
+          if (!trigger) {
+            return null
+          }
+
+          return (
+            <div {...props}>
+              {cloneElement(trigger, {
+                onClick: () => {
+                  if (typeof onOpenChange === 'function') {
+                    onOpenChange(true)
+                  }
+                },
+              } as Record<string, unknown>)}
+            </div>
+          )
+        }
+
+        return <div {...props}>{children as React.ReactNode}</div>
+      },
       Backdrop: passthrough,
       Container: passthrough,
       Dialog: ({ children, ...props }: Record<string, unknown>) => (
@@ -217,6 +256,10 @@ const openEditForm = () => {
   view = render(<OrderForm mode='edit' />)
 }
 
+const openCreateForm = () => {
+  view = render(<OrderForm mode='create' />)
+}
+
 /**
  * Re-renders the form shell with identical props, simulating the parent
  * list re-rendering on a realtime refresh. OrderForm re-derives activeItem
@@ -246,6 +289,7 @@ describe('OrderForm edit-session optimistic concurrency', () => {
   beforeEach(() => {
     resetStores()
     orderTombstones.reset()
+    mocks.createMany.mockReset()
     mocks.update.mockReset()
   })
 
@@ -503,5 +547,55 @@ describe('OrderForm edit-session optimistic concurrency', () => {
     })
 
     expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+  })
+
+  it('does not blind-insert a create that resolves after a full clear', async () => {
+    // Review blocker P1: the client does not know the created id until the
+    // HTTP response returns, so no id tombstone can cover it at clear time.
+    // A full clear that committed while the POST was in flight may have
+    // deleted the order — the late response must not be treated as
+    // authoritative state; a resync decides instead whether it still exists.
+    const resync = vi.fn()
+    const stopResync = subscribeOrdersResync(resync)
+
+    const pendingCreate = deferred<OrderRecord[]>()
+    mocks.createMany.mockReturnValue(pendingCreate.promise)
+
+    openCreateForm()
+
+    // A closed modal keeps its trigger rendered; pressing it opens the
+    // create session (HeroUI trigger wiring, reproduced by the modal mock).
+    act(() => {
+      fireEvent.click(
+        screen.getByRole('button', { name: '创建订单' }),
+      )
+    })
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: '创建' }))
+    })
+    expect(mocks.createMany).toHaveBeenCalledTimes(1)
+
+    // While the POST is in flight, a full clear is processed elsewhere (the
+    // sync hook): the clear epoch advances and the workspace empties.
+    act(() => {
+      orderTombstones.bumpClearEpoch()
+      useOrderStore.getState().clearOrders()
+    })
+
+    // The create response lands last, carrying an id the client could not
+    // have tombstoned at clear time.
+    await act(async () => {
+      pendingCreate.resolve([makeOrder('c', { version: 1, note: 'created' })])
+      await flushAsync()
+    })
+
+    // No blind insert into the emptied workspace, and an authoritative
+    // resync was requested to settle whether the order survived the clear.
+    expect(useOrderStore.getState().ordersById['c']).toBeUndefined()
+    expect(resync).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: '创建' })).toBeNull()
+
+    stopResync()
   })
 })

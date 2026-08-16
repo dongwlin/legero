@@ -364,18 +364,39 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
 
     try {
       if (mode === 'create') {
+        // A full clear that commits while the POST is in flight may delete
+        // the freshly created order, and HTTP/WS arrival order does not tell
+        // us which state the response reflects. The clear cannot tombstone
+        // the id up front — the client only learns it when the response
+        // arrives — so the clear epoch is captured at submit: a clear that
+        // happened meanwhile means the response must not be blindly inserted
+        // as authoritative state. The resync decides instead whether the
+        // order still exists.
+        const clearEpochAtStart = orderTombstones.clearEpochValue()
         const persistedRecords = await orderRepository.createMany(
           formValue,
           quantity,
         )
-        // Authoritative merge: newly created records are absent from the
-        // store, so this applies them; it also guards the rare replay where
-        // the store somehow already holds the id at a higher version. The
-        // confirmed creates are journaled so an in-flight snapshot cannot
-        // drop them before their realtime echo arrives.
-        upsertOrdersIfNewer(persistedRecords)
-        for (const persistedRecord of persistedRecords) {
-          orderOptimistic.recordUpsert(persistedRecord)
+
+        if (orderTombstones.clearEpochValue() !== clearEpochAtStart) {
+          requestOrdersResync()
+        } else {
+          // Authoritative merge: newly created records are absent from the
+          // store, so this applies them; it also guards the rare replay where
+          // the store somehow already holds the id at a higher version. The
+          // confirmed creates are journaled so an in-flight snapshot cannot
+          // drop them before their realtime echo arrives. Both are skipped
+          // for ids rejected by the session tombstones (e.g. a before_today
+          // clear racing the create).
+          const survivors = persistedRecords.filter(
+            (persistedRecord) =>
+              !orderTombstones.rejectsUpsert(persistedRecord),
+          )
+
+          upsertOrdersIfNewer(survivors)
+          for (const persistedRecord of survivors) {
+            orderOptimistic.recordUpsert(persistedRecord)
+          }
         }
       } else {
         const activeRecord = activeItem ?? null
@@ -403,7 +424,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         // when the id was terminally deleted while the request was in flight:
         // a late PUT response must not resurrect a removed order (the backend
         // never reuses an order id).
-        if (!orderTombstones.has(persistedRecord.id)) {
+        if (!orderTombstones.rejectsUpsert(persistedRecord)) {
           upsertIfNewer(persistedRecord)
           orderOptimistic.recordUpsert(persistedRecord)
         }
