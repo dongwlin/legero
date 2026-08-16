@@ -41,7 +41,11 @@ interface OrderFormContentProps {
   mode: FormMode
   submitError: string | null
   submitButtonText: string
-  onSubmit: (formValue: OrderFormValue, quantity: number) => Promise<void>
+  onSubmit: (
+    formValue: OrderFormValue,
+    quantity: number,
+    baseVersion: number | undefined,
+  ) => Promise<void>
 }
 
 const OrderFormContent: React.FC<OrderFormContentProps> = ({
@@ -76,12 +80,20 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
     showTakeoutOptions,
   } = useOrderForm(initialItem, mode)
 
+  // The server version the user's edit session was opened on. `OrderForm`
+  // remounts this component per session via `key={formSessionKey}`, so the
+  // value stays pinned even when realtime advances the store's record while
+  // the form is open: expectedVersion must describe the state the user
+  // actually edited, not the latest store version at submit time, otherwise
+  // a concurrent update would silently pass the OCC check.
+  const [baseVersion] = useState(() => initialItem?.version)
+
   const handleNoteChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     updateFormValue('note', event.target.value)
   }
 
   const handleSubmit = () => {
-    void onSubmit(formValue, num || 1)
+    void onSubmit(formValue, num || 1, baseVersion)
   }
 
   return (
@@ -322,6 +334,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const handleSubmit = async (
     formValue: OrderFormValue,
     quantity: number,
+    baseVersion: number | undefined,
   ): Promise<void> => {
     setIsSubmitting(true)
     setSubmitError(null)
@@ -347,10 +360,11 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         const persistedRecord = await orderRepository.update(
           updateTargetID,
           nextRecord,
-          // Optimistic concurrency: the version the client observed when the
-          // edit started. A 409 order_conflict means someone else changed the
-          // order meanwhile and the form must be re-read.
-          activeRecord.version,
+          // Optimistic concurrency: the version the edit session was opened
+          // on (pinned by OrderFormContent), not the store's current version
+          // at submit time. A 409 order_conflict means someone else changed
+          // the order meanwhile and the form must be re-read.
+          baseVersion ?? activeRecord.version,
         )
 
         // The response is authoritative but may arrive after a realtime
