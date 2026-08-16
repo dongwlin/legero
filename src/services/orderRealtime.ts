@@ -1,4 +1,9 @@
-import { ApiError, ensureFreshAuthTokens, getApiBaseUrl } from './apiClient'
+import {
+  AUTH_REFRESH_TIMEOUT_MS,
+  ApiError,
+  ensureFreshAuthTokens,
+  getApiBaseUrl,
+} from './apiClient'
 import type {
   ClearWorkspaceMode,
   OrderDTO,
@@ -7,6 +12,8 @@ import type {
   RealtimeSessionResponse,
 } from './apiTypes'
 import { orderDtoToOrderRecord } from './orderRecordMapper'
+import { startRealtimeRecoverySignals } from './realtimeRecovery'
+import type { RealtimeRecoveryHandlers } from './realtimeRecovery'
 import { realtimeSession } from './realtimeSession'
 
 type SubscriptionStatus =
@@ -40,6 +47,24 @@ type RealtimeState = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'closed
 const normalizeClearMode = (mode: unknown): ClearWorkspaceMode =>
   mode === 'before_today' ? 'before_today' : 'all'
 
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new DOMException('Aborted', 'AbortError'))
+    }, timeoutMs)
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        window.clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+
 export type OrderRealtimeSubscription = {
   close: () => void
 }
@@ -50,10 +75,22 @@ export type OrderRealtimeSubscription = {
 export const SESSION_TIMEOUT_MS = 5_000
 export const READY_TIMEOUT_MS = 8_000
 
+// ensureFreshAuthTokens() is single-flight, but apiClient now bounds its own
+// refresh fetch with AUTH_REFRESH_TIMEOUT_MS and releases the single-flight
+// slot on abort, so the next attempt starts a genuinely fresh refresh. The
+// wrapper here is defense-in-depth: even if that bound is ever regressed, a
+// hung refresh must not pin the channel in 'connecting' forever — the state
+// machine moves on and retries.
+
 // A connection is only considered stable after staying online for this long;
 // only then is the failure counter reset. Resetting on 'ready' would turn a
 // flapping connection into a fixed high-frequency reconnect loop.
 export const STABLE_CONNECTION_MS = 30_000
+
+// A socket that stays 'online' through a background session of at least this
+// length is presumed stale on return to the foreground (mobile OSes routinely
+// freeze or tear down background connections) and is rebuilt immediately.
+export const BACKGROUND_STALE_MS = 30_000
 
 export const INITIAL_RECONNECT_DELAY_MS = 1_000
 export const MAX_RECONNECT_DELAY_MS = 30_000
@@ -154,6 +191,10 @@ export const orderRealtime = {
     let stableConnectionTimer: number | null = null
     let sessionAbortController: AbortController | null = null
     let readyTimer: number | null = null
+    let stopRecoverySignals: (() => void) | null = null
+    let networkOnline = true
+    let isBackgrounded = false
+    let backgroundedAt = 0
 
     const isClosed = (): boolean => state === 'closed'
 
@@ -226,6 +267,14 @@ export const orderRealtime = {
       reconnectAttempts += 1
       clearStableConnectionTimer()
       clearReconnectTimer()
+
+      // While offline or backgrounded, timer-based retries are paused: they
+      // would burn battery on futile attempts. The recovery signals (network
+      // online, app foreground) drive the next attempt instead.
+      if (isBackgrounded || !networkOnline) {
+        return
+      }
+
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null
         void connect()
@@ -248,8 +297,131 @@ export const orderRealtime = {
       }
     }
 
+    // Abandon the current attempt (socket and/or in-flight session request):
+    // bump the generation so late events from it are rejected, then tear down
+    // whatever is live. Used when the environment changes underneath the
+    // channel (network drop, network change, stale background socket).
+    const invalidateActiveSocket = (code: number, reason: string) => {
+      generation += 1
+      clearReadyTimer()
+      closeSocket(code, reason)
+      sessionAbortController?.abort()
+      sessionAbortController = null
+    }
+
+    const handleNetworkOffline = () => {
+      networkOnline = false
+
+      if (isClosed()) {
+        return
+      }
+
+      clearReconnectTimer()
+
+      if (state === 'online' || state === 'connecting') {
+        // A possibly half-open socket or an in-flight attempt: tear it down
+        // now instead of waiting for the OS to notice the dead interface.
+        invalidateActiveSocket(1000, 'network_offline')
+        state = 'reconnecting'
+      }
+    }
+
+    const handleNetworkOnline = () => {
+      networkOnline = true
+
+      if (isClosed() || isBackgrounded) {
+        return
+      }
+
+      clearReconnectTimer()
+
+      if (state === 'online') {
+        // The network identity changed (e.g. Wi-Fi -> cellular) without an
+        // offline event; the socket may be bound to a dead interface, so
+        // rebuild it for a guaranteed-fresh server state.
+        invalidateActiveSocket(1000, 'network_recovery')
+        void connect()
+        return
+      }
+
+      if (state === 'connecting') {
+        // An attempt is already in flight; let it finish.
+        return
+      }
+
+      // Break the backoff: a recovered network is a strong signal that the
+      // previous failures were environmental, not server-side.
+      reconnectAttempts = 0
+      void connect()
+    }
+
+    const handleAppBackground = () => {
+      isBackgrounded = true
+      backgroundedAt = Date.now()
+
+      if (isClosed()) {
+        return
+      }
+
+      // Pause timer-driven retries while backgrounded; recovery events resume
+      // the state machine.
+      clearReconnectTimer()
+    }
+
+    const handleAppForeground = () => {
+      isBackgrounded = false
+
+      // Consume the background duration immediately: a later duplicate or
+      // spurious foreground signal must not re-judge the socket against this
+      // background's timestamp.
+      const backgroundDuration =
+        backgroundedAt > 0 ? Date.now() - backgroundedAt : 0
+      backgroundedAt = 0
+
+      if (isClosed() || !networkOnline) {
+        return
+      }
+
+      clearReconnectTimer()
+
+      const staleAfterBackground = backgroundDuration >= BACKGROUND_STALE_MS
+
+      if (state === 'online') {
+        // A long background session is presumed to have torn down the socket;
+        // rebuild it. Short backgrounds keep the healthy connection.
+        if (staleAfterBackground) {
+          invalidateActiveSocket(1000, 'foreground_recovery')
+          void connect()
+        }
+        return
+      }
+
+      if (state === 'connecting') {
+        // An in-flight attempt that spanned a long background is presumed
+        // stale: its auth refresh / session request / handshake may be hung
+        // on a frozen network. Abandon it (generation bump + abort) and start
+        // a fresh flow instead of trusting it to finish.
+        if (staleAfterBackground) {
+          invalidateActiveSocket(1000, 'foreground_recovery')
+          void connect()
+        }
+        return
+      }
+
+      reconnectAttempts = 0
+      void connect()
+    }
+
     const connect = async () => {
       if (isClosed()) {
+        return
+      }
+
+      // Starting a connection while offline or backgrounded would only burn
+      // an auth/session request on a dead environment; the recovery signals
+      // drive the attempt once it is usable again.
+      if (isBackgrounded || !networkOnline) {
+        state = 'reconnecting'
         return
       }
 
@@ -260,7 +432,10 @@ export const orderRealtime = {
       const currentGeneration = ++generation
 
       try {
-        const tokens = await ensureFreshAuthTokens()
+        const tokens = await withTimeout(
+          ensureFreshAuthTokens(),
+          AUTH_REFRESH_TIMEOUT_MS,
+        )
 
         // close() can land while the auth refresh is in flight: every await
         // boundary must re-check the generation before starting the next
@@ -362,7 +537,22 @@ export const orderRealtime = {
       }
     }
 
-    void connect()
+    const recoveryHandlers: RealtimeRecoveryHandlers = {
+      onNetworkOffline: handleNetworkOffline,
+      onNetworkOnline: handleNetworkOnline,
+      onAppBackground: handleAppBackground,
+      onAppForeground: handleAppForeground,
+    }
+    const recovery = startRealtimeRecoverySignals(recoveryHandlers)
+    stopRecoverySignals = recovery.stop
+
+    // The recovery initialization reports the initial network and lifecycle
+    // state; on native that snapshot is read asynchronously (Capacitor plugin
+    // calls), so the first connect must wait for it — otherwise a subscription
+    // created while offline or backgrounded would still burn an auth/session
+    // request before the gate is known. On web the snapshot is synchronous
+    // and the ready promise is already resolved.
+    void recovery.ready.then(() => void connect())
 
     return {
       close: () => {
@@ -378,6 +568,8 @@ export const orderRealtime = {
         sessionAbortController?.abort()
         sessionAbortController = null
         closeSocket(1000, 'client_closed')
+        stopRecoverySignals?.()
+        stopRecoverySignals = null
         options.onSubscriptionStatus?.('CLOSED')
       },
     }
