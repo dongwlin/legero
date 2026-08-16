@@ -42,6 +42,24 @@ type RealtimeState = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'closed
 const normalizeClearMode = (mode: unknown): ClearWorkspaceMode =>
   mode === 'before_today' ? 'before_today' : 'all'
 
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new DOMException('Aborted', 'AbortError'))
+    }, timeoutMs)
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        window.clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+
 export type OrderRealtimeSubscription = {
   close: () => void
 }
@@ -51,6 +69,12 @@ export type OrderRealtimeSubscription = {
 // forever.
 export const SESSION_TIMEOUT_MS = 5_000
 export const READY_TIMEOUT_MS = 8_000
+
+// ensureFreshAuthTokens() is single-flight and its refresh fetch has no
+// timeout of its own: a hung refresh would pin the channel in 'connecting'
+// forever, because every new ensureFreshAuthTokens() call returns the same
+// pending promise. Bound our wait so the state machine can move on and retry.
+export const AUTH_REFRESH_TIMEOUT_MS = 8_000
 
 // A connection is only considered stable after staying online for this long;
 // only then is the failure counter reset. Resetting on 'ready' would turn a
@@ -394,7 +418,10 @@ export const orderRealtime = {
       const currentGeneration = ++generation
 
       try {
-        const tokens = await ensureFreshAuthTokens()
+        const tokens = await withTimeout(
+          ensureFreshAuthTokens(),
+          AUTH_REFRESH_TIMEOUT_MS,
+        )
 
         // close() can land while the auth refresh is in flight: every await
         // boundary must re-check the generation before starting the next

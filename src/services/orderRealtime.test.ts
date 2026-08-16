@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  AUTH_REFRESH_TIMEOUT_MS,
   BACKGROUND_STALE_MS,
   INITIAL_RECONNECT_DELAY_MS,
   MAX_RECONNECT_DELAY_MS,
@@ -818,6 +819,59 @@ describe('orderRealtime connection lifecycle', () => {
 
     expect(socket.closeCalls).toHaveLength(0)
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('times out a hung auth refresh so the channel is not pinned in connecting', async () => {
+    mocks.ensureFreshAuthTokens.mockImplementation(() => new Promise(() => {}))
+
+    const subscription = subscribe()
+
+    await flushAsync()
+    expect(mocks.ensureFreshAuthTokens).toHaveBeenCalledTimes(1)
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    // The refresh never settles; the per-attempt timeout must let the state
+    // machine move on to the next attempt (with backoff).
+    await vi.advanceTimersByTimeAsync(AUTH_REFRESH_TIMEOUT_MS)
+    await flushAsync()
+    await vi.advanceTimersByTimeAsync(INITIAL_RECONNECT_DELAY_MS)
+    await flushAsync()
+
+    expect(mocks.ensureFreshAuthTokens).toHaveBeenCalledTimes(2)
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    subscription.close()
+  })
+
+  it('recovers from a hung auth refresh after a long background', async () => {
+    mocks.ensureFreshAuthTokens
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValue({ accessToken: 'access-1' })
+
+    const onSubscriptionStatus = vi.fn()
+    const subscription = subscribe({ onSubscriptionStatus })
+
+    await flushAsync()
+    expect(mocks.ensureFreshAuthTokens).toHaveBeenCalledTimes(1)
+
+    // Background while the refresh is still pending: the attempt times out
+    // during the background and its retry is deferred.
+    recoveryHandlers().onAppBackground()
+    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS)
+
+    // Foreground starts a fresh flow with a new refresh call.
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+
+    expect(mocks.ensureFreshAuthTokens).toHaveBeenCalledTimes(2)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('SUBSCRIBED')
 
     subscription.close()
   })
