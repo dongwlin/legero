@@ -5,9 +5,8 @@ import {
   type OrderRealtimeSubscription,
 } from '@/services/orderRealtime'
 import {
-  compareUpdatedAt,
   createOrderEventBuffer,
-  latestUpsertUpdatedAt,
+  latestUpsertVersion,
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
 } from '@/services/orderReconcile'
@@ -65,15 +64,37 @@ export const useOrderWorkspaceSync = () => {
         return
       }
 
-      const upserts = Array.from(pendingUpserts.values())
-      const removes = Array.from(pendingRemoves.values())
+      // Upserts for the same id consolidate on the highest server version:
+      // within one batch a delayed stale event must not displace the newer
+      // event it trails.
+      const upsertsById = new Map<string, OrderRecord>()
+
+      for (const order of pendingUpserts.values()) {
+        const current = upsertsById.get(order.id)
+        if (!current || order.version > current.version) {
+          upsertsById.set(order.id, order)
+        }
+      }
+
       pendingUpserts.clear()
+      const upserts = Array.from(upsertsById.values())
+      const removes = Array.from(pendingRemoves.values())
       pendingRemoves.clear()
 
       const store = useOrderStore.getState()
 
       if (upserts.length > 0) {
-        store.upsertOrders(upserts)
+        // A realtime upsert is applied only when it is strictly newer than
+        // the store's record: a duplicate echo (same version) or a delayed
+        // stale event (lower version) must not overwrite authoritative state.
+        const toApply = upserts.filter((order) => {
+          const existing = store.ordersById[order.id]
+          return !existing || order.version > existing.version
+        })
+
+        if (toApply.length > 0) {
+          store.upsertOrders(toApply)
+        }
       }
 
       for (const id of removes) {
@@ -94,7 +115,7 @@ export const useOrderWorkspaceSync = () => {
     // lifetime. Pending mutations always win: their completion (or rollback)
     // owns the authoritative state, and the optimistic record predates the
     // server versions any event would carry. Settled mutations only win over
-    // the snapshot itself — a buffered realtime event with a strictly newer
+    // the snapshot itself — a buffered realtime event with a strictly higher
     // server version (e.g. another client's update committed after ours)
     // supersedes the local result. Orders the events themselves removed
     // (remove/clear) stay removed.
@@ -109,7 +130,7 @@ export const useOrderWorkspaceSync = () => {
 
       const store = useOrderStore.getState()
       const ordersById = new Map(orders.map((order) => [order.id, order]))
-      const latestEventVersion = latestUpsertUpdatedAt(events)
+      const latestEventVersion = latestUpsertVersion(events)
 
       for (const id of protectedIds) {
         const optimistic = store.ordersById[id]
@@ -127,7 +148,7 @@ export const useOrderWorkspaceSync = () => {
 
         if (
           eventVersion === undefined ||
-          compareUpdatedAt(eventVersion, optimistic.updatedAt) <= 0
+          eventVersion <= optimistic.version
         ) {
           ordersById.set(id, optimistic)
         }
@@ -159,17 +180,18 @@ export const useOrderWorkspaceSync = () => {
     // Upserts are skipped only when the store already owns a state at least
     // as new: while a mutation is still pending (its completion or rollback
     // owns the authoritative state, and the optimistic record is not
-    // version-comparable), or when the event carries no newer server version
-    // than the store's record (the echo of a settled local mutation, or an
-    // older event). A strictly newer event — another client's update — must
-    // win even over a completed local mutation.
+    // version-comparable), or when the event carries no strictly higher
+    // server version than the store's record (the echo of a settled local
+    // mutation, a duplicate, or an older event). A strictly newer event —
+    // another client's update — must win even over a completed local
+    // mutation.
     const applyBufferedEvents = (events: RealtimeOrderEvent[]) => {
       const store = useOrderStore.getState()
 
       for (const event of events) {
         switch (event.type) {
           case 'upsert': {
-            const { id, updatedAt } = event.order
+            const { id } = event.order
 
             if (orderOptimistic.hasPending(id)) {
               continue
@@ -177,10 +199,7 @@ export const useOrderWorkspaceSync = () => {
 
             const current = store.ordersById[id]
 
-            if (
-              current &&
-              compareUpdatedAt(current.updatedAt, updatedAt) >= 0
-            ) {
+            if (current && current.version >= event.order.version) {
               continue
             }
 
@@ -307,7 +326,14 @@ export const useOrderWorkspaceSync = () => {
                 return
               }
 
-              pendingUpserts.set(order.id, order)
+              // Batched upserts for the same id consolidate on the highest
+              // version at insertion: within one batch a delayed stale event
+              // must not displace the newer event it trails.
+              const queued = pendingUpserts.get(order.id)
+              if (!queued || order.version > queued.version) {
+                pendingUpserts.set(order.id, order)
+              }
+
               scheduleBatchFlush()
             }
           },

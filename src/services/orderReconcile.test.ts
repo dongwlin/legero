@@ -7,10 +7,11 @@ import { DEFAULT_ORDER_FORM_VALUE, STEP_STATUS, type OrderRecord } from '@/types
 dayjs.extend(utc)
 dayjs.extend(timezone)
 import {
-  compareUpdatedAt,
   compactRealtimeEvents,
   createOrderEventBuffer,
-  latestUpsertUpdatedAt,
+  isNewerOrder,
+  latestUpsertVersion,
+  pickLatestOrder,
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
 } from './orderReconcile'
@@ -38,6 +39,18 @@ const upsert = (id: string, note?: string): RealtimeOrderEvent => ({
   order: makeOrder(id, '2025-01-01T00:00:00+08:00', note ? { note } : {}),
 })
 
+const upsertVersion = (
+  id: string,
+  version: number,
+  note?: string,
+): RealtimeOrderEvent => ({
+  type: 'upsert',
+  order: makeOrder(id, '2025-01-01T00:00:00+08:00', {
+    version,
+    ...(note ? { note } : {}),
+  }),
+})
+
 const remove = (id: string): RealtimeOrderEvent => ({ type: 'remove', id })
 
 const clearAll: RealtimeOrderEvent = { type: 'clear', mode: 'all' }
@@ -56,9 +69,27 @@ const yesterdayOrder = (id: string, overrides: Partial<OrderRecord> = {}): Order
 
 describe('compactRealtimeEvents', () => {
   it('drops earlier duplicate upserts, keeping the newest per id', () => {
-    expect(compactRealtimeEvents([upsert('a', 'v1'), upsert('a', 'v2')])).toEqual([
-      upsert('a', 'v2'),
-    ])
+    expect(
+      compactRealtimeEvents([upsertVersion('a', 1, 'v1'), upsertVersion('a', 2, 'v2')]),
+    ).toEqual([upsertVersion('a', 2, 'v2')])
+  })
+
+  it('keeps the highest version even when an older event arrives later', () => {
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 12, 'v12'),
+        upsertVersion('a', 11, 'v11-delayed'),
+      ]),
+    ).toEqual([upsertVersion('a', 12, 'v12')])
+  })
+
+  it('collapses duplicate upserts with the same version as idempotent', () => {
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 11, 'first'),
+        upsertVersion('a', 11, 'echo'),
+      ]),
+    ).toEqual([upsertVersion('a', 11, 'first')])
   })
 
   it('lets a trailing remove win over an earlier upsert of the same id', () => {
@@ -71,15 +102,25 @@ describe('compactRealtimeEvents', () => {
     ])
   })
 
+  it('does not let a stale upsert resurrect an order removed after an upsert', () => {
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 13, 'v13'),
+        remove('a'),
+        upsertVersion('a', 12, 'v12-delayed'),
+      ]),
+    ).toEqual([remove('a')])
+  })
+
   it('preserves the relative order of surviving events for distinct ids', () => {
     expect(
       compactRealtimeEvents([
-        upsert('a', 'v1'),
+        upsertVersion('a', 1, 'v1'),
         remove('b'),
-        upsert('a', 'v2'),
+        upsertVersion('a', 2, 'v2'),
         upsert('c'),
       ]),
-    ).toEqual([remove('b'), upsert('a', 'v2'), upsert('c')])
+    ).toEqual([remove('b'), upsertVersion('a', 2, 'v2'), upsert('c')])
   })
 
   it('drops everything before the last full clear but keeps the clear itself', () => {
@@ -139,7 +180,10 @@ describe('reconcileSnapshotWithEvents', () => {
 
   it('overlays buffered upserts on the snapshot, adding new orders', () => {
     const snapshot = [makeOrder('a', '2025-01-01T00:00:00+08:00')]
-    const updated = makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'newer' })
+    const updated = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 2,
+      note: 'newer',
+    })
     const created = makeOrder('b', '2025-01-02T00:00:00+08:00')
 
     const result = reconcileSnapshotWithEvents(snapshot, [
@@ -177,6 +221,33 @@ describe('reconcileSnapshotWithEvents', () => {
     ])
 
     expect(result.map((order) => order.id).sort()).toEqual(['b', 'c'])
+  })
+
+  it('does not let a stale buffered upsert downgrade a newer snapshot record', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 13,
+        note: 'snapshot-v13',
+      }),
+    ]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      upsertVersion('a', 12, 'stale-v12'),
+    ])
+
+    expect(result).toEqual(snapshot)
+  })
+
+  it('overlays a buffered upsert with a strictly higher version than the snapshot', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      upsertVersion('a', 12, 'remote-v12'),
+    ])
+
+    expect(result).toEqual([makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 12, note: 'remote-v12' })])
   })
 
   it('applies a full clear over the snapshot and keeps only later events', () => {
@@ -227,51 +298,65 @@ describe('reconcileSnapshotWithEvents', () => {
   })
 })
 
-describe('compareUpdatedAt', () => {
-  it('orders RFC3339 server timestamps chronologically', () => {
-    expect(compareUpdatedAt('2025-01-01T00:00:02+08:00', '2025-01-01T00:00:01+08:00')).toBeGreaterThan(0)
-    expect(compareUpdatedAt('2025-01-01T00:00:01+08:00', '2025-01-01T00:00:02+08:00')).toBeLessThan(0)
-    expect(compareUpdatedAt('2025-01-01T00:00:00+08:00', '2025-01-02T00:00:00+08:00')).toBeLessThan(0)
+describe('version ordering primitives', () => {
+  it('isNewerOrder compares exclusively by version', () => {
+    const older = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 })
+    const newer = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 })
+
+    expect(isNewerOrder(newer, older)).toBe(true)
+    expect(isNewerOrder(older, newer)).toBe(false)
+    expect(isNewerOrder(newer, { ...newer })).toBe(false)
   })
 
-  it('compares across fractional-second precisions', () => {
-    expect(compareUpdatedAt('2025-01-01T00:00:01.5+08:00', '2025-01-01T00:00:01+08:00')).toBeGreaterThan(0)
-    expect(compareUpdatedAt('2025-01-01T00:00:01.25+08:00', '2025-01-01T00:00:01.3+08:00')).toBeLessThan(0)
+  it('pickLatestOrder returns the higher-version order', () => {
+    const older = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 5 })
+    const newer = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 9 })
+
+    expect(pickLatestOrder(older, newer)).toBe(newer)
+    expect(pickLatestOrder(newer, older)).toBe(newer)
   })
 
-  it('treats equal instants in different representations as equal', () => {
-    expect(compareUpdatedAt('2025-01-01T00:00:00+08:00', '2025-01-01T00:00:00+08:00')).toBe(0)
-    expect(compareUpdatedAt('2025-01-01T00:00:00.5+08:00', '2025-01-01T00:00:00.50+08:00')).toBe(0)
+  it('same-second updatedAt cannot compete with versions: higher version wins', () => {
+    // Both records share the identical updatedAt (the race timestamps could
+    // not distinguish); only version can order them.
+    const sharedUpdatedAt = '2026-08-16T14:20:30+08:00'
+    const local = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 11,
+      updatedAt: sharedUpdatedAt,
+      note: 'local',
+    })
+    const remote = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 12,
+      updatedAt: sharedUpdatedAt,
+      note: 'remote',
+    })
+
+    expect(isNewerOrder(remote, local)).toBe(true)
+    expect(pickLatestOrder(local, remote)).toBe(remote)
+  })
+
+  it('an equal version is idempotent under pickLatestOrder', () => {
+    const a = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 12 })
+    const b = { ...a, note: 'echo' }
+
+    expect(pickLatestOrder(a, b)).toBe(a)
+    expect(pickLatestOrder(b, a)).toBe(b)
   })
 })
 
-describe('latestUpsertUpdatedAt', () => {
-  it('keeps the newest upsert version per order id', () => {
+describe('latestUpsertVersion', () => {
+  it('keeps the highest server version per order id', () => {
     const events: RealtimeOrderEvent[] = [
       upsert('a'),
-      {
-        type: 'upsert',
-        order: makeOrder('a', '2025-01-01T00:00:00+08:00', {
-          updatedAt: '2025-01-01T00:00:03+08:00',
-        }),
-      },
-      {
-        type: 'upsert',
-        order: makeOrder('b', '2025-01-01T00:00:00+08:00', {
-          updatedAt: '2025-01-01T00:00:02+08:00',
-        }),
-      },
-      {
-        type: 'upsert',
-        order: makeOrder('a', '2025-01-01T00:00:00+08:00', {
-          updatedAt: '2025-01-01T00:00:04+08:00',
-        }),
-      },
+      upsertVersion('a', 11, 'second'),
+      upsertVersion('b', 2, 'b-v2'),
+      upsertVersion('a', 13, 'third'),
+      upsertVersion('a', 12, 'delayed-stale'),
     ]
 
-    const latest = latestUpsertUpdatedAt(events)
-    expect(latest.get('a')).toBe('2025-01-01T00:00:04+08:00')
-    expect(latest.get('b')).toBe('2025-01-01T00:00:02+08:00')
+    const latest = latestUpsertVersion(events)
+    expect(latest.get('a')).toBe(13)
+    expect(latest.get('b')).toBe(2)
   })
 
   it('ignores remove and clear events', () => {
@@ -282,14 +367,14 @@ describe('latestUpsertUpdatedAt', () => {
       { type: 'upsert', order: makeOrder('c', '2025-01-01T00:00:00+08:00') },
     ]
 
-    const latest = latestUpsertUpdatedAt(events)
-    expect(latest.get('a')).toBe('2025-01-01T00:00:00+08:00')
+    const latest = latestUpsertVersion(events)
+    expect(latest.get('a')).toBe(1)
     expect(latest.has('b')).toBe(false)
-    expect(latest.get('c')).toBe('2025-01-01T00:00:00+08:00')
+    expect(latest.get('c')).toBe(1)
   })
 
   it('returns an empty map for an empty event list', () => {
-    expect(latestUpsertUpdatedAt([]).size).toBe(0)
+    expect(latestUpsertVersion([]).size).toBe(0)
   })
 })
 
@@ -308,10 +393,10 @@ describe('createOrderEventBuffer', () => {
     buffer.beginReconciliation()
     buffer.push(upsert('a', 'v1'))
     buffer.push(remove('b'))
-    buffer.push(upsert('a', 'v2'))
+    buffer.push(upsertVersion('a', 2, 'v2'))
 
     expect(buffer.isReconciling).toBe(true)
-    expect(buffer.endReconciliation()).toEqual([remove('b'), upsert('a', 'v2')])
+    expect(buffer.endReconciliation()).toEqual([remove('b'), upsertVersion('a', 2, 'v2')])
     expect(buffer.isReconciling).toBe(false)
   })
 

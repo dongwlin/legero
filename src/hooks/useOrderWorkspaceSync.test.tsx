@@ -305,9 +305,14 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     // The user's mutation began while the snapshot was in flight and already
-    // completed: the store holds the server-confirmed result.
+    // completed: the store holds the server-confirmed result (version 11).
+    // Note the malicious case the review calls out: the local result and the
+    // remote event share the identical updatedAt, so only `version` can
+    // order them.
+    const sharedUpdatedAt = '2026-08-16T14:20:30+08:00'
     const localA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
-      updatedAt: '2025-01-01T00:00:02+08:00',
+      version: 11,
+      updatedAt: sharedUpdatedAt,
       note: 'local-completed',
     })
     act(() => {
@@ -315,11 +320,13 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     // Another client updates a after our mutation committed; the server
-    // broadcasts the newer state while the snapshot is still in flight.
+    // broadcasts the newer state (version 12, same updatedAt) while the
+    // snapshot is still in flight.
     act(() => {
       ws.onUpsert(
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
-          updatedAt: '2025-01-01T00:00:03+08:00',
+          version: 12,
+          updatedAt: sharedUpdatedAt,
           note: 'remote-newer',
         }),
       )
@@ -328,6 +335,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     await act(async () => {
       snapshot.resolve([
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 10,
           updatedAt: '2025-01-01T00:00:01+08:00',
           note: 'stale-snapshot',
         }),
@@ -335,8 +343,9 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
       await flushAsync()
     })
 
-    // The realtime event is newer than the settled local mutation: it must
-    // win over both the local result and the stale snapshot.
+    // The realtime event has a higher version than the settled local
+    // mutation: it must win over both the local result and the stale
+    // snapshot, even though their updatedAt values are identical.
     expect(useOrderStore.getState().ordersById['a']?.note).toBe('remote-newer')
   })
 
@@ -354,7 +363,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     const localA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
-      updatedAt: '2025-01-01T00:00:02+08:00',
+      version: 11,
       note: 'local-completed',
     })
     act(() => {
@@ -364,7 +373,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     act(() => {
       ws.onUpsert(
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
-          updatedAt: '2025-01-01T00:00:03+08:00',
+          version: 12,
           note: 'remote-newer',
         }),
       )
@@ -375,8 +384,8 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
       await flushAsync()
     })
 
-    // The failure replay must not defer the newer event: it supersedes the
-    // completed local mutation.
+    // The failure replay must not defer the newer event: version 12
+    // supersedes the completed local mutation (version 11).
     expect(useOrderStore.getState().ordersById['a']?.note).toBe('remote-newer')
   })
 
@@ -394,10 +403,10 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     // The mutation settles during the snapshot; no WS event mentions a, so
-    // the marker must still keep the server-confirmed record over the stale
-    // snapshot.
+    // the marker must still keep the server-confirmed record (version 11)
+    // over the stale snapshot (version 10).
     const serverA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
-      updatedAt: '2025-01-01T00:00:02+08:00',
+      version: 11,
       note: 'server-confirmed',
     })
     act(() => {
@@ -407,7 +416,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     await act(async () => {
       snapshot.resolve([
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
-          updatedAt: '2025-01-01T00:00:01+08:00',
+          version: 10,
           note: 'stale-snapshot',
         }),
       ])
@@ -431,19 +440,19 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     const serverA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
-      updatedAt: '2025-01-01T00:00:02+08:00',
+      version: 11,
       note: 'server-confirmed',
     })
     act(() => {
       useOrderStore.getState().upsertOrder(serverA1)
     })
 
-    // The server echoes the same commit over WS: same version, only its
-    // serialization differs from the HTTP response already in the store.
+    // The server echoes the same commit over WS: same version (11), only
+    // its serialization differs from the HTTP response already in the store.
     act(() => {
       ws.onUpsert(
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
-          updatedAt: '2025-01-01T00:00:02+08:00',
+          version: 11,
           note: 'echo-variant',
         }),
       )
@@ -452,16 +461,61 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     await act(async () => {
       snapshot.resolve([
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
-          updatedAt: '2025-01-01T00:00:01+08:00',
+          version: 10,
           note: 'stale-snapshot',
         }),
       ])
       await flushAsync()
     })
 
-    // The event is not strictly newer than the settled local result, so the
-    // local result stays authoritative.
+    // The event is not strictly newer (same version) than the settled local
+    // result, so the local result stays authoritative.
     expect(useOrderStore.getState().ordersById['a']?.note).toBe('server-confirmed')
+  })
+
+  it('keeps the completed local mutation when the buffered event has a lower version', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(false)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const localA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 11,
+      note: 'local-completed',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(localA1)
+    })
+
+    // A delayed stale event (version 10) arrives while the snapshot is in
+    // flight: it must not overwrite the settled local mutation (version 11).
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 10,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 9,
+          note: 'stale-snapshot',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('local-completed')
   })
 
   it('does not let a failed snapshot replay clobber a protected optimistic record', async () => {
@@ -512,18 +566,58 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     act(() => {
-      ws.onUpsert(makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'v1' }))
-      ws.onUpsert(makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'v2' }))
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10, note: 'first' }),
+      )
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11, note: 'second' }),
+      )
     })
 
     await act(async () => {
       snapshot.resolve([
-        makeOrder('a', '2025-01-01T00:00:00+08:00', { note: 'snapshot' }),
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 9, note: 'snapshot' }),
       ])
       await flushAsync()
     })
 
-    expect(useOrderStore.getState().ordersById['a']?.note).toBe('v2')
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('second')
+  })
+
+  it('does not let a delayed lower-version upsert downgrade the snapshot during reconciliation', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // A delayed stale upsert (version 11) is buffered while the snapshot is
+    // in flight; the snapshot itself already carries version 12.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'snapshot-v12',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    // The stale event cannot lower the store back to version 11.
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('snapshot-v12')
   })
 
   it('lets a remove received during the snapshot win over the snapshot', async () => {
@@ -766,6 +860,137 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     expect(useOrderStore.getState().ordersById['b']).toEqual(orderB)
+  })
+
+  it('does not let a delayed stale realtime event overwrite a newer store record', async () => {
+    mocks.listOrders.mockResolvedValue([
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 12,
+        note: 'authoritative-v12',
+      }),
+    ])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']?.version).toBe(12)
+
+    // The delayed realtime event carries an older version (11): it must be
+    // ignored even though the snapshot is long settled.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve())
+      })
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(12)
+    expect(order?.note).toBe('authoritative-v12')
+  })
+
+  it('treats a duplicate realtime event with the same version as idempotent', async () => {
+    mocks.listOrders.mockResolvedValue([
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 12,
+        note: 'authoritative-v12',
+      }),
+    ])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']?.version).toBe(12)
+
+    // The WS echo of the same commit (same version) must not overwrite the
+    // record already stored from the snapshot.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'echo-variant',
+        }),
+      )
+    })
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve())
+      })
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(12)
+    expect(order?.note).toBe('authoritative-v12')
+  })
+
+  it('consolidates out-of-order upserts in one batch on the highest version', async () => {
+    mocks.listOrders.mockResolvedValue([
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 10,
+        note: 'v10',
+      }),
+    ])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    // A newer update (v12) and a delayed stale one (v11) arrive in the same
+    // batch; the flush must apply only the highest version.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'v12',
+        }),
+      )
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'v11-delayed',
+        }),
+      )
+    })
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve())
+      })
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(12)
+    expect(order?.note).toBe('v12')
   })
 
   it('applies a clear immediately when no reconciliation is in flight, even if the follow-up snapshot fails', async () => {
