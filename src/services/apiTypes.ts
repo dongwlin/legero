@@ -21,6 +21,7 @@ export type WorkspaceDTO = {
 
 export type OrderDTO = {
   id: string
+  version: number
   displayNo: string
   stapleTypeCode: number | null
   sizeCode: number

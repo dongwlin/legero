@@ -5,6 +5,7 @@ import { orderOptimistic } from './orderOptimistic'
 const makeOrder = (id: string): OrderRecord => ({
   ...DEFAULT_ORDER_FORM_VALUE,
   id,
+  version: 1,
   displayNo: id,
   totalPriceCents: 1500,
   stapleStepStatusCode: STEP_STATUS.notStarted,
