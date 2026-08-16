@@ -5,7 +5,9 @@ import {
   type OrderRealtimeSubscription,
 } from '@/services/orderRealtime'
 import {
+  compareUpdatedAt,
   createOrderEventBuffer,
+  latestUpsertUpdatedAt,
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
 } from '@/services/orderReconcile'
@@ -87,25 +89,46 @@ export const useOrderWorkspaceSync = () => {
       flushRafId = window.requestAnimationFrame(flushBatched)
     }
 
-    // Re-applies the store's current (optimistic) records for protected ids
-    // on top of a reconciled list, so a stale snapshot cannot overwrite an
-    // in-flight mutation. Orders the events themselves removed (remove/clear)
-    // stay removed.
+    // Re-applies the store's records for protected ids on top of a reconciled
+    // list, so a stale snapshot cannot overwrite a mutation that overlaps its
+    // lifetime. Pending mutations always win: their completion (or rollback)
+    // owns the authoritative state, and the optimistic record predates the
+    // server versions any event would carry. Settled mutations only win over
+    // the snapshot itself — a buffered realtime event with a strictly newer
+    // server version (e.g. another client's update committed after ours)
+    // supersedes the local result. Orders the events themselves removed
+    // (remove/clear) stay removed.
     const overlayOptimisticRecords = (
       orders: OrderRecord[],
-      pendingIds: ReadonlySet<string>,
+      protectedIds: ReadonlySet<string>,
+      events: RealtimeOrderEvent[],
     ): OrderRecord[] => {
-      if (pendingIds.size === 0) {
+      if (protectedIds.size === 0) {
         return orders
       }
 
       const store = useOrderStore.getState()
       const ordersById = new Map(orders.map((order) => [order.id, order]))
+      const latestEventVersion = latestUpsertUpdatedAt(events)
 
-      for (const id of pendingIds) {
+      for (const id of protectedIds) {
         const optimistic = store.ordersById[id]
 
-        if (optimistic && ordersById.has(id)) {
+        if (!optimistic || !ordersById.has(id)) {
+          continue
+        }
+
+        if (orderOptimistic.hasPending(id)) {
+          ordersById.set(id, optimistic)
+          continue
+        }
+
+        const eventVersion = latestEventVersion.get(id)
+
+        if (
+          eventVersion === undefined ||
+          compareUpdatedAt(eventVersion, optimistic.updatedAt) <= 0
+        ) {
           ordersById.set(id, optimistic)
         }
       }
@@ -133,21 +156,37 @@ export const useOrderWorkspaceSync = () => {
     // dropped — apply them as ordinary updates on top of whatever the store
     // currently holds, then surface the error. The next successful
     // reconciliation (retry or reconnect) restores the full server state.
-    // Upserts for orders whose mutations overlap the failed snapshot are
-    // deferred: their completion (or rollback) owns the authoritative state.
-    const applyBufferedEvents = (
-      events: RealtimeOrderEvent[],
-      pendingIds: ReadonlySet<string>,
-    ) => {
+    // Upserts are skipped only when the store already owns a state at least
+    // as new: while a mutation is still pending (its completion or rollback
+    // owns the authoritative state, and the optimistic record is not
+    // version-comparable), or when the event carries no newer server version
+    // than the store's record (the echo of a settled local mutation, or an
+    // older event). A strictly newer event — another client's update — must
+    // win even over a completed local mutation.
+    const applyBufferedEvents = (events: RealtimeOrderEvent[]) => {
       const store = useOrderStore.getState()
 
       for (const event of events) {
         switch (event.type) {
-          case 'upsert':
-            if (!pendingIds.has(event.order.id)) {
-              store.upsertOrder(event.order)
+          case 'upsert': {
+            const { id, updatedAt } = event.order
+
+            if (orderOptimistic.hasPending(id)) {
+              continue
             }
+
+            const current = store.ordersById[id]
+
+            if (
+              current &&
+              compareUpdatedAt(current.updatedAt, updatedAt) >= 0
+            ) {
+              continue
+            }
+
+            store.upsertOrder(event.order)
             break
+          }
           case 'remove':
             store.removeOrder(event.id)
             break
@@ -203,14 +242,16 @@ export const useOrderWorkspaceSync = () => {
         }
 
         // The snapshot is the base state; buffered events are newer and win.
-        // Optimistic records for mutations that overlap this snapshot's
-        // lifetime are kept so the snapshot cannot clobber them (the HTTP
-        // response settles the authoritative state afterwards).
+        // Records for mutations that overlap this snapshot's lifetime are
+        // re-applied so the snapshot cannot clobber them — but a buffered
+        // event with a strictly newer server version still wins (overlay
+        // only guards against the stale snapshot itself).
         const events = eventBuffer.endReconciliation()
         setOrders(
           overlayOptimisticRecords(
             reconcileSnapshotWithEvents(nextOrders, events),
             orderOptimistic.idsToProtect(snapshotMarker),
+            events,
           ),
         )
       } catch (error) {
@@ -218,10 +259,7 @@ export const useOrderWorkspaceSync = () => {
           return
         }
 
-        applyBufferedEvents(
-          eventBuffer.endReconciliation(),
-          orderOptimistic.idsToProtect(snapshotMarker),
-        )
+        applyBufferedEvents(eventBuffer.endReconciliation())
 
         if (shouldBlock) {
           setHydrationState({

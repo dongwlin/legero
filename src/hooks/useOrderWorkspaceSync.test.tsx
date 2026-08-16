@@ -290,6 +290,179 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     expect(useOrderStore.getState().ordersById['a']?.note).toBe('optimistic')
   })
 
+  it('lets a newer realtime upsert win over a completed local mutation (success path)', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(false)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The user's mutation began while the snapshot was in flight and already
+    // completed: the store holds the server-confirmed result.
+    const localA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      updatedAt: '2025-01-01T00:00:02+08:00',
+      note: 'local-completed',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(localA1)
+    })
+
+    // Another client updates a after our mutation committed; the server
+    // broadcasts the newer state while the snapshot is still in flight.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:03+08:00',
+          note: 'remote-newer',
+        }),
+      )
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:01+08:00',
+          note: 'stale-snapshot',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    // The realtime event is newer than the settled local mutation: it must
+    // win over both the local result and the stale snapshot.
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('remote-newer')
+  })
+
+  it('lets a newer realtime upsert win over a completed local mutation when the snapshot fails', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(false)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const localA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      updatedAt: '2025-01-01T00:00:02+08:00',
+      note: 'local-completed',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(localA1)
+    })
+
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:03+08:00',
+          note: 'remote-newer',
+        }),
+      )
+    })
+
+    await act(async () => {
+      snapshot.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    // The failure replay must not defer the newer event: it supersedes the
+    // completed local mutation.
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('remote-newer')
+  })
+
+  it('keeps the completed local mutation when no realtime event arrived before the snapshot lands', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(false)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The mutation settles during the snapshot; no WS event mentions a, so
+    // the marker must still keep the server-confirmed record over the stale
+    // snapshot.
+    const serverA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      updatedAt: '2025-01-01T00:00:02+08:00',
+      note: 'server-confirmed',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(serverA1)
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:01+08:00',
+          note: 'stale-snapshot',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('server-confirmed')
+  })
+
+  it('keeps the completed local mutation when the buffered event carries the same server version', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.hasPending.mockReturnValue(false)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const serverA1 = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      updatedAt: '2025-01-01T00:00:02+08:00',
+      note: 'server-confirmed',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(serverA1)
+    })
+
+    // The server echoes the same commit over WS: same version, only its
+    // serialization differs from the HTTP response already in the store.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:02+08:00',
+          note: 'echo-variant',
+        }),
+      )
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:01+08:00',
+          note: 'stale-snapshot',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    // The event is not strictly newer than the settled local result, so the
+    // local result stays authoritative.
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('server-confirmed')
+  })
+
   it('does not let a failed snapshot replay clobber a protected optimistic record', async () => {
     const snapshot = deferred<OrderRecord[]>()
     mocks.listOrders.mockReturnValue(snapshot.promise)

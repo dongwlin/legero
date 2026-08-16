@@ -7,8 +7,10 @@ import { DEFAULT_ORDER_FORM_VALUE, STEP_STATUS, type OrderRecord } from '@/types
 dayjs.extend(utc)
 dayjs.extend(timezone)
 import {
+  compareUpdatedAt,
   compactRealtimeEvents,
   createOrderEventBuffer,
+  latestUpsertUpdatedAt,
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
 } from './orderReconcile'
@@ -221,6 +223,72 @@ describe('reconcileSnapshotWithEvents', () => {
     )
 
     expect(result).toEqual([])
+  })
+})
+
+describe('compareUpdatedAt', () => {
+  it('orders RFC3339 server timestamps chronologically', () => {
+    expect(compareUpdatedAt('2025-01-01T00:00:02+08:00', '2025-01-01T00:00:01+08:00')).toBeGreaterThan(0)
+    expect(compareUpdatedAt('2025-01-01T00:00:01+08:00', '2025-01-01T00:00:02+08:00')).toBeLessThan(0)
+    expect(compareUpdatedAt('2025-01-01T00:00:00+08:00', '2025-01-02T00:00:00+08:00')).toBeLessThan(0)
+  })
+
+  it('compares across fractional-second precisions', () => {
+    expect(compareUpdatedAt('2025-01-01T00:00:01.5+08:00', '2025-01-01T00:00:01+08:00')).toBeGreaterThan(0)
+    expect(compareUpdatedAt('2025-01-01T00:00:01.25+08:00', '2025-01-01T00:00:01.3+08:00')).toBeLessThan(0)
+  })
+
+  it('treats equal instants in different representations as equal', () => {
+    expect(compareUpdatedAt('2025-01-01T00:00:00+08:00', '2025-01-01T00:00:00+08:00')).toBe(0)
+    expect(compareUpdatedAt('2025-01-01T00:00:00.5+08:00', '2025-01-01T00:00:00.50+08:00')).toBe(0)
+  })
+})
+
+describe('latestUpsertUpdatedAt', () => {
+  it('keeps the newest upsert version per order id', () => {
+    const events: RealtimeOrderEvent[] = [
+      upsert('a'),
+      {
+        type: 'upsert',
+        order: makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:03+08:00',
+        }),
+      },
+      {
+        type: 'upsert',
+        order: makeOrder('b', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:02+08:00',
+        }),
+      },
+      {
+        type: 'upsert',
+        order: makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          updatedAt: '2025-01-01T00:00:04+08:00',
+        }),
+      },
+    ]
+
+    const latest = latestUpsertUpdatedAt(events)
+    expect(latest.get('a')).toBe('2025-01-01T00:00:04+08:00')
+    expect(latest.get('b')).toBe('2025-01-01T00:00:02+08:00')
+  })
+
+  it('ignores remove and clear events', () => {
+    const events: RealtimeOrderEvent[] = [
+      upsert('a'),
+      remove('b'),
+      clearAll,
+      { type: 'upsert', order: makeOrder('c', '2025-01-01T00:00:00+08:00') },
+    ]
+
+    const latest = latestUpsertUpdatedAt(events)
+    expect(latest.get('a')).toBe('2025-01-01T00:00:00+08:00')
+    expect(latest.has('b')).toBe(false)
+    expect(latest.get('c')).toBe('2025-01-01T00:00:00+08:00')
+  })
+
+  it('returns an empty map for an empty event list', () => {
+    expect(latestUpsertUpdatedAt([]).size).toBe(0)
   })
 })
 

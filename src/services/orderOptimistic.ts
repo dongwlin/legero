@@ -65,10 +65,17 @@ export const orderOptimistic = {
   },
 
   /**
-   * Order ids whose optimistic state must survive a snapshot that started
-   * with the given marker: those pending at the start (the snapshot read may
-   * predate their completion) and those whose latest mutation began after
-   * the start (the snapshot read predates the mutation itself).
+   * Order ids whose mutations overlap the lifetime of a snapshot that
+   * started with the given marker: those pending at the start (the snapshot
+   * read may predate their completion) and those whose latest mutation began
+   * after the start (the snapshot read predates the mutation itself).
+   *
+   * The set only names the candidates: the caller decides at commit time how
+   * each one is protected. A still-pending mutation always wins (its
+   * completion or rollback owns the authoritative state), while a settled
+   * mutation only wins over the stale snapshot itself — a buffered realtime
+   * event with a strictly newer server version supersedes it. A plain
+   * Set<orderId> cannot express that distinction on its own.
    */
   idsToProtect(marker: MutationSnapshotMarker): Set<string> {
     const ids = new Set(marker.pendingIds)

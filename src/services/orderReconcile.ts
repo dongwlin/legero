@@ -107,6 +107,53 @@ export const reconcileSnapshotWithEvents = (
   return [...ordersById.values()]
 }
 
+/**
+ * Compares two server-issued `updatedAt` strings chronologically. Both are
+ * RFC3339 values produced by the backend's fixed-offset formatter, so
+ * Date.parse resolves them to comparable instants; unparseable values fall
+ * back to lexical order (which is still chronological for that formatter's
+ * canonical output). Returns a negative number when a predates b.
+ */
+export const compareUpdatedAt = (a: string, b: string): number => {
+  const aMs = Date.parse(a)
+  const bMs = Date.parse(b)
+
+  if (Number.isNaN(aMs) || Number.isNaN(bMs)) {
+    return a === b ? 0 : a < b ? -1 : 1
+  }
+
+  return aMs === bMs ? 0 : aMs < bMs ? -1 : 1
+}
+
+/**
+ * The newest server `updatedAt` per order id among the given (compacted)
+ * realtime events, for version comparisons against the store. Remove and
+ * clear events carry no version and are ignored: an order removed by the
+ * events is simply absent from the reconciled list and can never be
+ * resurrected by the overlay.
+ */
+export const latestUpsertUpdatedAt = (
+  events: RealtimeOrderEvent[],
+): Map<string, string> => {
+  const latest = new Map<string, string>()
+
+  for (const event of events) {
+    if (event.type !== 'upsert') {
+      continue
+    }
+
+    const current = latest.get(event.order.id)
+    if (
+      current === undefined ||
+      compareUpdatedAt(event.order.updatedAt, current) > 0
+    ) {
+      latest.set(event.order.id, event.order.updatedAt)
+    }
+  }
+
+  return latest
+}
+
 export type OrderEventBuffer = {
   readonly isReconciling: boolean
   beginReconciliation: () => void
