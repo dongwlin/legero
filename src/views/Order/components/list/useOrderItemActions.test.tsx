@@ -50,6 +50,16 @@ const flushAsync = async () => {
   }
 }
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 const resetStores = () => {
   localStorage.clear()
   useOrderStore.setState({
@@ -198,6 +208,86 @@ describe('useOrderItemActions optimistic mutations', () => {
     expect(orderOptimistic.hasPending('a')).toBe(false)
     expect(resync).not.toHaveBeenCalled()
     expect(result.current.mutationError).toBe('Failed to fetch')
+
+    stopResync()
+  })
+
+  it('does not let a late mutation response downgrade a newer realtime state', async () => {
+    const record = makeOrder('a', { version: 10, note: 'original' })
+    useOrderStore.getState().upsertOrder(record)
+
+    const pendingResponse = deferred<OrderRecord>()
+    mocks.toggleStep.mockReturnValue(pendingResponse.promise)
+
+    const { result } = renderHook(() => useOrderItemActions(record))
+
+    act(() => {
+      result.current.handleToggleStapleStep()
+    })
+
+    // The store holds the optimistic copy (v10) while the mutation is in
+    // flight; another client commits v12 and the realtime channel applies it.
+    act(() => {
+      useOrderStore.getState().upsertOrder(
+        makeOrder('a', { version: 12, note: 'remote-v12' }),
+      )
+    })
+
+    // Our own HTTP response (v11) settles later: the authoritative merge
+    // must not downgrade the store back to v11.
+    await act(async () => {
+      pendingResponse.resolve(
+        makeOrder('a', {
+          version: 11,
+          note: 'local-v11',
+          stapleStepStatusCode: STEP_STATUS.completed,
+        }),
+      )
+      await flushAsync()
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(12)
+    expect(order?.note).toBe('remote-v12')
+    expect(orderOptimistic.hasPending('a')).toBe(false)
+  })
+
+  it('does not let a conflict rollback downgrade a newer realtime state', async () => {
+    const record = makeOrder('a', { version: 10, note: 'original' })
+    useOrderStore.getState().upsertOrder(record)
+
+    mocks.toggleStep.mockRejectedValue(
+      new ApiError(409, 'order_conflict', '订单已被其他操作修改。'),
+    )
+
+    const resync = vi.fn()
+    const stopResync = subscribeOrdersResync(resync)
+
+    const { result } = renderHook(() => useOrderItemActions(record))
+
+    act(() => {
+      result.current.handleToggleStapleStep()
+    })
+
+    // Another client commits v11 while the mutation is in flight: the
+    // authoritative realtime state must survive the rollback of the stale
+    // optimistic copy (v10).
+    act(() => {
+      useOrderStore.getState().upsertOrder(
+        makeOrder('a', { version: 11, note: 'remote-v11' }),
+      )
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(11)
+    expect(order?.note).toBe('remote-v11')
+    expect(orderOptimistic.hasPending('a')).toBe(false)
+    expect(resync).toHaveBeenCalledTimes(1)
+    expect(result.current.mutationError).toBe('订单已被其他操作修改。')
 
     stopResync()
   })

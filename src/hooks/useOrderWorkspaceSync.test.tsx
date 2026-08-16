@@ -1198,4 +1198,179 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
     expect(useOrderStore.getState().ordersById['today']).toEqual(today)
   })
+
+  it('applies a higher-version realtime upsert while the mutation is still pending', async () => {
+    mocks.listOrders.mockResolvedValue([])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().status).toBe('ready')
+
+    // The user's mutation is still pending: the store holds the optimistic
+    // copy at the pre-mutation server version (10).
+    const optimisticA = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 10,
+      note: 'optimistic',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(optimisticA)
+    })
+
+    // Another client commits v12 while the mutation is pending: the realtime
+    // event is authoritative and must win over the optimistic prediction,
+    // even though the local HTTP response has not returned yet.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'remote-v12',
+        }),
+      )
+    })
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve())
+      })
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(12)
+    expect(order?.note).toBe('remote-v12')
+  })
+
+  it('keeps the optimistic record when the realtime echo carries the same version while the mutation is pending', async () => {
+    mocks.listOrders.mockResolvedValue([])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    const optimisticA = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 10,
+      note: 'optimistic',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(optimisticA)
+    })
+
+    // The echo of the pre-mutation server state (same version) must not
+    // overwrite the optimistic prediction of the still-pending mutation.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 10,
+          note: 'echo-v10',
+        }),
+      )
+    })
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve())
+      })
+    })
+
+    expect(useOrderStore.getState().ordersById['a']?.note).toBe('optimistic')
+  })
+
+  it('lets a higher-version buffered event win over a still-pending optimistic mutation at snapshot commit', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const optimisticA = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 10,
+      note: 'optimistic',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(optimisticA)
+    })
+
+    // Another client commits v12 while the snapshot is in flight and the
+    // mutation is still pending: the buffered event is authoritative state
+    // the pending mutation's completion or rollback cannot supersede.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'remote-v12',
+        }),
+      )
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 10,
+          note: 'stale-snapshot',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(12)
+    expect(order?.note).toBe('remote-v12')
+  })
+
+  it('lets a higher-version buffered event win over a still-pending optimistic mutation when the snapshot fails', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const optimisticA = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 10,
+      note: 'optimistic',
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(optimisticA)
+    })
+
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'remote-v12',
+        }),
+      )
+    })
+
+    await act(async () => {
+      snapshot.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(12)
+    expect(order?.note).toBe('remote-v12')
+  })
 })
