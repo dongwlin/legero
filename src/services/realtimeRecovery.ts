@@ -128,29 +128,27 @@ const startNativeRecoverySignals = (
       removeAppListener = () => appListener.remove()
 
       // Report the initial network and lifecycle state (the app may start
-      // while offline or already backgrounded). Each snapshot is fetched
-      // independently: a rejection from one plugin must not prevent the
-      // other from being captured.
-      const [networkStatus, appState] = await Promise.allSettled([
-        Network.getStatus(),
-        CapacitorApp.getState(),
-      ])
+      // while offline or already backgrounded). Each snapshot is applied as
+      // soon as its own call settles: a rejection or a hung plugin must not
+      // delay or prevent the other snapshot's signal.
+      const networkSnapshot = Network.getStatus()
+      const appSnapshot = CapacitorApp.getState()
 
-      if (
-        isActive &&
-        networkStatus.status === 'fulfilled' &&
-        !networkStatus.value.connected
-      ) {
-        handlers.onNetworkOffline()
-      }
+      const applyNetworkSnapshot = networkSnapshot.then((status) => {
+        if (isActive && !status.connected) {
+          handlers.onNetworkOffline()
+        }
+      })
 
-      if (
-        isActive &&
-        appState.status === 'fulfilled' &&
-        !appState.value.isActive
-      ) {
-        handlers.onAppBackground()
-      }
+      const applyAppSnapshot = appSnapshot.then((appState) => {
+        if (isActive && !appState.isActive) {
+          handlers.onAppBackground()
+        }
+      })
+
+      // Readiness waits for both snapshots to settle; a never-settling
+      // plugin call is released by the NATIVE_READY_TIMEOUT_MS safety window.
+      await Promise.allSettled([applyNetworkSnapshot, applyAppSnapshot])
     } catch {
       // A plugin registration failure (e.g. a broken native bridge) must not
       // surface as an unhandled rejection: the recovery signals stay silent

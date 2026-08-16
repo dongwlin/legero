@@ -331,6 +331,66 @@ describe('realtimeRecovery (native)', () => {
     controller.stop()
   })
 
+  it('applies the app snapshot immediately while the network status read hangs', async () => {
+    vi.useFakeTimers()
+
+    try {
+      mocks.networkGetStatus.mockImplementation(() => new Promise(() => {}))
+      mocks.appGetState.mockResolvedValue({ isActive: false })
+
+      const handlers = makeHandlers()
+      const controller = startRealtimeRecoverySignals(handlers)
+
+      await flushAsync()
+
+      // The settled snapshot must be applied without waiting for the hung
+      // plugin call (or the 5 s readiness safety window).
+      expect(handlers.onAppBackground).toHaveBeenCalledTimes(1)
+
+      // Readiness still waits for both snapshots, not just the settled one.
+      let readySettled = false
+      void controller.ready.then(() => {
+        readySettled = true
+      })
+      await flushAsync()
+      expect(readySettled).toBe(false)
+
+      controller.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('applies the network snapshot immediately while the app state read hangs', async () => {
+    vi.useFakeTimers()
+
+    try {
+      mocks.appGetState.mockImplementation(() => new Promise(() => {}))
+      mocks.networkGetStatus.mockResolvedValue({
+        connected: false,
+        connectionType: 'none',
+      })
+
+      const handlers = makeHandlers()
+      const controller = startRealtimeRecoverySignals(handlers)
+
+      await flushAsync()
+
+      expect(handlers.onNetworkOffline).toHaveBeenCalledTimes(1)
+
+      let readySettled = false
+      void controller.ready.then(() => {
+        readySettled = true
+      })
+      await flushAsync()
+      expect(readySettled).toBe(false)
+
+      controller.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('reports the initial snapshot before ready resolves', async () => {
     mocks.networkGetStatus.mockResolvedValue({
       connected: false,
