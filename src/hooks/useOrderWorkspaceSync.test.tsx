@@ -505,4 +505,81 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
 
     expect(useOrderStore.getState().ordersById['b']).toEqual(orderB)
   })
+
+  it('applies a clear immediately when no reconciliation is in flight, even if the follow-up snapshot fails', async () => {
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      first.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00'),
+        makeOrder('b', '2025-01-02T00:00:00+08:00'),
+      ])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeDefined()
+
+    // The clear arrives with no snapshot in flight: it must hit the store
+    // immediately, not only after the follow-up snapshot succeeds.
+    act(() => {
+      ws.onClear({ clearedCount: 2, mode: 'all' })
+    })
+    expect(useOrderStore.getState().ordersById).toEqual({})
+
+    // The follow-up snapshot fails: the locally-applied clear still holds.
+    await act(async () => {
+      second.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById).toEqual({})
+  })
+
+  it('applies a before_today clear immediately when no reconciliation is in flight', async () => {
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const today = todayOrder('today')
+    const yesterday = makeOrder('yesterday', '2020-01-01T10:00:00+08:00')
+
+    await act(async () => {
+      first.resolve([today, yesterday])
+      await flushAsync()
+    })
+
+    act(() => {
+      ws.onClear({ clearedCount: 1, mode: 'before_today' })
+    })
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+    expect(useOrderStore.getState().ordersById['yesterday']).toBeUndefined()
+
+    // The follow-up snapshot fails: the locally-applied clear still holds.
+    await act(async () => {
+      second.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+    expect(useOrderStore.getState().ordersById['yesterday']).toBeUndefined()
+  })
 })

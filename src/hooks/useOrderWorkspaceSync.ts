@@ -305,6 +305,11 @@ export const useOrderWorkspaceSync = () => {
                 return
               }
 
+              // No snapshot in flight: apply the clear semantics to the
+              // store immediately, so a failed follow-up snapshot cannot
+              // leave server-deleted orders behind (the follow-up then
+              // reconciles any boundary ambiguity).
+              applyClearToStore(event.mode)
               void syncSnapshot(false)
             }
           },
