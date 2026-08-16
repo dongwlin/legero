@@ -738,6 +738,47 @@ describe('orderRealtime connection lifecycle', () => {
     subscription.close()
   })
 
+  it('abandons an in-flight connecting attempt that spanned a long background', async () => {
+    mocks.realtimeSessionCreate.mockImplementation((signal?: AbortSignal) => {
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'))
+        })
+      })
+    })
+
+    const onSubscriptionStatus = vi.fn()
+    const subscription = subscribe({ onSubscriptionStatus })
+
+    await flushAsync()
+    const hungSignal = mocks.realtimeSessionCreate.mock.calls[0]?.[0] as
+      | AbortSignal
+      | undefined
+    expect(hungSignal).toBeDefined()
+    expect(hungSignal?.aborted).toBe(false)
+
+    // The app is backgrounded (e.g. OS suspend) while the session request is
+    // still in flight; the handshake cannot complete while frozen.
+    recoveryHandlers().onAppBackground()
+    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS)
+
+    // Foreground: the old attempt must be invalidated and exactly one fresh
+    // connection flow must start.
+    mocks.realtimeSessionCreate.mockResolvedValue(SESSION)
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+
+    expect(hungSignal?.aborted).toBe(true)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('SUBSCRIBED')
+
+    subscription.close()
+  })
+
   it('keeps a healthy online socket after a short background', async () => {
     const subscription = subscribe()
     await flushAsync()
@@ -748,6 +789,30 @@ describe('orderRealtime connection lifecycle', () => {
     recoveryHandlers().onAppBackground()
     await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS - 1_000)
 
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+
+    expect(socket.closeCalls).toHaveLength(0)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('does not rebuild the socket on a duplicate foreground after a short background', async () => {
+    const subscription = subscribe()
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    // Short background, then a normal foreground: the socket is kept.
+    recoveryHandlers().onAppBackground()
+    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS - 1_000)
+    recoveryHandlers().onAppForeground()
+
+    // A later duplicate foreground signal must not re-judge the socket
+    // against the old (already consumed) background timestamp.
+    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS)
     recoveryHandlers().onAppForeground()
     await flushAsync()
 

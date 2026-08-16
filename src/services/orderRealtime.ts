@@ -341,19 +341,25 @@ export const orderRealtime = {
     const handleAppForeground = () => {
       isBackgrounded = false
 
+      // Consume the background duration immediately: a later duplicate or
+      // spurious foreground signal must not re-judge the socket against this
+      // background's timestamp.
+      const backgroundDuration =
+        backgroundedAt > 0 ? Date.now() - backgroundedAt : 0
+      backgroundedAt = 0
+
       if (isClosed() || !networkOnline) {
         return
       }
 
       clearReconnectTimer()
 
+      const staleAfterBackground = backgroundDuration >= BACKGROUND_STALE_MS
+
       if (state === 'online') {
         // A long background session is presumed to have torn down the socket;
         // rebuild it. Short backgrounds keep the healthy connection.
-        if (
-          backgroundedAt > 0 &&
-          Date.now() - backgroundedAt >= BACKGROUND_STALE_MS
-        ) {
+        if (staleAfterBackground) {
           invalidateActiveSocket(1000, 'foreground_recovery')
           void connect()
         }
@@ -361,7 +367,14 @@ export const orderRealtime = {
       }
 
       if (state === 'connecting') {
-        // An attempt is already in flight; let it finish.
+        // An in-flight attempt that spanned a long background is presumed
+        // stale: its auth refresh / session request / handshake may be hung
+        // on a frozen network. Abandon it (generation bump + abort) and start
+        // a fresh flow instead of trusting it to finish.
+        if (staleAfterBackground) {
+          invalidateActiveSocket(1000, 'foreground_recovery')
+          void connect()
+        }
         return
       }
 
