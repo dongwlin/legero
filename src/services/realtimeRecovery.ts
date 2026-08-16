@@ -14,9 +14,27 @@ export type RealtimeRecoveryHandlers = {
   onAppForeground: () => void
 }
 
+export type RealtimeRecoveryController = {
+  // Resolves once the initial network and app lifecycle state has been
+  // captured (or is unreachable). On web the snapshot is read synchronously,
+  // so this is already resolved; on native the Capacitor plugin calls are
+  // asynchronous, and the realtime channel must defer its first connect until
+  // this resolves or a subscription created while offline/backgrounded would
+  // still burn an auth/session request before the gate is known.
+  ready: Promise<void>
+  stop: () => void
+}
+
+// Native plugin calls (listener registration plus the initial status reads)
+// can in principle never settle on a broken bridge; without a bound the first
+// connect would be deferred forever. After this safety window readiness is
+// declared with the default (online, foreground) state, and the timer-based
+// reconnect machine remains the fallback.
+export const NATIVE_READY_TIMEOUT_MS = 5_000
+
 const startWebRecoverySignals = (
   handlers: RealtimeRecoveryHandlers,
-): (() => void) => {
+): RealtimeRecoveryController => {
   const handleOnline = () => {
     handlers.onNetworkOnline()
   }
@@ -48,93 +66,119 @@ const startWebRecoverySignals = (
     handlers.onAppBackground()
   }
 
-  return () => {
-    window.removeEventListener('online', handleOnline)
-    window.removeEventListener('offline', handleOffline)
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  return {
+    // The web initial state was read synchronously above.
+    ready: Promise.resolve(),
+    stop: () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    },
   }
 }
 
 const startNativeRecoverySignals = (
   handlers: RealtimeRecoveryHandlers,
-): (() => void) => {
+): RealtimeRecoveryController => {
   let removeNetworkListener: (() => Promise<void>) | null = null
   let removeAppListener: (() => Promise<void>) | null = null
   let isActive = true
 
+  let markReady: (() => void) | null = null
+  const ready = new Promise<void>((resolve) => {
+    markReady = resolve
+  })
+
   const register = async () => {
-    const networkListener = await Network.addListener(
-      'networkStatusChange',
-      (status) => {
-        if (status.connected) {
-          handlers.onNetworkOnline()
-        } else {
-          handlers.onNetworkOffline()
-        }
-      },
-    )
+    try {
+      const networkListener = await Network.addListener(
+        'networkStatusChange',
+        (status) => {
+          if (status.connected) {
+            handlers.onNetworkOnline()
+          } else {
+            handlers.onNetworkOffline()
+          }
+        },
+      )
 
-    if (!isActive) {
-      await networkListener.remove()
-      return
-    }
+      if (!isActive) {
+        await networkListener.remove()
+        return
+      }
 
-    removeNetworkListener = () => networkListener.remove()
+      removeNetworkListener = () => networkListener.remove()
 
-    const appListener = await CapacitorApp.addListener(
-      'appStateChange',
-      ({ isActive: appIsActive }) => {
-        if (appIsActive) {
-          handlers.onAppForeground()
-        } else {
-          handlers.onAppBackground()
-        }
-      },
-    )
+      const appListener = await CapacitorApp.addListener(
+        'appStateChange',
+        ({ isActive: appIsActive }) => {
+          if (appIsActive) {
+            handlers.onAppForeground()
+          } else {
+            handlers.onAppBackground()
+          }
+        },
+      )
 
-    if (!isActive) {
-      await appListener.remove()
-      return
-    }
+      if (!isActive) {
+        await appListener.remove()
+        return
+      }
 
-    removeAppListener = () => appListener.remove()
+      removeAppListener = () => appListener.remove()
 
-    // Report the initial network and lifecycle state (the app may start
-    // while offline or already backgrounded).
-    const status = await Network.getStatus()
+      // Report the initial network and lifecycle state (the app may start
+      // while offline or already backgrounded).
+      const status = await Network.getStatus()
 
-    if (isActive && !status.connected) {
-      handlers.onNetworkOffline()
-    }
+      if (isActive && !status.connected) {
+        handlers.onNetworkOffline()
+      }
 
-    const appState = await CapacitorApp.getState()
+      const appState = await CapacitorApp.getState()
 
-    if (isActive && !appState.isActive) {
-      handlers.onAppBackground()
+      if (isActive && !appState.isActive) {
+        handlers.onAppBackground()
+      }
+    } catch {
+      // A plugin registration failure (e.g. a broken native bridge) must not
+      // surface as an unhandled rejection: the recovery signals stay silent
+      // and the timer-based reconnect state machine remains the fallback.
+    } finally {
+      // The initial snapshot is determined (or unreachable): release the
+      // first connect.
+      markReady?.()
     }
   }
 
-  // A plugin registration failure (e.g. a broken native bridge) must not
-  // surface as an unhandled rejection: the recovery signals stay silent and
-  // the timer-based reconnect state machine remains the fallback.
-  void register().catch(() => {})
+  void register()
 
-  return () => {
-    isActive = false
+  // Safety net for a hung plugin bridge: a never-settling plugin call would
+  // otherwise defer the first connect forever.
+  const readinessFallback = window.setTimeout(() => {
+    markReady?.()
+  }, NATIVE_READY_TIMEOUT_MS)
 
-    if (removeNetworkListener) {
-      void removeNetworkListener()
-    }
+  return {
+    ready,
+    stop: () => {
+      isActive = false
+      window.clearTimeout(readinessFallback)
 
-    if (removeAppListener) {
-      void removeAppListener()
-    }
+      if (removeNetworkListener) {
+        void removeNetworkListener()
+      }
+
+      if (removeAppListener) {
+        void removeAppListener()
+      }
+    },
   }
 }
 
 export const startRealtimeRecoverySignals = (
   handlers: RealtimeRecoveryHandlers,
-): (() => void) => {
+): RealtimeRecoveryController => {
   if (Capacitor.isNativePlatform()) {
     return startNativeRecoverySignals(handlers)
   }

@@ -537,9 +537,16 @@ export const orderRealtime = {
       onAppBackground: handleAppBackground,
       onAppForeground: handleAppForeground,
     }
-    stopRecoverySignals = startRealtimeRecoverySignals(recoveryHandlers)
+    const recovery = startRealtimeRecoverySignals(recoveryHandlers)
+    stopRecoverySignals = recovery.stop
 
-    void connect()
+    // The recovery initialization reports the initial network and lifecycle
+    // state; on native that snapshot is read asynchronously (Capacitor plugin
+    // calls), so the first connect must wait for it — otherwise a subscription
+    // created while offline or backgrounded would still burn an auth/session
+    // request before the gate is known. On web the snapshot is synchronous
+    // and the ready promise is already resolved.
+    void recovery.ready.then(() => void connect())
 
     return {
       close: () => {

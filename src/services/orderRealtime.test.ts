@@ -161,7 +161,7 @@ describe('orderRealtime connection lifecycle', () => {
     mocks.realtimeSessionCreate.mockReset().mockResolvedValue(SESSION)
     mocks.startRealtimeRecoverySignals
       .mockReset()
-      .mockReturnValue(() => {})
+      .mockReturnValue({ ready: Promise.resolve(), stop: () => {} })
   })
 
   afterEach(() => {
@@ -569,7 +569,10 @@ describe('orderRealtime connection lifecycle', () => {
 
   it('unregisters recovery signals on close', async () => {
     const stopRecoverySignals = vi.fn()
-    mocks.startRealtimeRecoverySignals.mockReturnValue(stopRecoverySignals)
+    mocks.startRealtimeRecoverySignals.mockReturnValue({
+      ready: Promise.resolve(),
+      stop: stopRecoverySignals,
+    })
 
     const subscription = subscribe()
     await flushAsync()
@@ -926,7 +929,7 @@ describe('orderRealtime connection lifecycle', () => {
     mocks.startRealtimeRecoverySignals.mockImplementation(
       (handlers: RecoveryHandlers) => {
         handlers.onAppBackground()
-        return () => {}
+        return { ready: Promise.resolve(), stop: () => {} }
       },
     )
 
@@ -948,7 +951,7 @@ describe('orderRealtime connection lifecycle', () => {
     mocks.startRealtimeRecoverySignals.mockImplementation(
       (handlers: RecoveryHandlers) => {
         handlers.onNetworkOffline()
-        return () => {}
+        return { ready: Promise.resolve(), stop: () => {} }
       },
     )
 
@@ -962,6 +965,78 @@ describe('orderRealtime connection lifecycle', () => {
     recoveryHandlers().onNetworkOnline()
     await flushAsync()
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('waits for the native initial state snapshot before the first connect', async () => {
+    const readyState: { markReady: (() => void) | null } = { markReady: null }
+    const ready = new Promise<void>((resolve) => {
+      readyState.markReady = resolve
+    })
+
+    mocks.startRealtimeRecoverySignals.mockImplementation(
+      (handlers: RecoveryHandlers) => {
+        // Native plugin calls resolve asynchronously: the initial offline
+        // state is only known after subscribe() has returned. This is the
+        // race the recovery ready promise must close.
+        void Promise.resolve().then(() => handlers.onNetworkOffline())
+        return { ready, stop: () => {} }
+      },
+    )
+
+    const subscription = subscribe()
+
+    await flushAsync()
+    // The initial snapshot is still pending: no auth/session request may be
+    // started while the gate is unknown.
+    expect(mocks.ensureFreshAuthTokens).not.toHaveBeenCalled()
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    readyState.markReady?.()
+    await flushAsync()
+    // The snapshot reported offline: the first connect is gated, not started.
+    expect(mocks.ensureFreshAuthTokens).not.toHaveBeenCalled()
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    // Network recovery starts the flow.
+    recoveryHandlers().onNetworkOnline()
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('waits for the native app-state snapshot before the first connect', async () => {
+    const readyState: { markReady: (() => void) | null } = { markReady: null }
+    const ready = new Promise<void>((resolve) => {
+      readyState.markReady = resolve
+    })
+
+    mocks.startRealtimeRecoverySignals.mockImplementation(
+      (handlers: RecoveryHandlers) => {
+        // The initial app state (e.g. already backgrounded) is reported
+        // asynchronously on native, after subscribe() has returned.
+        void Promise.resolve().then(() => handlers.onAppBackground())
+        return { ready, stop: () => {} }
+      },
+    )
+
+    const subscription = subscribe()
+
+    await flushAsync()
+    expect(mocks.ensureFreshAuthTokens).not.toHaveBeenCalled()
+
+    readyState.markReady?.()
+    await flushAsync()
+    // Backgrounded from the start: still no futile auth/session request.
+    expect(mocks.ensureFreshAuthTokens).not.toHaveBeenCalled()
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    // Foreground recovery starts the flow.
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+    expect(mocks.ensureFreshAuthTokens).toHaveBeenCalledTimes(1)
 
     subscription.close()
   })

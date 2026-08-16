@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { startRealtimeRecoverySignals } from './realtimeRecovery'
+import { NATIVE_READY_TIMEOUT_MS, startRealtimeRecoverySignals } from './realtimeRecovery'
 import type { RealtimeRecoveryHandlers } from './realtimeRecovery'
 
 const mocks = vi.hoisted(() => ({
@@ -51,7 +51,7 @@ describe('realtimeRecovery (web fallback)', () => {
 
   it('wires window online/offline events and stops on cleanup', () => {
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     window.dispatchEvent(new Event('offline'))
     expect(handlers.onNetworkOffline).toHaveBeenCalledTimes(1)
@@ -59,7 +59,7 @@ describe('realtimeRecovery (web fallback)', () => {
     window.dispatchEvent(new Event('online'))
     expect(handlers.onNetworkOnline).toHaveBeenCalledTimes(1)
 
-    stop()
+    controller.stop()
     window.dispatchEvent(new Event('offline'))
     window.dispatchEvent(new Event('online'))
     expect(handlers.onNetworkOffline).toHaveBeenCalledTimes(1)
@@ -68,7 +68,7 @@ describe('realtimeRecovery (web fallback)', () => {
 
   it('maps visibilitychange to app background and foreground', () => {
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
@@ -84,7 +84,7 @@ describe('realtimeRecovery (web fallback)', () => {
     document.dispatchEvent(new Event('visibilitychange'))
     expect(handlers.onAppForeground).toHaveBeenCalledTimes(1)
 
-    stop()
+    controller.stop()
   })
 
   it('reports the initial network state when the browser is offline', () => {
@@ -96,11 +96,11 @@ describe('realtimeRecovery (web fallback)', () => {
 
     try {
       const handlers = makeHandlers()
-      const stop = startRealtimeRecoverySignals(handlers)
+      const controller = startRealtimeRecoverySignals(handlers)
 
       expect(handlers.onNetworkOffline).toHaveBeenCalledTimes(1)
 
-      stop()
+      controller.stop()
     } finally {
       if (originalDescriptor) {
         Object.defineProperty(navigator, 'onLine', originalDescriptor)
@@ -112,11 +112,11 @@ describe('realtimeRecovery (web fallback)', () => {
 
   it('does not report offline when the browser starts online', () => {
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     expect(handlers.onNetworkOffline).not.toHaveBeenCalled()
 
-    stop()
+    controller.stop()
   })
 
   it('reports background when the page starts hidden', () => {
@@ -126,11 +126,11 @@ describe('realtimeRecovery (web fallback)', () => {
     })
 
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     expect(handlers.onAppBackground).toHaveBeenCalledTimes(1)
 
-    stop()
+    controller.stop()
   })
 
   it('does not report background when the page starts visible', () => {
@@ -140,11 +140,21 @@ describe('realtimeRecovery (web fallback)', () => {
     })
 
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     expect(handlers.onAppBackground).not.toHaveBeenCalled()
 
-    stop()
+    controller.stop()
+  })
+
+  it('resolves ready immediately on web', async () => {
+    const controller = startRealtimeRecoverySignals(makeHandlers())
+
+    // The web initial state is read synchronously, so the first connect must
+    // not be deferred.
+    await expect(controller.ready).resolves.toBeUndefined()
+
+    controller.stop()
   })
 })
 
@@ -165,7 +175,7 @@ describe('realtimeRecovery (native)', () => {
 
   it('wires native network and app lifecycle listeners', async () => {
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     await flushAsync()
 
@@ -194,19 +204,19 @@ describe('realtimeRecovery (native)', () => {
     appCallback({ isActive: true })
     expect(handlers.onAppForeground).toHaveBeenCalledTimes(1)
 
-    stop()
+    controller.stop()
   })
 
   it('reports offline when the native app starts without connectivity', async () => {
     mocks.networkGetStatus.mockResolvedValue({ connected: false, connectionType: 'none' })
 
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     await flushAsync()
     expect(handlers.onNetworkOffline).toHaveBeenCalledTimes(1)
 
-    stop()
+    controller.stop()
   })
 
   it('removes native listeners on stop', async () => {
@@ -215,10 +225,10 @@ describe('realtimeRecovery (native)', () => {
     mocks.networkAddListener.mockResolvedValue({ remove: removeNetwork })
     mocks.appAddListener.mockResolvedValue({ remove: removeApp })
 
-    const stop = startRealtimeRecoverySignals(makeHandlers())
+    const controller = startRealtimeRecoverySignals(makeHandlers())
 
     await flushAsync()
-    stop()
+    controller.stop()
     await flushAsync()
 
     expect(removeNetwork).toHaveBeenCalledTimes(1)
@@ -229,22 +239,22 @@ describe('realtimeRecovery (native)', () => {
     mocks.appGetState.mockResolvedValue({ isActive: false })
 
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     await flushAsync()
     expect(handlers.onAppBackground).toHaveBeenCalledTimes(1)
 
-    stop()
+    controller.stop()
   })
 
   it('does not report background when the app starts in the foreground', async () => {
     const handlers = makeHandlers()
-    const stop = startRealtimeRecoverySignals(handlers)
+    const controller = startRealtimeRecoverySignals(handlers)
 
     await flushAsync()
     expect(handlers.onAppBackground).not.toHaveBeenCalled()
 
-    stop()
+    controller.stop()
   })
 
   it('keeps cleanup idempotent when stopped before listeners are registered', async () => {
@@ -252,8 +262,8 @@ describe('realtimeRecovery (native)', () => {
       () => new Promise(() => {}),
     )
 
-    const stop = startRealtimeRecoverySignals(makeHandlers())
-    stop()
+    const controller = startRealtimeRecoverySignals(makeHandlers())
+    controller.stop()
     await flushAsync()
 
     expect(mocks.networkAddListener).toHaveBeenCalledTimes(1)
@@ -262,9 +272,9 @@ describe('realtimeRecovery (native)', () => {
   it('swallows a network listener registration rejection', async () => {
     mocks.networkAddListener.mockRejectedValue(new Error('bridge broken'))
 
-    const stop = startRealtimeRecoverySignals(makeHandlers())
+    const controller = startRealtimeRecoverySignals(makeHandlers())
     await flushAsync()
-    stop()
+    controller.stop()
   })
 
   it('swallows an app listener registration rejection and still removes the network listener', async () => {
@@ -272,9 +282,9 @@ describe('realtimeRecovery (native)', () => {
     mocks.networkAddListener.mockResolvedValue({ remove: removeNetwork })
     mocks.appAddListener.mockRejectedValue(new Error('bridge broken'))
 
-    const stop = startRealtimeRecoverySignals(makeHandlers())
+    const controller = startRealtimeRecoverySignals(makeHandlers())
     await flushAsync()
-    stop()
+    controller.stop()
     await flushAsync()
 
     expect(removeNetwork).toHaveBeenCalledTimes(1)
@@ -283,8 +293,70 @@ describe('realtimeRecovery (native)', () => {
   it('swallows an initial status read rejection', async () => {
     mocks.networkGetStatus.mockRejectedValue(new Error('bridge broken'))
 
-    const stop = startRealtimeRecoverySignals(makeHandlers())
+    const controller = startRealtimeRecoverySignals(makeHandlers())
     await flushAsync()
-    stop()
+    controller.stop()
+  })
+
+  it('reports the initial snapshot before ready resolves', async () => {
+    mocks.networkGetStatus.mockResolvedValue({
+      connected: false,
+      connectionType: 'none',
+    })
+
+    const handlers = makeHandlers()
+    const order: string[] = []
+    vi.mocked(handlers.onNetworkOffline).mockImplementation(() => {
+      order.push('snapshot')
+    })
+
+    const controller = startRealtimeRecoverySignals(handlers)
+    void controller.ready.then(() => {
+      order.push('ready')
+    })
+
+    await flushAsync()
+
+    // The realtime channel gates its first connect on ready, so the snapshot
+    // must be reported before ready resolves — otherwise the gate is useless.
+    expect(order).toEqual(['snapshot', 'ready'])
+
+    controller.stop()
+  })
+
+  it('resolves ready when listener registration fails', async () => {
+    mocks.networkAddListener.mockRejectedValue(new Error('bridge broken'))
+
+    const controller = startRealtimeRecoverySignals(makeHandlers())
+    await expect(controller.ready).resolves.toBeUndefined()
+
+    controller.stop()
+  })
+
+  it('resolves ready through the safety window when the bridge hangs', async () => {
+    vi.useFakeTimers()
+
+    try {
+      mocks.networkAddListener.mockImplementation(() => new Promise(() => {}))
+
+      const controller = startRealtimeRecoverySignals(makeHandlers())
+      let readySettled = false
+      void controller.ready.then(() => {
+        readySettled = true
+      })
+
+      expect(readySettled).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(NATIVE_READY_TIMEOUT_MS - 1)
+      expect(readySettled).toBe(false)
+
+      // A hung plugin bridge must not defer the first connect forever.
+      await vi.advanceTimersByTimeAsync(1)
+      expect(readySettled).toBe(true)
+
+      controller.stop()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
