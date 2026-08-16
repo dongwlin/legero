@@ -1,6 +1,7 @@
 import type { ClearWorkspaceMode } from '@/services/apiTypes'
 import { isOrderCreatedToday } from '@/services/orderDomainUtils'
 import type { LocalMutationEffect } from '@/services/orderOptimistic'
+import { orderTombstones } from '@/services/orderTombstones'
 import type { OrderRecord } from '@/types'
 
 /**
@@ -216,9 +217,14 @@ export const reconcileSnapshotWithEvents = (
           // Every id in the snapshot at this point existed before the clear
           // (the snapshot was requested before the clear event arrived, and
           // any pre-clear buffered event was compacted away), so the clear
-          // terminally deletes each of them.
+          // terminally deletes each of them. Locally they are dropped right
+          // here; session-wide they are parked as pending epoch tombstones so
+          // a later reconciliation can never resurrect them before the
+          // post-clear follow-up snapshot confirms the cleared state (see
+          // orderTombstones.confirmClearEpoch).
           for (const id of ordersById.keys()) {
             tombstonedByClear.add(id)
+            orderTombstones.blockPendingClear(id)
           }
 
           ordersById.clear()

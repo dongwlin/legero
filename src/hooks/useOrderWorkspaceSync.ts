@@ -78,6 +78,12 @@ export const useOrderWorkspaceSync = () => {
     let syncInFlight = false
     let pendingReconcile = false
     let pendingReconcileShouldBlock = false
+    // Ids received in the current reconciliation window before its first
+    // clear event: they existed before the clear (the channel is ordered), so
+    // at the clear's receipt they are known to predate it and a full clear
+    // terminally deletes them. Reset per window (see syncSnapshot).
+    let windowPreClearIds = new Set<string>()
+    let windowSawClear = false
 
     const flushBatched = () => {
       flushRafId = null
@@ -198,12 +204,16 @@ export const useOrderWorkspaceSync = () => {
     // terminal deletion barrier for the ids the client knows before the
     // store is touched, so a later stale statement for any of them is
     // dropped at the gates instead of being applied to the (now empty or
-    // filtered) store slots.
+    // filtered) store slots. A full clear additionally opens the clear epoch
+    // barrier: ids whose existence is only learned later — through the
+    // in-flight snapshot base — may still predate the clear, and they stay
+    // blocked until a post-clear snapshot confirms the cleared state.
     const applyClearToStore = (mode: ClearWorkspaceMode) => {
       const store = useOrderStore.getState()
 
       if (mode === 'all') {
         tombstoneClearedIds('all')
+        orderTombstones.bumpClearEpoch()
         store.clearOrders()
         return
       }
@@ -286,6 +296,14 @@ export const useOrderWorkspaceSync = () => {
       flushBatched()
       const snapshotMarker = orderOptimistic.captureSnapshotMarker()
       eventBuffer.beginReconciliation()
+      // Per-window clear-barrier bookkeeping: ids received before this
+      // window's first clear are known to predate it (see onClear), and the
+      // epoch value captured here decides at commit time whether this
+      // snapshot is guaranteed post-clear — a snapshot requested after the
+      // clear event was received — and may confirm the barrier.
+      windowPreClearIds = new Set()
+      windowSawClear = false
+      const clearEpochAtStart = orderTombstones.clearEpochValue()
 
       try {
         const nextOrders = await orderRepository.list('all')
@@ -313,17 +331,38 @@ export const useOrderWorkspaceSync = () => {
         const events = eventBuffer.endReconciliation()
         const effects = orderOptimistic.effectsAfter(snapshotMarker)
 
+        const reconciled = applyLocalRemoveEffects(
+          reconcileSnapshotWithEvents(
+            applyLocalUpsertEffects(nextOrders, effects),
+            events,
+          ),
+          effects,
+        )
+        const protectedOrders = overlayProtectedRecords(
+          reconciled,
+          orderOptimistic.idsToProtect(snapshotMarker),
+        )
+
+        // A snapshot requested after the clear event was received reflects
+        // the post-clear server state (the clear committed before its event
+        // was broadcast), so it confirms the clear epoch: pending ids it does
+        // not contain were terminally deleted by the clear and become
+        // permanent tombstones, while ids it contains lived through the clear
+        // and are released. A snapshot already in flight when the clear
+        // arrived (`clearEpochAtStart` predates the bump) may carry pre-clear
+        // state and must not confirm — its base ids keep riding the pending
+        // barrier until the follow-up lands.
+        if (
+          orderTombstones.isClearEpochOpen() &&
+          orderTombstones.clearEpochValue() === clearEpochAtStart
+        ) {
+          orderTombstones.confirmClearEpoch(
+            new Set(protectedOrders.map((order) => order.id)),
+          )
+        }
+
         setOrders(
-          overlayProtectedRecords(
-            applyLocalRemoveEffects(
-              reconcileSnapshotWithEvents(
-                applyLocalUpsertEffects(nextOrders, effects),
-                events,
-              ),
-              effects,
-            ),
-            orderOptimistic.idsToProtect(snapshotMarker),
-          ).filter((order) => !orderTombstones.rejectsUpsert(order)),
+          protectedOrders.filter((order) => !orderTombstones.rejectsUpsert(order)),
         )
       } catch (error) {
         if (isDisposed) {
@@ -407,7 +446,13 @@ export const useOrderWorkspaceSync = () => {
               if (eventBuffer.isReconciling) {
                 // Buffer the server event: at commit time it is replayed over
                 // the snapshot with version-aware merges, so it survives even
-                // when the order has an in-flight optimistic mutation.
+                // when the order has an in-flight optimistic mutation. Ids
+                // received before this window's first clear are remembered —
+                // they predate the clear (the channel is ordered) and a full
+                // clear terminally deletes them at its receipt.
+                if (!windowSawClear) {
+                  windowPreClearIds.add(order.id)
+                }
                 eventBuffer.push({ type: 'upsert', order })
                 return
               }
@@ -438,6 +483,11 @@ export const useOrderWorkspaceSync = () => {
               pendingUpserts.delete(id)
 
               if (eventBuffer.isReconciling) {
+                // Same pre-clear-window bookkeeping as onUpsert: the removed
+                // id existed before a clear that may follow in this window.
+                if (!windowSawClear) {
+                  windowPreClearIds.add(id)
+                }
                 eventBuffer.push({ type: 'remove', id })
                 return
               }
@@ -456,9 +506,24 @@ export const useOrderWorkspaceSync = () => {
                 // keeps part of the list). Client-known ids are tombstoned at
                 // receipt — not at replay — so a stale delayed upsert of a
                 // cleared id that arrives later in the window is dropped at
-                // the onUpsert gate instead of entering the buffer.
+                // the onUpsert gate instead of entering the buffer. Ids
+                // received earlier in this window arrived before the clear
+                // over the ordered channel, so they existed pre-clear too.
+                windowSawClear = true
+
                 if (event.mode === 'all') {
                   tombstoneClearedIds('all')
+
+                  for (const id of windowPreClearIds) {
+                    orderTombstones.markRemoved(id)
+                  }
+
+                  // Open the full-clear epoch barrier: ids only discovered
+                  // later — like the in-flight snapshot base, whose ids the
+                  // reconciliation parks via blockPendingClear — may still
+                  // predate the clear and stay blocked until a post-clear
+                  // snapshot confirms the cleared state.
+                  orderTombstones.bumpClearEpoch()
                 } else {
                   tombstoneClearedIds('before_today')
                   orderTombstones.markBeforeTodayClear()

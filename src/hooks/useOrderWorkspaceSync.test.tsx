@@ -2230,4 +2230,171 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
     expect(useOrderStore.getState().ordersById['today']).toEqual(today)
   })
+
+  it('keeps a full-clear tombstone for a snapshot-only id across the follow-up reconciliation', async () => {
+    // Review blocker P1: 'a' exists only in the in-flight snapshot base — it
+    // was never in the store and no buffered event mentioned it, so no
+    // receipt-time tombstone exists. The clear barrier must survive past the
+    // first reconciliation (where the base wipe is only local to the replay)
+    // into the follow-up window, or a delayed stale upsert of 'a' would be
+    // accepted as a brand-new order there and resurrect the cleared order.
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    expect(mocks.listOrders).toHaveBeenCalledTimes(1)
+
+    // The store is empty, so the buffered full clear has no store-known ids
+    // to tombstone — it only opens the clear epoch barrier.
+    act(() => {
+      ws.onClear({ clearedCount: 1, mode: 'all' })
+    })
+    expect(orderTombstones.isClearEpochOpen()).toBe(true)
+
+    // Snapshot #1 (read before the clear) still contains 'a': the reconciled
+    // replay wipes it, and the id joins the pending clear barrier.
+    await act(async () => {
+      first.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 }),
+      ])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(mocks.listOrders).toHaveBeenCalledTimes(2)
+
+    // A stale delayed upsert of 'a' arrives while the follow-up snapshot is
+    // in flight: 'a' rides the pending clear barrier, so it is dropped at the
+    // onUpsert gate instead of entering the follow-up buffer.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+
+    await act(async () => {
+      second.resolve([])
+      await flushAsync()
+    })
+
+    // The post-clear follow-up confirmed the cleared state: 'a' became a
+    // permanent tombstone, so it stays absent.
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(orderTombstones.has('a')).toBe(true)
+    expect(useOrderStore.getState().status).toBe('ready')
+  })
+
+  it('tombstones ids buffered before a full clear for the whole session', async () => {
+    // Review blocker P1, buffer-known source: snapshot #1's window received
+    // an upsert of 'x' before the clear arrived, so 'x' existed pre-clear.
+    // The full clear terminally deletes it — not just inside window #1 (where
+    // the compaction drops it) but for every later window too, so a delayed
+    // upsert in the follow-up window cannot resurrect it.
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const orderX = makeOrder('x', '2025-01-01T00:00:00+08:00', { version: 11 })
+
+    act(() => {
+      ws.onUpsert(orderX)
+      ws.onClear({ clearedCount: 1, mode: 'all' })
+    })
+    // The id seen before the clear in this window is tombstoned at receipt.
+    expect(orderTombstones.has('x')).toBe(true)
+
+    await act(async () => {
+      first.resolve([])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['x']).toBeUndefined()
+    expect(mocks.listOrders).toHaveBeenCalledTimes(2)
+
+    // The follow-up window receives another delayed upsert of the same id: it
+    // must not be treated as a fresh post-clear order.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('x', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+
+    await act(async () => {
+      second.resolve([])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['x']).toBeUndefined()
+  })
+
+  it('lets a post-clear creation confirmed by the follow-up snapshot survive the clear epoch', async () => {
+    // The epoch barrier must not over-block: an order created after the clear
+    // uses a fresh uuid and can legitimately appear in the in-flight snapshot
+    // base (the snapshot may have been served from post-clear state). It is
+    // parked by the first replay, but once the follow-up post-clear snapshot
+    // confirms it, the pending barrier must release it — not tombstone it.
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The clear is buffered while snapshot #1 is in flight; the snapshot was
+    // served after the clear and already contains the fresh order 'f'.
+    act(() => {
+      ws.onClear({ clearedCount: 0, mode: 'all' })
+    })
+
+    const fresh = makeOrder('f', '2025-01-02T00:00:00+08:00', {
+      version: 1,
+      note: 'fresh',
+    })
+
+    // The ambiguous first snapshot parks 'f' and drops it from the store.
+    await act(async () => {
+      first.resolve([fresh])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['f']).toBeUndefined()
+    expect(mocks.listOrders).toHaveBeenCalledTimes(2)
+
+    // The guaranteed-post-clear follow-up confirms the fresh order: it
+    // survives the epoch and lands in the store.
+    await act(async () => {
+      second.resolve([fresh])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['f']).toEqual(fresh)
+    expect(orderTombstones.has('f')).toBe(false)
+    expect(useOrderStore.getState().status).toBe('ready')
+  })
 })
