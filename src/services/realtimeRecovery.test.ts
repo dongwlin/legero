@@ -298,6 +298,39 @@ describe('realtimeRecovery (native)', () => {
     controller.stop()
   })
 
+  it('still captures the app snapshot when the network status read rejects', async () => {
+    mocks.networkGetStatus.mockRejectedValue(new Error('bridge broken'))
+    mocks.appGetState.mockResolvedValue({ isActive: false })
+
+    const handlers = makeHandlers()
+    const controller = startRealtimeRecoverySignals(handlers)
+
+    await flushAsync()
+    expect(mocks.appGetState).toHaveBeenCalledTimes(1)
+    expect(handlers.onAppBackground).toHaveBeenCalledTimes(1)
+    expect(handlers.onNetworkOffline).not.toHaveBeenCalled()
+
+    controller.stop()
+  })
+
+  it('still captures the network snapshot when the app state read rejects', async () => {
+    mocks.appGetState.mockRejectedValue(new Error('bridge broken'))
+    mocks.networkGetStatus.mockResolvedValue({
+      connected: false,
+      connectionType: 'none',
+    })
+
+    const handlers = makeHandlers()
+    const controller = startRealtimeRecoverySignals(handlers)
+
+    await flushAsync()
+    expect(mocks.networkGetStatus).toHaveBeenCalledTimes(1)
+    expect(handlers.onNetworkOffline).toHaveBeenCalledTimes(1)
+    expect(handlers.onAppBackground).not.toHaveBeenCalled()
+
+    controller.stop()
+  })
+
   it('reports the initial snapshot before ready resolves', async () => {
     mocks.networkGetStatus.mockResolvedValue({
       connected: false,

@@ -128,16 +128,27 @@ const startNativeRecoverySignals = (
       removeAppListener = () => appListener.remove()
 
       // Report the initial network and lifecycle state (the app may start
-      // while offline or already backgrounded).
-      const status = await Network.getStatus()
+      // while offline or already backgrounded). Each snapshot is fetched
+      // independently: a rejection from one plugin must not prevent the
+      // other from being captured.
+      const [networkStatus, appState] = await Promise.allSettled([
+        Network.getStatus(),
+        CapacitorApp.getState(),
+      ])
 
-      if (isActive && !status.connected) {
+      if (
+        isActive &&
+        networkStatus.status === 'fulfilled' &&
+        !networkStatus.value.connected
+      ) {
         handlers.onNetworkOffline()
       }
 
-      const appState = await CapacitorApp.getState()
-
-      if (isActive && !appState.isActive) {
+      if (
+        isActive &&
+        appState.status === 'fulfilled' &&
+        !appState.value.isActive
+      ) {
         handlers.onAppBackground()
       }
     } catch {
