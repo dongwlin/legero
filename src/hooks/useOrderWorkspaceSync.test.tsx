@@ -292,6 +292,50 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     expect(useOrderStore.getState().ordersById['a']?.note).toBe('optimistic')
   })
 
+  it('lets a higher-version snapshot beat a lower-version optimistic overlay', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The user toggles a while the snapshot is in flight: the optimistic
+    // record (v10) lands in the store, but no server confirmation exists yet
+    // and no WS event is buffered — the v11 commit happened while the client
+    // was offline, so there is no echo to replay.
+    const optimistic = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 10,
+      note: 'optimistic',
+      stapleStepStatusCode: STEP_STATUS.completed,
+    })
+    act(() => {
+      useOrderStore.getState().upsertOrder(optimistic)
+    })
+
+    // The snapshot is read from a server state NEWER than the optimistic
+    // record's base (v11). The overlay previously compared only against
+    // buffered realtime versions, so this authoritative snapshot was
+    // downgraded to the stale local optimistic state.
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'authoritative-snapshot',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(11)
+    expect(order?.note).toBe('authoritative-snapshot')
+  })
+
   it('lets a newer realtime upsert win over a completed local mutation (success path)', async () => {
     const snapshot = deferred<OrderRecord[]>()
     mocks.listOrders.mockReturnValue(snapshot.promise)

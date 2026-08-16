@@ -32,32 +32,6 @@ export const pickLatestOrder = (
 ): OrderRecord => (b.version > a.version ? b : a)
 
 /**
- * The highest server `version` per order id among the given (compacted)
- * realtime events, for version comparisons against the store. Remove and
- * clear events carry no version and are ignored: an order removed by the
- * events is simply absent from the reconciled list and can never be
- * resurrected by the overlay.
- */
-export const latestUpsertVersion = (
-  events: RealtimeOrderEvent[],
-): Map<string, number> => {
-  const latest = new Map<string, number>()
-
-  for (const event of events) {
-    if (event.type !== 'upsert') {
-      continue
-    }
-
-    const current = latest.get(event.order.id)
-    if (current === undefined || event.order.version > current) {
-      latest.set(event.order.id, event.order.version)
-    }
-  }
-
-  return latest
-}
-
-/**
  * Compacts a buffered event stream for replay once a snapshot lands.
  *
  * - Everything before the last full (`all`) clear is moot: such a clear wipes

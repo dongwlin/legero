@@ -10,7 +10,6 @@ import {
   compactRealtimeEvents,
   createOrderEventBuffer,
   isNewerOrder,
-  latestUpsertVersion,
   pickLatestOrder,
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
@@ -341,40 +340,6 @@ describe('version ordering primitives', () => {
 
     expect(pickLatestOrder(a, b)).toBe(a)
     expect(pickLatestOrder(b, a)).toBe(b)
-  })
-})
-
-describe('latestUpsertVersion', () => {
-  it('keeps the highest server version per order id', () => {
-    const events: RealtimeOrderEvent[] = [
-      upsert('a'),
-      upsertVersion('a', 11, 'second'),
-      upsertVersion('b', 2, 'b-v2'),
-      upsertVersion('a', 13, 'third'),
-      upsertVersion('a', 12, 'delayed-stale'),
-    ]
-
-    const latest = latestUpsertVersion(events)
-    expect(latest.get('a')).toBe(13)
-    expect(latest.get('b')).toBe(2)
-  })
-
-  it('ignores remove and clear events', () => {
-    const events: RealtimeOrderEvent[] = [
-      upsert('a'),
-      remove('b'),
-      clearAll,
-      { type: 'upsert', order: makeOrder('c', '2025-01-01T00:00:00+08:00') },
-    ]
-
-    const latest = latestUpsertVersion(events)
-    expect(latest.get('a')).toBe(1)
-    expect(latest.has('b')).toBe(false)
-    expect(latest.get('c')).toBe(1)
-  })
-
-  it('returns an empty map for an empty event list', () => {
-    expect(latestUpsertVersion([]).size).toBe(0)
   })
 })
 

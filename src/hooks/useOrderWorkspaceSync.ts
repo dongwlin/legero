@@ -6,7 +6,6 @@ import {
 } from '@/services/orderRealtime'
 import {
   createOrderEventBuffer,
-  latestUpsertVersion,
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
 } from '@/services/orderReconcile'
@@ -106,18 +105,19 @@ export const useOrderWorkspaceSync = () => {
 
     // Re-applies the store's records for protected ids on top of a reconciled
     // list, so a stale snapshot cannot overwrite a mutation that overlaps its
-    // lifetime. The optimistic record of a mutation — pending or settled —
-    // keeps the pre-mutation server version, so it only wins over the
-    // snapshot itself: a buffered realtime event with a strictly higher
-    // server version (e.g. another client's update committed after ours) is
-    // authoritative state the mutation's completion or rollback cannot
-    // supersede, and wins even while the mutation is still pending. Settled
-    // mutations follow the same rule. Orders the events themselves removed
-    // (remove/clear) stay removed.
-    const overlayOptimisticRecords = (
+    // lifetime. The comparison runs exclusively by server `version` against
+    // the full reconciled candidate (snapshot + buffered realtime): the store
+    // record of a mutation — pending or settled — keeps a version the snapshot
+    // must not downgrade, but a reconciled state with a strictly higher
+    // version (e.g. another client committed after ours, or the snapshot was
+    // read from a state newer than the mutation's base) stays authoritative.
+    // An equal version means the same server commit and the local record
+    // survives (it may carry client-only detail such as a rollback target).
+    // Orders the buffered events themselves removed (remove/clear) are absent
+    // from the reconciled list and stay removed.
+    const overlayProtectedRecords = (
       orders: OrderRecord[],
       protectedIds: ReadonlySet<string>,
-      events: RealtimeOrderEvent[],
     ): OrderRecord[] => {
       if (protectedIds.size === 0) {
         return orders
@@ -125,21 +125,16 @@ export const useOrderWorkspaceSync = () => {
 
       const store = useOrderStore.getState()
       const ordersById = new Map(orders.map((order) => [order.id, order]))
-      const latestEventVersion = latestUpsertVersion(events)
 
       for (const id of protectedIds) {
         const optimistic = store.ordersById[id]
+        const authoritative = ordersById.get(id)
 
-        if (!optimistic || !ordersById.has(id)) {
+        if (!optimistic || !authoritative) {
           continue
         }
 
-        const eventVersion = latestEventVersion.get(id)
-
-        if (
-          eventVersion === undefined ||
-          eventVersion <= optimistic.version
-        ) {
+        if (authoritative.version <= optimistic.version) {
           ordersById.set(id, optimistic)
         }
       }
@@ -236,15 +231,16 @@ export const useOrderWorkspaceSync = () => {
 
         // The snapshot is the base state; buffered events are newer and win.
         // Records for mutations that overlap this snapshot's lifetime are
-        // re-applied so the snapshot cannot clobber them — but a buffered
-        // event with a strictly newer server version still wins (overlay
-        // only guards against the stale snapshot itself).
+        // re-applied so the snapshot cannot clobber them — but the version
+        // comparison runs against the reconciled candidate itself, so a
+        // strictly higher authoritative state (a buffered event or a
+        // snapshot read from a state newer than the mutation's base) still
+        // wins.
         const events = eventBuffer.endReconciliation()
         setOrders(
-          overlayOptimisticRecords(
+          overlayProtectedRecords(
             reconcileSnapshotWithEvents(nextOrders, events),
             orderOptimistic.idsToProtect(snapshotMarker),
-            events,
           ),
         )
       } catch (error) {
