@@ -304,12 +304,17 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const [createSessionId, setCreateSessionId] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  // A pending 409 conflict refresh: the version that conflicted, waiting for
-  // the resynced record to supersede it. Bumped into the session key below so
-  // OrderFormContent remounts (re-initializing form values AND the pinned
-  // baseVersion) from the fresh record once the store advances past it.
+  // A pending 409 conflict refresh: the version that conflicted plus the
+  // reconciliation sequence at the time (so a commit that lands AFTER the
+  // resync request can be told apart from one that predates it), waiting for
+  // the resynced record to supersede the conflicted version. Bumped into the
+  // session key below so OrderFormContent remounts (re-initializing form
+  // values AND the pinned baseVersion) from the fresh record once the store
+  // advances past it — or the session closes if the resync reveals the order
+  // was deleted.
   const [conflictRefresh, setConflictRefresh] = useState<{
     conflictedVersion: number
+    syncSeqAtConflict: number
   } | null>(null)
   // Monotonic per-completed-refresh counter: the edit session key advances
   // only when a conflict refresh actually completes, so a normal open session
@@ -447,7 +452,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         // — never a blend of the old content with a new base version, which
         // would reintroduce the lost update OCC prevents.
         if (mode === 'edit' && conflictRefresh === null && baseVersion !== undefined) {
-          setConflictRefresh({ conflictedVersion: baseVersion })
+          setConflictRefresh({
+            conflictedVersion: baseVersion,
+            syncSeqAtConflict: useOrderStore.getState().orderSyncSeq,
+          })
         }
       }
 
@@ -468,12 +476,17 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
       ? `${updateTargetID}:${editSessionGeneration}`
       : ''
 
-  // Conflict recovery inside a live edit session: once the store record is
+  // Conflict recovery inside a live edit session. Once the store record is
   // strictly newer than the version that got the 409 (the resync commit
   // landed), restart the edit session — the generation bumps, so
   // OrderFormContent remounts and both the form values and the pinned
   // baseVersion re-initialize from the authoritative record. The session
-  // never blends the old form content with a new base version. State is not
+  // never blends the old form content with a new base version. If instead a
+  // reconciliation landed after the 409 without the record at all, the
+  // authoritative state deleted the order: there is no fresh record to
+  // restart against, so the edit session closes. Absence alone is never
+  // enough — it must be confirmed by a commit that postdates the 409, so a
+  // transient gap during the resync does not kill the session. State is not
   // touched synchronously in the effect body: the check runs on the store
   // subscription (the resync commit setOrders) and in a microtask that
   // catches an advance that already landed by the time the effect runs.
@@ -482,27 +495,55 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
       return
     }
 
+    // One resolution per conflict refresh: the store subscription can fire
+    // again because of the very state change the resolution performs (e.g.
+    // clearing updateTargetID), and the resolution must not re-run.
+    let settled = false
+
     const restart = () => {
+      if (settled) {
+        return
+      }
+      settled = true
       setConflictRefresh(null)
       setEditSessionGeneration((generation) => generation + 1)
     }
 
-    queueMicrotask(() => {
-      const record = useOrderStore.getState().ordersById[updateTargetID]
+    const closeSession = () => {
+      if (settled) {
+        return
+      }
+      settled = true
+      setConflictRefresh(null)
+      setUpdateTargetID('')
+    }
 
-      if (record && record.version > conflictRefresh.conflictedVersion) {
+    const settle = (
+      record: OrderRecord | undefined,
+      orderSyncSeq: number,
+    ) => {
+      if (
+        record === undefined &&
+        orderSyncSeq > conflictRefresh.syncSeqAtConflict
+      ) {
+        closeSession()
+      } else if (
+        record &&
+        record.version > conflictRefresh.conflictedVersion
+      ) {
         restart()
       }
+    }
+
+    queueMicrotask(() => {
+      const store = useOrderStore.getState()
+      settle(store.ordersById[updateTargetID], store.orderSyncSeq)
     })
 
     return useOrderStore.subscribe((state) => {
-      const record = state.ordersById[updateTargetID]
-
-      if (record && record.version > conflictRefresh.conflictedVersion) {
-        restart()
-      }
+      settle(state.ordersById[updateTargetID], state.orderSyncSeq)
     })
-  }, [conflictRefresh, updateTargetID])
+  }, [conflictRefresh, setUpdateTargetID, updateTargetID])
 
   useEffect(() => {
     if (!isOpen) {

@@ -126,6 +126,7 @@ const resetStores = () => {
     lastHydratedAt: null,
     status: 'idle',
     errorMessage: null,
+    orderSyncSeq: 0,
   })
 }
 

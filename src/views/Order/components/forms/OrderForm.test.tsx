@@ -282,6 +282,7 @@ const resetStores = () => {
     lastHydratedAt: null,
     status: 'idle',
     errorMessage: null,
+    orderSyncSeq: 0,
   })
 }
 
@@ -595,6 +596,61 @@ describe('OrderForm edit-session optimistic concurrency', () => {
     expect(useOrderStore.getState().ordersById['c']).toBeUndefined()
     expect(resync).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('button', { name: '创建' })).toBeNull()
+
+    stopResync()
+  })
+
+  it('closes the edit session when the 409 resync commits a snapshot without the record', async () => {
+    // Review blocker P2: if the authoritative resync after a 409 reveals the
+    // order was deleted meanwhile, there is no fresh record to restart the
+    // session against — the modal must close instead of staying open on a
+    // ghost (repeated submits would fail with '未找到要修改的订单').
+    useOrderStore.getState().upsertOrder(
+      makeOrder('a', { version: 10, note: 'original' }),
+    )
+    useOrderStore.getState().setUpdateTargetID('a')
+
+    const resync = vi.fn()
+    const stopResync = subscribeOrdersResync(resync)
+
+    openEditForm()
+
+    mocks.update.mockRejectedValue(
+      new ApiError(409, 'order_conflict', '订单已被其他操作修改。'),
+    )
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: '修改' }))
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    // The 409 surfaced, the resync was requested, and the modal stays open
+    // while the resync is still in flight (absence alone must not close it).
+    expect(resync).toHaveBeenCalledTimes(1)
+    expect(useOrderStore.getState().updateTargetID).toBe('a')
+    expect(useOrderStore.getState().ordersById['a']).toBeDefined()
+
+    // The resync commit lands: the snapshot no longer contains 'a' (the
+    // order was deleted while the conflict was being resolved). The commit
+    // advances the store's reconciliation sequence.
+    const syncSeqAtConflict = useOrderStore.getState().orderSyncSeq
+    act(() => {
+      useOrderStore.getState().setOrders([])
+    })
+    expect(useOrderStore.getState().orderSyncSeq).toBeGreaterThan(
+      syncSeqAtConflict,
+    )
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    // The edit session closed: no update target, no modal rendered.
+    expect(useOrderStore.getState().updateTargetID).toBe('')
+    expect(screen.queryByRole('button', { name: '修改' })).toBeNull()
 
     stopResync()
   })

@@ -80,6 +80,12 @@ interface OrderState {
   lastHydratedAt: string | null
   status: OrderStoreStatus
   errorMessage: string | null
+  /**
+   * Monotonic counter of reconciliation commits (`setOrders` calls): a
+   * consumer that requested an authoritative resync can tell a commit that
+   * landed after its request from one that predates it.
+   */
+  orderSyncSeq: number
   setOrders: (orders: OrderRecord[]) => void
   upsertOrder: (item: OrderRecord) => void
   upsertOrders: (items: OrderRecord[]) => void
@@ -118,6 +124,7 @@ export const useOrderStore = create<OrderState>()(
       lastHydratedAt: null,
       status: 'idle',
       errorMessage: null,
+      orderSyncSeq: 0,
       setOrders: (orders) =>
         set((state) => {
           const sorted = sortOrdersByTimeline(orders)
@@ -132,6 +139,7 @@ export const useOrderStore = create<OrderState>()(
             lastHydratedAt: new Date().toISOString(),
             status: 'ready' as const,
             errorMessage: null,
+            orderSyncSeq: state.orderSyncSeq + 1,
             ...createQuickCalcState(nextSelectedOrderIds),
           }
         }),
@@ -260,6 +268,7 @@ export const useOrderStore = create<OrderState>()(
           status: 'idle',
           errorMessage: null,
           updateTargetID: '',
+          orderSyncSeq: 0,
           ...createQuickCalcState(EMPTY_QUICK_CALC_SELECTION),
         }),
       setFilter: (filter) => set({ filter }),
