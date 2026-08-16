@@ -39,14 +39,20 @@ export const pickLatestOrder = (
  *   the whole workspace, so earlier upserts/removes can never resurface.
  *   A `before_today` clear only drops older orders, so events before it can
  *   still touch today's orders and are kept.
+ * - A full clear is also a terminal tombstone for every id the window saw
+ *   before it — exactly like a remove. The Legero backend never reuses an
+ *   order id (orders are created with a fresh uuid), so a post-clear upsert
+ *   of such an id is a stale, delayed event, not a recreation (there is no
+ *   legitimate post-clear re-creation of a pre-clear id), and must not
+ *   resurrect the order.
  * - For each order id only one event survives. Between upserts the strictly
  *   higher server version wins regardless of arrival order (an equal version
  *   keeps the earlier arrival — it is the same server state), so a delayed
  *   stale event can never overwrite a newer one. Once a remove appears for
  *   an id it is a terminal tombstone for the rest of the window: the Legero
- *   backend never reuses an order id (orders are created with a fresh uuid),
- *   so a trailing upsert is not a recreation but a stale, delayed event and
- *   must not resurrect the order, while an earlier upsert is superseded.
+ *   backend never reuses an order id, so a trailing upsert is not a
+ *   recreation but a stale, delayed event and must not resurrect the order,
+ *   while an earlier upsert is superseded.
  * - Every clear op itself survives, so the replay can apply its semantics to
  *   the snapshot.
  *
@@ -70,6 +76,26 @@ export const compactRealtimeEvents = (
   // as an op so it wipes the snapshot as well.
   const tail =
     lastClearAllIndex === -1 ? events : events.slice(lastClearAllIndex)
+
+  // Ids the client saw before the last full clear: the clear terminally
+  // deleted them, and the backend never reuses an order id, so a post-clear
+  // upsert of any of them is a stale/delayed event that must not resurrect
+  // the order. (Once an id appears in a pre-clear upsert or remove there is
+  // no legitimate later statement for it in this window.)
+  const knownBeforeClear = new Set<string>()
+
+  if (lastClearAllIndex !== -1) {
+    for (let index = 0; index < lastClearAllIndex; index += 1) {
+      const event = events[index]
+
+      if (event.type === 'upsert') {
+        knownBeforeClear.add(event.order.id)
+      } else if (event.type === 'remove') {
+        knownBeforeClear.add(event.id)
+      }
+    }
+  }
+
   const clearIndices = new Set<number>()
   const winnerIndexById = new Map<string, number>()
   // Once a remove appears for an id it is a terminal tombstone inside this
@@ -94,7 +120,7 @@ export const compactRealtimeEvents = (
       continue
     }
 
-    if (removedIds.has(id)) {
+    if (removedIds.has(id) || knownBeforeClear.has(id)) {
       continue
     }
 
@@ -127,6 +153,20 @@ export const compactRealtimeEvents = (
  * id the higher server version wins: a stale buffered event (a delayed older
  * upsert) never downgrades a newer snapshot record, and an equal version is
  * idempotent.
+ *
+ * A full clear is a terminal delete of the whole workspace at clear time and
+ * therefore also of every id the client knew then: the ids present in the
+ * snapshot base (the only pre-clear state observable here — the buffer holds
+ * only events received while the snapshot was being fetched) are tombstoned
+ * by it. A later upsert of such an id is a stale, delayed event and is
+ * dropped, because the backend never reuses an order id. Trade-off note: the
+ * client cannot tell whether the snapshot itself was served before or after
+ * the clear (HTTP and WebSocket are independent transports), so a snapshot
+ * served after the clear could lose a post-clear creation with the same id
+ * as a pre-clear order until the next reconciliation. The alternative —
+ * keeping those ids — would leave the pre-clear resurrection window open;
+ * without server-side revision/sequencing the strict no-reuse invariant is
+ * the safer default.
  */
 export const reconcileSnapshotWithEvents = (
   snapshot: OrderRecord[],
@@ -136,9 +176,18 @@ export const reconcileSnapshotWithEvents = (
     snapshot.map((order) => [order.id, order]),
   )
 
+  // Ids terminally deleted by a full clear in this window: the backend never
+  // reuses an order id, so a later upsert of any of them is stale and must
+  // not resurrect the order.
+  const tombstonedByClear = new Set<string>()
+
   for (const event of compactRealtimeEvents(events)) {
     switch (event.type) {
       case 'upsert': {
+        if (tombstonedByClear.has(event.order.id)) {
+          break
+        }
+
         const current = ordersById.get(event.order.id)
 
         // The buffered event is the newest server state for this id; on an
@@ -154,6 +203,14 @@ export const reconcileSnapshotWithEvents = (
         break
       case 'clear':
         if (event.mode === 'all') {
+          // Every id in the snapshot at this point existed before the clear
+          // (the snapshot was requested before the clear event arrived, and
+          // any pre-clear buffered event was compacted away), so the clear
+          // terminally deletes each of them.
+          for (const id of ordersById.keys()) {
+            tombstonedByClear.add(id)
+          }
+
           ordersById.clear()
         } else {
           // before_today: the server keeps only orders created on the

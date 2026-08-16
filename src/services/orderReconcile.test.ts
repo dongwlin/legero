@@ -149,6 +149,38 @@ describe('compactRealtimeEvents', () => {
     ).toEqual([clearAll, upsert('b'), remove('c')])
   })
 
+  it('drops a post-clear upsert of an id the window saw before the full clear', () => {
+    // A full clear is a terminal delete of the ids known before it — exactly
+    // like a remove: the backend never reuses an order id, so a post-clear
+    // upsert is a stale/delayed event, not a recreation.
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 5, 'pre-clear'),
+        clearAll,
+        upsertVersion('a', 20, 'stale-delayed'),
+      ]),
+    ).toEqual([clearAll])
+  })
+
+  it('drops a post-clear upsert of an id removed before the full clear', () => {
+    expect(
+      compactRealtimeEvents([
+        remove('a'),
+        clearAll,
+        upsertVersion('a', 2, 'stale-delayed'),
+      ]),
+    ).toEqual([clearAll])
+  })
+
+  it('keeps a post-clear upsert of an id unseen before the full clear (fresh creation)', () => {
+    // An order created after the clear uses a fresh uuid, so it is not
+    // tombstoned by the clear and survives normally.
+    expect(compactRealtimeEvents([clearAll, upsert('fresh')])).toEqual([
+      clearAll,
+      upsert('fresh'),
+    ])
+  })
+
   it('keeps only the latest clear and the events after it', () => {
     expect(
       compactRealtimeEvents([upsert('a'), clearAll, upsert('b'), clearAll, upsert('c')]),
@@ -265,20 +297,42 @@ describe('reconcileSnapshotWithEvents', () => {
     expect(result).toEqual([makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 12, note: 'remote-v12' })])
   })
 
-  it('applies a full clear over the snapshot and keeps only later events', () => {
+  it('applies a full clear over the snapshot and keeps only later fresh events', () => {
     const snapshot = [
       makeOrder('a', '2025-01-01T00:00:00+08:00'),
       makeOrder('b', '2025-01-02T00:00:00+08:00'),
     ]
-    const recreated = makeOrder('a', '2025-01-04T00:00:00+08:00')
+    const created = makeOrder('c', '2025-01-04T00:00:00+08:00')
 
     const result = reconcileSnapshotWithEvents(snapshot, [
       upsert('b'),
       clearAll,
-      { type: 'upsert', order: recreated },
+      { type: 'upsert', order: created },
     ])
 
-    expect(result).toEqual([recreated])
+    // A fresh id created after the clear survives; the pre-clear state is
+    // wiped regardless of the stale snapshot base.
+    expect(result).toEqual([created])
+  })
+
+  it('does not let a stale post-clear upsert resurrect an order known before the full clear', () => {
+    // A full clear is a terminal delete of every id the client knew at clear
+    // time — including the snapshot base, which was requested before the
+    // clear event arrived. The backend never reuses an order id, so a
+    // post-clear upsert of 'a' (present in the snapshot) is a stale, delayed
+    // event, not a recreation, and must not resurrect the order.
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+      makeOrder('b', '2025-01-02T00:00:00+08:00'),
+    ]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      upsert('b'),
+      clearAll,
+      upsertVersion('a', 20, 'stale-delayed'),
+    ])
+
+    expect(result).toEqual([])
   })
 
   it('a before_today clear drops only orders created before today', () => {

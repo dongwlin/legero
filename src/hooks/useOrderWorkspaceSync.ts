@@ -156,6 +156,23 @@ export const useOrderWorkspaceSync = () => {
       return [...ordersById.values()]
     }
 
+    // A full clear is a terminal delete of the whole workspace at the moment
+    // it is received: ids the client currently knows are tombstoned so a
+    // delayed stale upsert of any of them — arriving via the batch queue, the
+    // reconciliation buffer or a late HTTP response — can never resurrect an
+    // order the server already deleted (the backend never reuses an order
+    // id). The clear payload carries no deleted-id list, so only the
+    // client-known ids can be covered here; the reconciliation-window
+    // compaction closes the rest of the resurrection window (see
+    // compactRealtimeEvents).
+    const tombstoneClearedIds = () => {
+      const store = useOrderStore.getState()
+
+      for (const id of Object.keys(store.ordersById)) {
+        orderTombstones.markRemoved(id)
+      }
+    }
+
     // Applies a clear event's semantics to the store: 'all' empties the
     // workspace, 'before_today' keeps only orders created on the current
     // business day (the server deleted everything older).
@@ -163,6 +180,11 @@ export const useOrderWorkspaceSync = () => {
       const store = useOrderStore.getState()
 
       if (mode === 'all') {
+        // Tombstone the client-known ids before emptying the store, so the
+        // clear itself becomes the deletion barrier: every later statement
+        // for those ids is stale and is dropped at the gates above instead of
+        // being applied to the (now empty) store slots.
+        tombstoneClearedIds()
         store.clearOrders()
         return
       }
@@ -400,7 +422,14 @@ export const useOrderWorkspaceSync = () => {
                 // it so the reconciliation replays it (otherwise the
                 // snapshot would resurrect cleared orders), and schedule the
                 // follow-up snapshot the clear already implied (before_today
-                // keeps part of the list).
+                // keeps part of the list). Client-known ids are tombstoned at
+                // receipt — not at replay — so a stale delayed upsert of a
+                // cleared id that arrives later in the window is dropped at
+                // the onUpsert gate instead of entering the buffer.
+                if (event.mode === 'all') {
+                  tombstoneClearedIds()
+                }
+
                 eventBuffer.push({ type: 'clear', mode: event.mode })
                 pendingReconcile = true
                 return
