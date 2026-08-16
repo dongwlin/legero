@@ -11,10 +11,11 @@ import {
   type RealtimeOrderEvent,
 } from '@/services/orderReconcile'
 import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import { orderOptimistic } from '@/services/orderOptimistic'
+import { subscribeOrdersResync } from '@/services/orderResync'
 import type { ClearWorkspaceMode } from '@/services/apiTypes'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
-import { orderOptimistic } from '@/services/orderOptimistic'
 import type { OrderRecord } from '@/types'
 
 const getErrorMessage = (error: unknown): string =>
@@ -298,6 +299,16 @@ export const useOrderWorkspaceSync = () => {
       }
     }
 
+    // Authoritative-state invalidation (e.g. a mutation rejected with
+    // 409 order_conflict elsewhere in the UI) requests a fresh
+    // reconciliation: the same buffer-and-replay mechanism as a reconnect
+    // guarantees realtime events received during the fetch still win.
+    const stopResyncSubscription = subscribeOrdersResync(() => {
+      if (!isDisposed) {
+        void syncSnapshot(useOrderStore.getState().status !== 'ready')
+      }
+    })
+
     const initialize = async () => {
       try {
         const shouldBlock = refreshKey > 0 || useOrderStore.getState().status !== 'ready'
@@ -412,6 +423,8 @@ export const useOrderWorkspaceSync = () => {
 
     return () => {
       isDisposed = true
+
+      stopResyncSubscription?.()
 
       if (flushRafId !== null) {
         window.cancelAnimationFrame(flushRafId)

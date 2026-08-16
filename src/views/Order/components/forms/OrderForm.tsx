@@ -342,6 +342,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         const persistedRecord = await orderRepository.update(
           updateTargetID,
           nextRecord,
+          // Optimistic concurrency: the version the client observed when the
+          // edit started. A 409 order_conflict means someone else changed the
+          // order meanwhile and the form must be re-read.
+          activeRecord.version,
         )
 
         upsertOrder(persistedRecord)

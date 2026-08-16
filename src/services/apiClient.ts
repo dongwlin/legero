@@ -127,6 +127,17 @@ export const isInvalidSessionError = (error: unknown): boolean =>
   error.status === 401 &&
   INVALID_SESSION_CODES.has(error.code)
 
+/**
+ * Whether the backend rejected a mutation because the client's
+ * `expectedVersion` is stale (another request already advanced the order).
+ * A 409 is not transient: retrying the same expectedVersion would fail
+ * again, so callers must refetch the authoritative state first.
+ */
+export const isOrderConflictError = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  error.status === 409 &&
+  error.code === 'order_conflict'
+
 const tokensNeedRefresh = (tokens: AuthTokens): boolean => {
   const expiresAtMs = Date.parse(tokens.accessTokenExpiresAt)
 

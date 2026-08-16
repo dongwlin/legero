@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState } from 'react'
 import { type OrderRecord } from '@/types'
+import { isOrderConflictError } from '@/services/apiClient'
 import { orderRepository } from '@/services/orderRepository'
+import { orderOptimistic } from '@/services/orderOptimistic'
+import { requestOrdersResync } from '@/services/orderResync'
 import {
   toggleOrderServed,
   toggleOrderStepStatus,
 } from '@/services/orderStatus'
-import { orderOptimistic } from '@/services/orderOptimistic'
 import { useOrderStore } from '@/store/order'
 import { getMutationErrorMessage } from './orderItemHelpers'
 
@@ -58,17 +60,30 @@ export const useOrderItemActions = (
 
       const gen = orderOptimistic.beginMutation(record.id, record)
 
+      // Optimistic copies keep the server's version untouched: only the
+      // backend can mint the next version once the commit actually lands.
       upsertOrder(nextRecord)
 
       persist()
         .then((serverRecord) => {
           if (orderOptimistic.endMutation(record.id, gen)) {
+            // The response is the authoritative record: it carries the new
+            // server version, so replace the optimistic copy wholesale.
             upsertOrder(serverRecord)
           }
         })
         .catch((error) => {
           if (orderOptimistic.endMutation(record.id, gen)) {
             upsertOrder(record)
+
+            if (isOrderConflictError(error)) {
+              // The server rejected a stale expectedVersion (another client
+              // already advanced the order): the old version is gone for
+              // good, so roll back the optimistic record and refetch the
+              // authoritative state instead of retrying against it.
+              requestOrdersResync()
+            }
+
             setMutationError(getMutationErrorMessage(error))
           }
         })
@@ -80,7 +95,7 @@ export const useOrderItemActions = (
     performOptimisticToggle(
       lastStapleActionAtRef,
       (r) => toggleOrderStepStatus(r, 'staple'),
-      () => orderRepository.toggleStep(record.id, 'staple', record),
+      () => orderRepository.toggleStep(record.id, 'staple', record.version),
     )
   }, [performOptimisticToggle, record])
 
@@ -88,7 +103,7 @@ export const useOrderItemActions = (
     performOptimisticToggle(
       lastMeatActionAtRef,
       (r) => toggleOrderStepStatus(r, 'meat'),
-      () => orderRepository.toggleStep(record.id, 'meat', record),
+      () => orderRepository.toggleStep(record.id, 'meat', record.version),
     )
   }, [performOptimisticToggle, record])
 
@@ -96,7 +111,7 @@ export const useOrderItemActions = (
     performOptimisticToggle(
       lastServeActionAtRef,
       (r) => toggleOrderServed(r, new Date().toISOString()),
-      () => orderRepository.toggleServed(record.id, record),
+      () => orderRepository.toggleServed(record.id, record.version),
     )
   }, [performOptimisticToggle, record])
 

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
+import { requestOrdersResync } from '@/services/orderResync'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 import {
@@ -1068,6 +1069,48 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
 
     expect(useOrderStore.getState().ordersById['today']).toEqual(today)
     expect(useOrderStore.getState().ordersById['yesterday']).toBeUndefined()
+  })
+
+  it('reconciles against a fresh snapshot when a resync is requested (409 recovery)', async () => {
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      first.resolve([])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().status).toBe('ready')
+
+    // A mutation was rejected with 409 order_conflict elsewhere in the UI:
+    // the resync request must refetch the authoritative snapshot and replay
+    // buffered realtime events over it.
+    act(() => {
+      requestOrdersResync()
+    })
+    expect(mocks.listOrders).toHaveBeenCalledTimes(2)
+
+    const orderB = makeOrder('b', '2025-01-02T00:00:00+08:00', { version: 3 })
+    act(() => {
+      ws.onUpsert(orderB)
+    })
+
+    await act(async () => {
+      second.resolve([orderB])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['b']).toEqual(orderB)
+    expect(useOrderStore.getState().status).toBe('ready')
   })
 
   it('keeps an order absent after upsert then clear(all) when the follow-up snapshot fails', async () => {
