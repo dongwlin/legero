@@ -491,6 +491,92 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
   })
 
+  it('does not let a buffered realtime upsert resurrect an order deleted during the snapshot', async () => {
+    // Review blocker, success path: another client updates a to v11 while
+    // the snapshot is in flight, and the local DELETE confirms before the
+    // snapshot lands — but the delete's own WS event has not arrived, so
+    // only the old upsert is buffered. The buffered upsert must not win
+    // over the confirmed local remove.
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+    mocks.effectsAfter.mockReturnValue([{ type: 'remove', id: 'a', seq: 2 }])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'remote-v11',
+        }),
+      )
+    })
+
+    // The DELETE succeeds while the snapshot is still in flight; its WS
+    // remove event has not arrived yet, so no remove is buffered.
+    act(() => {
+      useOrderStore.getState().removeOrder('a')
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 10,
+          note: 'stale-snapshot',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    // The buffered v11 upsert predates the delete: the server state is
+    // already "a absent", so the order must stay absent.
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+  })
+
+  it('does not resurrect an order deleted during a failed snapshot via a buffered upsert', async () => {
+    // Review blocker, failure path: the buffered upsert would normally be
+    // applied onto the store on failure, re-inserting an order the client
+    // already deleted and the server no longer has. The confirmed remove
+    // tombstone must re-apply after the buffered replay.
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.effectsAfter.mockReturnValue([{ type: 'remove', id: 'a', seq: 2 }])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'remote-v11',
+        }),
+      )
+    })
+
+    // The DELETE succeeds while the snapshot is still in flight.
+    act(() => {
+      useOrderStore.getState().removeOrder('a')
+    })
+
+    await act(async () => {
+      snapshot.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+  })
+
   it('lets a newer realtime upsert win over a completed local mutation (success path)', async () => {
     const snapshot = deferred<OrderRecord[]>()
     mocks.listOrders.mockReturnValue(snapshot.promise)

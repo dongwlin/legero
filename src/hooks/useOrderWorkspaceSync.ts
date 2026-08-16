@@ -5,7 +5,9 @@ import {
   type OrderRealtimeSubscription,
 } from '@/services/orderRealtime'
 import {
-  applyLocalMutationEffects,
+  applyLocalRemoveEffects,
+  applyLocalUpsertEffects,
+  confirmedRemoveIds,
   createOrderEventBuffer,
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
@@ -233,24 +235,31 @@ export const useOrderWorkspaceSync = () => {
 
         // The snapshot is the base state. On top of it the commit replays the
         // sources that are newer than the snapshot read, in ascending age:
-        // first the confirmed local mutations that overlapped the snapshot's
+        // first the confirmed local upserts that overlapped the snapshot's
         // lifetime (their authoritative HTTP responses are known even when
-        // the WS echo is not — form updates, creates and deletes included),
-        // then the buffered realtime events, which stay the newest server
-        // statements. Records for mutations that are still only pending (not
-        // confirmed, hence absent from the effects journal) are re-applied
-        // last by version against the reconciled candidate, so a strictly
-        // higher authoritative state still wins while a stale snapshot never
-        // clobbers the local record.
+        // the WS echo is not — form updates and creates included), then the
+        // buffered realtime events, which stay the newest server statements.
+        // Confirmed local removes are applied last, as terminal tombstones:
+        // a delete that confirmed during the snapshot must stay absent even
+        // when a buffered realtime upsert predates it — HTTP responses and
+        // WebSocket events are independent transport paths, and the backend
+        // never reuses an order id, so no upsert can outlive a confirmed
+        // delete of the same id. Records for mutations that are still only
+        // pending (not confirmed, hence absent from the effects journal) are
+        // re-applied last by version against the reconciled candidate, so a
+        // strictly higher authoritative state still wins while a stale
+        // snapshot never clobbers the local record.
         const events = eventBuffer.endReconciliation()
+        const effects = orderOptimistic.effectsAfter(snapshotMarker)
+
         setOrders(
           overlayProtectedRecords(
-            reconcileSnapshotWithEvents(
-              applyLocalMutationEffects(
-                nextOrders,
-                orderOptimistic.effectsAfter(snapshotMarker),
+            applyLocalRemoveEffects(
+              reconcileSnapshotWithEvents(
+                applyLocalUpsertEffects(nextOrders, effects),
+                events,
               ),
-              events,
+              effects,
             ),
             orderOptimistic.idsToProtect(snapshotMarker),
           ),
@@ -261,6 +270,19 @@ export const useOrderWorkspaceSync = () => {
         }
 
         applyBufferedEvents(eventBuffer.endReconciliation())
+
+        // Buffered upserts must not resurrect an id the client already
+        // deleted: confirmed local removes are terminal tombstones and are
+        // re-applied last, over whatever the failure replay inserted (the
+        // backend never reuses an order id, so no upsert can outlive a
+        // confirmed delete of the same id).
+        const store = useOrderStore.getState()
+
+        for (const id of confirmedRemoveIds(
+          orderOptimistic.effectsAfter(snapshotMarker),
+        )) {
+          store.removeOrder(id)
+        }
 
         if (shouldBlock) {
           setHydrationState({

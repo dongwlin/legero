@@ -7,8 +7,10 @@ import { DEFAULT_ORDER_FORM_VALUE, STEP_STATUS, type OrderRecord } from '@/types
 dayjs.extend(utc)
 dayjs.extend(timezone)
 import {
-  applyLocalMutationEffects,
+  applyLocalRemoveEffects,
+  applyLocalUpsertEffects,
   compactRealtimeEvents,
+  confirmedRemoveIds,
   createOrderEventBuffer,
   isNewerOrder,
   pickLatestOrder,
@@ -357,7 +359,7 @@ describe('version ordering primitives', () => {
   })
 })
 
-describe('applyLocalMutationEffects', () => {
+describe('applyLocalUpsertEffects', () => {
   const effect = (
     order: OrderRecord,
     seq = 1,
@@ -373,7 +375,7 @@ describe('applyLocalMutationEffects', () => {
       makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
     ]
 
-    const result = applyLocalMutationEffects(snapshot, [
+    const result = applyLocalUpsertEffects(snapshot, [
       effect(
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
           version: 11,
@@ -399,7 +401,7 @@ describe('applyLocalMutationEffects', () => {
       note: 'confirmed-create',
     })
 
-    expect(applyLocalMutationEffects(snapshot, [effect(created)])).toEqual([
+    expect(applyLocalUpsertEffects(snapshot, [effect(created)])).toEqual([
       ...snapshot,
       created,
     ])
@@ -413,7 +415,7 @@ describe('applyLocalMutationEffects', () => {
       }),
     ]
 
-    const result = applyLocalMutationEffects(snapshot, [
+    const result = applyLocalUpsertEffects(snapshot, [
       effect(
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
           version: 11,
@@ -426,7 +428,7 @@ describe('applyLocalMutationEffects', () => {
   })
 
   it('treats an equal-version effect as the same server commit (idempotent)', () => {
-    const result = applyLocalMutationEffects(
+    const result = applyLocalUpsertEffects(
       [
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
           version: 11,
@@ -446,22 +448,14 @@ describe('applyLocalMutationEffects', () => {
     expect(result[0]?.version).toBe(11)
   })
 
-  it('keeps a confirmed delete absent even when the snapshot still contains the order', () => {
-    const snapshot = [
-      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
-    ]
-
-    expect(applyLocalMutationEffects(snapshot, [removeEffect('a')])).toEqual([])
-  })
-
-  it('applies a mix of confirmed upserts and removes', () => {
+  it('applies a mix of confirmed upserts and ignores remove effects', () => {
     const snapshot = [
       makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 9 }),
       makeOrder('b', '2025-01-02T00:00:00+08:00', { version: 9 }),
     ]
     const created = makeOrder('c', '2025-01-03T00:00:00+08:00')
 
-    const result = applyLocalMutationEffects(snapshot, [
+    const result = applyLocalUpsertEffects(snapshot, [
       removeEffect('b'),
       effect(
         makeOrder('a', '2025-01-01T00:00:00+08:00', {
@@ -472,8 +466,101 @@ describe('applyLocalMutationEffects', () => {
       effect(created),
     ])
 
-    expect(result.map((order) => order.id).sort()).toEqual(['a', 'c'])
+    expect(result.map((order) => order.id).sort()).toEqual(['a', 'b', 'c'])
     expect(result.find((order) => order.id === 'a')?.version).toBe(10)
+  })
+})
+
+describe('applyLocalRemoveEffects / confirmedRemoveIds', () => {
+  const removeEffect = (id: string, seq = 1): LocalMutationEffect => ({
+    type: 'remove',
+    id,
+    seq,
+  })
+  const upsertEffect = (order: OrderRecord, seq = 1): LocalMutationEffect => ({
+    type: 'upsert',
+    order,
+    seq,
+  })
+
+  it('keeps a confirmed delete absent even when the reconciled list contains the order', () => {
+    const orders = [makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 })]
+
+    expect(applyLocalRemoveEffects(orders, [removeEffect('a')])).toEqual([])
+  })
+
+  it('extracts only the removed ids from an effect journal', () => {
+    expect(
+      confirmedRemoveIds([
+        removeEffect('b'),
+        upsertEffect(makeOrder('a', '2025-01-01T00:00:00+08:00')),
+        removeEffect('c'),
+      ]),
+    ).toEqual(['b', 'c'])
+  })
+
+  it('removes all ids with a confirmed remove, keeping untouched orders', () => {
+    const orders = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 }),
+      makeOrder('b', '2025-01-02T00:00:00+08:00', { version: 11 }),
+    ]
+
+    expect(applyLocalRemoveEffects(orders, [removeEffect('a', 7)])).toEqual([
+      orders[1],
+    ])
+  })
+
+  it('is idempotent for duplicate removal effects of the same id', () => {
+    const orders = [makeOrder('a', '2025-01-01T00:00:00+08:00')]
+
+    expect(
+      applyLocalRemoveEffects(orders, [removeEffect('a', 5), removeEffect('a', 9)]),
+    ).toEqual([])
+  })
+})
+
+describe('remove tombstone across the full reconcile pipeline', () => {
+  const removeEffect = (id: string, seq = 1): LocalMutationEffect => ({
+    type: 'remove',
+    id,
+    seq,
+  })
+
+  it('keeps a confirmed delete absent even when a buffered realtime upsert predates it', () => {
+    // Review blocker, success path: a buffered remote upsert lands before
+    // the local DELETE confirms; the old pipeline replayed the upsert after
+    // the remove and resurrected the order.
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+    const effects = [removeEffect('a', 2)]
+
+    const result = applyLocalRemoveEffects(
+      reconcileSnapshotWithEvents(
+        applyLocalUpsertEffects(snapshot, effects),
+        [upsertVersion('a', 11, 'remote-v11')],
+      ),
+      effects,
+    )
+
+    expect(result).toEqual([])
+  })
+
+  it('lets a confirmed delete win over a buffered upsert even when the upsert has a higher version', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+    const effects = [removeEffect('a', 2)]
+
+    const result = applyLocalRemoveEffects(
+      reconcileSnapshotWithEvents(
+        applyLocalUpsertEffects(snapshot, effects),
+        [upsertVersion('a', 20, 'remote-v20')],
+      ),
+      effects,
+    )
+
+    expect(result).toEqual([])
   })
 })
 

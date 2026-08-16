@@ -173,7 +173,25 @@ export const reconcileSnapshotWithEvents = (
 }
 
 /**
- * Applies confirmed local mutation effects on top of a snapshot, before the
+ * Ids with a confirmed local remove in the effect journal, as terminal
+ * tombstones: the Legero backend never reuses an order id (orders are
+ * created with a fresh uuid), so once a delete is confirmed a remove must
+ * beat every other statement for the id — the snapshot, buffered realtime
+ * upserts, and local store records alike. Removes commute with removes, so
+ * confirmation order is irrelevant.
+ */
+export const confirmedRemoveIds = (
+  effects: LocalMutationEffect[],
+): string[] =>
+  effects
+    .filter(
+      (effect): effect is Extract<LocalMutationEffect, { type: 'remove' }> =>
+        effect.type === 'remove',
+    )
+    .map((effect) => effect.id)
+
+/**
+ * Applies confirmed local upsert effects on top of a snapshot, before the
  * buffered realtime events are replayed.
  *
  * The snapshot was read at one point in time; a local mutation that
@@ -182,14 +200,10 @@ export const reconcileSnapshotWithEvents = (
  * paths, so the mutation's WS echo may not have arrived yet. An upsert
  * effect lands only where the snapshot does not already hold a strictly
  * newer record (an equal version is the same server commit — idempotent).
- * A remove effect deletes the id unconditionally: a confirmed local delete
- * must stay absent even when the snapshot still contains the order.
- *
- * Events are applied afterwards, so their statements remain the newest
- * server state: a buffered remove/clear still beats a local effect, and an
- * upsert event with a higher version still wins.
+ * A buffered upsert event replayed afterwards with a higher version still
+ * wins.
  */
-export const applyLocalMutationEffects = (
+export const applyLocalUpsertEffects = (
   snapshot: OrderRecord[],
   effects: LocalMutationEffect[],
 ): OrderRecord[] => {
@@ -198,8 +212,7 @@ export const applyLocalMutationEffects = (
   )
 
   for (const effect of effects) {
-    if (effect.type === 'remove') {
-      ordersById.delete(effect.id)
+    if (effect.type !== 'upsert') {
       continue
     }
 
@@ -208,6 +221,27 @@ export const applyLocalMutationEffects = (
     if (!current || current.version <= effect.order.version) {
       ordersById.set(effect.order.id, effect.order)
     }
+  }
+
+  return [...ordersById.values()]
+}
+
+/**
+ * Applies confirmed local removes as terminal tombstones on top of an
+ * already-reconciled order list. Call this last: a delete that confirmed
+ * during the snapshot's lifetime must stay absent even when a buffered
+ * realtime upsert predates it — the WS echo of the delete, or a remote
+ * update, can never outlive the delete, because the backend never reuses
+ * the order id.
+ */
+export const applyLocalRemoveEffects = (
+  orders: OrderRecord[],
+  effects: LocalMutationEffect[],
+): OrderRecord[] => {
+  const ordersById = new Map(orders.map((order) => [order.id, order]))
+
+  for (const id of confirmedRemoveIds(effects)) {
+    ordersById.delete(id)
   }
 
   return [...ordersById.values()]
