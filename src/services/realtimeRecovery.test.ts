@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   networkAddListener: vi.fn(),
   networkGetStatus: vi.fn(),
   appAddListener: vi.fn(),
+  appGetState: vi.fn(),
 }))
 
 vi.mock('@capacitor/core', () => ({
@@ -23,7 +24,7 @@ vi.mock('@capacitor/network', () => ({
 }))
 
 vi.mock('@capacitor/app', () => ({
-  App: { addListener: mocks.appAddListener },
+  App: { addListener: mocks.appAddListener, getState: mocks.appGetState },
 }))
 
 const makeHandlers = (): RealtimeRecoveryHandlers => ({
@@ -117,6 +118,34 @@ describe('realtimeRecovery (web fallback)', () => {
 
     stop()
   })
+
+  it('reports background when the page starts hidden', () => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    })
+
+    const handlers = makeHandlers()
+    const stop = startRealtimeRecoverySignals(handlers)
+
+    expect(handlers.onAppBackground).toHaveBeenCalledTimes(1)
+
+    stop()
+  })
+
+  it('does not report background when the page starts visible', () => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    })
+
+    const handlers = makeHandlers()
+    const stop = startRealtimeRecoverySignals(handlers)
+
+    expect(handlers.onAppBackground).not.toHaveBeenCalled()
+
+    stop()
+  })
 })
 
 describe('realtimeRecovery (native)', () => {
@@ -127,6 +156,7 @@ describe('realtimeRecovery (native)', () => {
       .mockReset()
       .mockResolvedValue({ connected: true, connectionType: 'wifi' })
     mocks.appAddListener.mockReset().mockResolvedValue({ remove: vi.fn() })
+    mocks.appGetState.mockReset().mockResolvedValue({ isActive: true })
   })
 
   afterEach(() => {
@@ -193,6 +223,28 @@ describe('realtimeRecovery (native)', () => {
 
     expect(removeNetwork).toHaveBeenCalledTimes(1)
     expect(removeApp).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports background when the app starts backgrounded', async () => {
+    mocks.appGetState.mockResolvedValue({ isActive: false })
+
+    const handlers = makeHandlers()
+    const stop = startRealtimeRecoverySignals(handlers)
+
+    await flushAsync()
+    expect(handlers.onAppBackground).toHaveBeenCalledTimes(1)
+
+    stop()
+  })
+
+  it('does not report background when the app starts in the foreground', async () => {
+    const handlers = makeHandlers()
+    const stop = startRealtimeRecoverySignals(handlers)
+
+    await flushAsync()
+    expect(handlers.onAppBackground).not.toHaveBeenCalled()
+
+    stop()
   })
 
   it('keeps cleanup idempotent when stopped before listeners are registered', async () => {

@@ -37,10 +37,15 @@ const startWebRecoverySignals = (
   window.addEventListener('offline', handleOffline)
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
-  // The page may have loaded while the network was already down; report the
-  // current status so the state machine defers retries until recovery.
+  // The page may have loaded while the network was already down or the
+  // page was already hidden; report the current status so the state machine
+  // defers retries until recovery.
   if (!navigator.onLine) {
     handlers.onNetworkOffline()
+  }
+
+  if (document.visibilityState !== 'visible') {
+    handlers.onAppBackground()
   }
 
   return () => {
@@ -94,11 +99,18 @@ const startNativeRecoverySignals = (
 
     removeAppListener = () => appListener.remove()
 
-    // Report the initial network state (the app may start while offline).
+    // Report the initial network and lifecycle state (the app may start
+    // while offline or already backgrounded).
     const status = await Network.getStatus()
 
     if (isActive && !status.connected) {
       handlers.onNetworkOffline()
+    }
+
+    const appState = await CapacitorApp.getState()
+
+    if (isActive && !appState.isActive) {
+      handlers.onAppBackground()
     }
   }
 
