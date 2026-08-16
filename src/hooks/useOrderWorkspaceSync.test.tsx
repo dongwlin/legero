@@ -582,4 +582,90 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     expect(useOrderStore.getState().ordersById['today']).toEqual(today)
     expect(useOrderStore.getState().ordersById['yesterday']).toBeUndefined()
   })
+
+  it('keeps an order absent after upsert then clear(all) when the follow-up snapshot fails', async () => {
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const oldOrder = makeOrder('a', '2020-01-01T10:00:00+08:00')
+
+    await act(async () => {
+      first.resolve([oldOrder])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeDefined()
+
+    // The server sends upsert a and then a full clear, both before the next
+    // rAF flush. Client execution order must stay upsert -> clear, so the
+    // clear wipes the flushed upsert instead of the upsert resurrecting the
+    // order after the clear.
+    act(() => {
+      ws.onUpsert(oldOrder)
+      ws.onClear({ clearedCount: 1, mode: 'all' })
+    })
+
+    expect(useOrderStore.getState().ordersById).toEqual({})
+
+    // The non-blocking follow-up snapshot fails: the order must stay absent.
+    await act(async () => {
+      second.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById).toEqual({})
+  })
+
+  it('keeps an old order absent after upsert then clear(before_today) when the follow-up snapshot fails', async () => {
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const today = todayOrder('today')
+    const oldOrder = makeOrder('a', '2020-01-01T10:00:00+08:00')
+
+    await act(async () => {
+      first.resolve([today, oldOrder])
+      await flushAsync()
+    })
+
+    // The server sends upsert a and then a before_today clear, both before
+    // the next rAF flush: the old order must not be re-applied after the
+    // clear has dropped it.
+    act(() => {
+      ws.onUpsert(oldOrder)
+      ws.onClear({ clearedCount: 1, mode: 'before_today' })
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+
+    // The non-blocking follow-up snapshot fails: the old order stays absent,
+    // today's order stays put.
+    await act(async () => {
+      second.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+  })
 })

@@ -308,7 +308,12 @@ export const useOrderWorkspaceSync = () => {
               // No snapshot in flight: apply the clear semantics to the
               // store immediately, so a failed follow-up snapshot cannot
               // leave server-deleted orders behind (the follow-up then
-              // reconciles any boundary ambiguity).
+              // reconciles any boundary ambiguity). Batched upserts/removes
+              // that arrived before the clear are flushed first — they
+              // belong to the pre-clear server state, and flushing them
+              // inside syncSnapshot() would re-apply them after the clear
+              // and resurrect orders the server already deleted.
+              flushBatched()
               applyClearToStore(event.mode)
               void syncSnapshot(false)
             }
