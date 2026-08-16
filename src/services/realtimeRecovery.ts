@@ -114,7 +114,10 @@ const startNativeRecoverySignals = (
     }
   }
 
-  void register()
+  // A plugin registration failure (e.g. a broken native bridge) must not
+  // surface as an unhandled rejection: the recovery signals stay silent and
+  // the timer-based reconnect state machine remains the fallback.
+  void register().catch(() => {})
 
   return () => {
     isActive = false

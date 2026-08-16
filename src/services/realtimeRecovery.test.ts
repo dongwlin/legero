@@ -258,4 +258,33 @@ describe('realtimeRecovery (native)', () => {
 
     expect(mocks.networkAddListener).toHaveBeenCalledTimes(1)
   })
+
+  it('swallows a network listener registration rejection', async () => {
+    mocks.networkAddListener.mockRejectedValue(new Error('bridge broken'))
+
+    const stop = startRealtimeRecoverySignals(makeHandlers())
+    await flushAsync()
+    stop()
+  })
+
+  it('swallows an app listener registration rejection and still removes the network listener', async () => {
+    const removeNetwork = vi.fn()
+    mocks.networkAddListener.mockResolvedValue({ remove: removeNetwork })
+    mocks.appAddListener.mockRejectedValue(new Error('bridge broken'))
+
+    const stop = startRealtimeRecoverySignals(makeHandlers())
+    await flushAsync()
+    stop()
+    await flushAsync()
+
+    expect(removeNetwork).toHaveBeenCalledTimes(1)
+  })
+
+  it('swallows an initial status read rejection', async () => {
+    mocks.networkGetStatus.mockRejectedValue(new Error('bridge broken'))
+
+    const stop = startRealtimeRecoverySignals(makeHandlers())
+    await flushAsync()
+    stop()
+  })
 })
