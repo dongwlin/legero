@@ -411,6 +411,14 @@ export const orderRealtime = {
         return
       }
 
+      // Starting a connection while offline or backgrounded would only burn
+      // an auth/session request on a dead environment; the recovery signals
+      // drive the attempt once it is usable again.
+      if (isBackgrounded || !networkOnline) {
+        state = 'reconnecting'
+        return
+      }
+
       state = 'connecting'
       clearReconnectTimer()
       clearReadyTimer()

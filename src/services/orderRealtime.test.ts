@@ -921,4 +921,48 @@ describe('orderRealtime connection lifecycle', () => {
 
     subscription.close()
   })
+
+  it('defers the initial connect when the subscription starts backgrounded', async () => {
+    mocks.startRealtimeRecoverySignals.mockImplementation(
+      (handlers: RecoveryHandlers) => {
+        handlers.onAppBackground()
+        return () => {}
+      },
+    )
+
+    const subscription = subscribe()
+
+    await flushAsync()
+    // No futile auth/session request while backgrounded.
+    expect(mocks.ensureFreshAuthTokens).not.toHaveBeenCalled()
+
+    // Foreground recovery starts the flow.
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+    expect(mocks.ensureFreshAuthTokens).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('defers the initial connect when the subscription starts offline', async () => {
+    mocks.startRealtimeRecoverySignals.mockImplementation(
+      (handlers: RecoveryHandlers) => {
+        handlers.onNetworkOffline()
+        return () => {}
+      },
+    )
+
+    const subscription = subscribe()
+
+    await flushAsync()
+    expect(mocks.ensureFreshAuthTokens).not.toHaveBeenCalled()
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    // Network recovery starts the flow.
+    recoveryHandlers().onNetworkOnline()
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
 })
