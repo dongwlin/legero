@@ -5,6 +5,7 @@ import {
   type OrderRealtimeSubscription,
 } from '@/services/orderRealtime'
 import {
+  applyLocalMutationEffects,
   createOrderEventBuffer,
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
@@ -215,8 +216,9 @@ export const useOrderWorkspaceSync = () => {
       // so the snapshot cannot overwrite them. Flush anything received
       // before the reconciliation started first (those events predate the
       // snapshot read and are already covered by it). The mutation marker
-      // records which optimistic mutations may span the snapshot's lifetime:
-      // their records must survive the commit even when no realtime event
+      // records which local mutations — pending optimistic toggles and
+      // confirmed form updates, creates or deletes — may span the snapshot's
+      // lifetime: they must survive the commit even when no realtime event
       // mentions them (e.g. the WS echo has not arrived yet).
       flushBatched()
       const snapshotMarker = orderOptimistic.captureSnapshotMarker()
@@ -229,17 +231,27 @@ export const useOrderWorkspaceSync = () => {
           return
         }
 
-        // The snapshot is the base state; buffered events are newer and win.
-        // Records for mutations that overlap this snapshot's lifetime are
-        // re-applied so the snapshot cannot clobber them — but the version
-        // comparison runs against the reconciled candidate itself, so a
-        // strictly higher authoritative state (a buffered event or a
-        // snapshot read from a state newer than the mutation's base) still
-        // wins.
+        // The snapshot is the base state. On top of it the commit replays the
+        // sources that are newer than the snapshot read, in ascending age:
+        // first the confirmed local mutations that overlapped the snapshot's
+        // lifetime (their authoritative HTTP responses are known even when
+        // the WS echo is not — form updates, creates and deletes included),
+        // then the buffered realtime events, which stay the newest server
+        // statements. Records for mutations that are still only pending (not
+        // confirmed, hence absent from the effects journal) are re-applied
+        // last by version against the reconciled candidate, so a strictly
+        // higher authoritative state still wins while a stale snapshot never
+        // clobbers the local record.
         const events = eventBuffer.endReconciliation()
         setOrders(
           overlayProtectedRecords(
-            reconcileSnapshotWithEvents(nextOrders, events),
+            reconcileSnapshotWithEvents(
+              applyLocalMutationEffects(
+                nextOrders,
+                orderOptimistic.effectsAfter(snapshotMarker),
+              ),
+              events,
+            ),
             orderOptimistic.idsToProtect(snapshotMarker),
           ),
         )

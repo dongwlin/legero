@@ -6,6 +6,7 @@ import { type OrderFormValue, type OrderRecord } from '@/types'
 import { isOrderConflictError } from '@/services/apiClient'
 import { rebuildOrderRecord } from '@/services/orderFactories'
 import { orderRepository } from '@/services/orderRepository'
+import { orderOptimistic } from '@/services/orderOptimistic'
 import { requestOrdersResync } from '@/services/orderResync'
 import { useOrderStore } from '@/store/order'
 import { useOrderForm, FormMode } from './useOrderForm'
@@ -347,8 +348,13 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         )
         // Authoritative merge: newly created records are absent from the
         // store, so this applies them; it also guards the rare replay where
-        // the store somehow already holds the id at a higher version.
+        // the store somehow already holds the id at a higher version. The
+        // confirmed creates are journaled so an in-flight snapshot cannot
+        // drop them before their realtime echo arrives.
         upsertOrdersIfNewer(persistedRecords)
+        for (const persistedRecord of persistedRecords) {
+          orderOptimistic.recordUpsert(persistedRecord)
+        }
       } else {
         const activeRecord = activeItem ?? null
 
@@ -369,8 +375,11 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
 
         // The response is authoritative but may arrive after a realtime
         // update with an even higher version (another client's commit): the
-        // version-aware merge keeps the higher version.
+        // version-aware merge keeps the higher version. The confirmed update
+        // is journaled so a snapshot overlapping this mutation cannot
+        // downgrade it when the WS echo has not arrived yet.
         upsertIfNewer(persistedRecord)
+        orderOptimistic.recordUpsert(persistedRecord)
       }
 
       handleDialogClose(true)

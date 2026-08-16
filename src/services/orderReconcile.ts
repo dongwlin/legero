@@ -1,5 +1,6 @@
 import type { ClearWorkspaceMode } from '@/services/apiTypes'
 import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import type { LocalMutationEffect } from '@/services/orderOptimistic'
 import type { OrderRecord } from '@/types'
 
 /**
@@ -169,6 +170,47 @@ export const reconcileSnapshotWithEvents = (
         }
 
         break
+    }
+  }
+
+  return [...ordersById.values()]
+}
+
+/**
+ * Applies confirmed local mutation effects on top of a snapshot, before the
+ * buffered realtime events are replayed.
+ *
+ * The snapshot was read at one point in time; a local mutation that
+ * confirmed after that read is authoritative state the client already knows
+ * and must survive the commit — HTTP and WebSocket are independent transport
+ * paths, so the mutation's WS echo may not have arrived yet. An upsert
+ * effect lands only where the snapshot does not already hold a strictly
+ * newer record (an equal version is the same server commit — idempotent).
+ * A remove effect deletes the id unconditionally: a confirmed local delete
+ * must stay absent even when the snapshot still contains the order.
+ *
+ * Events are applied afterwards, so their statements remain the newest
+ * server state: a buffered remove/clear still beats a local effect, and an
+ * upsert event with a higher version still wins.
+ */
+export const applyLocalMutationEffects = (
+  snapshot: OrderRecord[],
+  effects: LocalMutationEffect[],
+): OrderRecord[] => {
+  const ordersById = new Map<string, OrderRecord>(
+    snapshot.map((order) => [order.id, order]),
+  )
+
+  for (const effect of effects) {
+    if (effect.type === 'remove') {
+      ordersById.delete(effect.id)
+      continue
+    }
+
+    const current = ordersById.get(effect.order.id)
+
+    if (!current || current.version <= effect.order.version) {
+      ordersById.set(effect.order.id, effect.order)
     }
   }
 

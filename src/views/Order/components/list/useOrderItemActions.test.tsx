@@ -212,6 +212,61 @@ describe('useOrderItemActions optimistic mutations', () => {
     stopResync()
   })
 
+  it('journals a confirmed toggle as an authoritative upsert effect', async () => {
+    const record = makeOrder('a', { version: 5, note: 'original' })
+    useOrderStore.getState().upsertOrder(record)
+
+    const marker = orderOptimistic.captureSnapshotMarker()
+
+    const serverRecord = makeOrder('a', {
+      version: 6,
+      note: 'server-after-toggle',
+      stapleStepStatusCode: STEP_STATUS.completed,
+    })
+    mocks.toggleStep.mockResolvedValue(serverRecord)
+
+    const { result } = renderHook(() => useOrderItemActions(record))
+
+    act(() => {
+      result.current.handleToggleStapleStep()
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    // A snapshot that overlaps this mutation can replay the confirmed result
+    // even when the WS echo has not arrived yet.
+    expect(orderOptimistic.effectsAfter(marker)).toEqual([
+      { type: 'upsert', order: serverRecord, seq: expect.any(Number) },
+    ])
+  })
+
+  it('journals a confirmed delete as a remove effect', async () => {
+    const record = makeOrder('a', { version: 5, note: 'original' })
+    useOrderStore.getState().upsertOrder(record)
+
+    const marker = orderOptimistic.captureSnapshotMarker()
+    mocks.remove.mockResolvedValue(undefined)
+
+    const { result } = renderHook(() => useOrderItemActions(record))
+
+    act(() => {
+      void result.current.handleRemove()
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+
+    // A snapshot that overlaps this delete cannot resurrect the order.
+    expect(orderOptimistic.effectsAfter(marker)).toEqual([
+      { type: 'remove', id: 'a', seq: expect.any(Number) },
+    ])
+  })
+
   it('does not let a late mutation response downgrade a newer realtime state', async () => {
     const record = makeOrder('a', { version: 10, note: 'original' })
     useOrderStore.getState().upsertOrder(record)

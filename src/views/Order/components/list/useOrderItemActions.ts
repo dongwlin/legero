@@ -71,8 +71,11 @@ export const useOrderItemActions = (
             // The response is authoritative, but it may arrive after a
             // realtime update with an even higher server version (another
             // client's commit). The version-aware merge keeps the higher
-            // version instead of overwriting the store blindly.
+            // version instead of overwriting the store blindly. The confirmed
+            // result is journaled too, so a snapshot that overlaps this
+            // mutation can never downgrade it even when the WS echo lags.
             upsertIfNewer(serverRecord)
+            orderOptimistic.recordUpsert(serverRecord)
           }
         })
         .catch((error) => {
@@ -134,6 +137,9 @@ export const useOrderItemActions = (
     try {
       await orderRepository.remove(record.id)
       removeOrder(record.id)
+      // Journal the confirmed delete so a snapshot that overlaps it cannot
+      // resurrect the order when the WS remove event has not arrived yet.
+      orderOptimistic.recordRemove(record.id)
       setIsDeleteOpen(false)
     } catch (error) {
       setMutationError(getMutationErrorMessage(error))

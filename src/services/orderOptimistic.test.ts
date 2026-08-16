@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_ORDER_FORM_VALUE, STEP_STATUS, type OrderRecord } from '@/types'
 import { orderOptimistic } from './orderOptimistic'
 
-const makeOrder = (id: string): OrderRecord => ({
+const makeOrder = (id: string, overrides: Partial<OrderRecord> = {}): OrderRecord => ({
   ...DEFAULT_ORDER_FORM_VALUE,
   id,
   version: 1,
@@ -13,6 +13,7 @@ const makeOrder = (id: string): OrderRecord => ({
   createdAt: '2025-01-01T00:00:00+08:00',
   updatedAt: '2025-01-01T00:00:00+08:00',
   completedAt: null,
+  ...overrides,
 })
 
 describe('orderOptimistic snapshot markers', () => {
@@ -72,5 +73,72 @@ describe('orderOptimistic snapshot markers', () => {
 
     expect(orderOptimistic.endMutation('stale-end', secondGeneration)).toBe(true)
     expect(orderOptimistic.hasPending('stale-end')).toBe(false)
+  })
+})
+
+describe('orderOptimistic confirmed mutation journal', () => {
+  it('recordUpsert protects the id against a snapshot that started before the confirmation', () => {
+    const marker = orderOptimistic.captureSnapshotMarker()
+
+    orderOptimistic.recordUpsert(
+      makeOrder('updated', { version: 11, note: 'confirmed' }),
+    )
+
+    expect(orderOptimistic.idsToProtect(marker).has('updated')).toBe(true)
+    expect(orderOptimistic.effectsAfter(marker)).toEqual([
+      {
+        type: 'upsert',
+        order: makeOrder('updated', { version: 11, note: 'confirmed' }),
+        seq: expect.any(Number),
+      },
+    ])
+  })
+
+  it('recordRemove protects the id and keeps its remove effect for replay', () => {
+    const marker = orderOptimistic.captureSnapshotMarker()
+
+    orderOptimistic.recordRemove('deleted')
+
+    expect(orderOptimistic.idsToProtect(marker).has('deleted')).toBe(true)
+    expect(orderOptimistic.effectsAfter(marker)).toEqual([
+      { type: 'remove', id: 'deleted', seq: expect.any(Number) },
+    ])
+  })
+
+  it('does not surface confirmed effects that predate the snapshot marker', () => {
+    orderOptimistic.recordUpsert(makeOrder('predates', { version: 5 }))
+
+    const marker = orderOptimistic.captureSnapshotMarker()
+
+    expect(orderOptimistic.effectsAfter(marker)).toEqual([])
+    expect(orderOptimistic.idsToProtect(marker).has('predates')).toBe(false)
+  })
+
+  it('keeps only the latest confirmed effect per id and replays in confirmation order', () => {
+    const marker = orderOptimistic.captureSnapshotMarker()
+
+    orderOptimistic.recordUpsert(
+      makeOrder('first', { version: 1, note: 'v1' }),
+    )
+    orderOptimistic.recordUpsert(
+      makeOrder('second', { version: 2, note: 'v2' }),
+    )
+    // A later confirmation of the same id replaces the earlier effect.
+    orderOptimistic.recordUpsert(
+      makeOrder('first', { version: 3, note: 'v3' }),
+    )
+    orderOptimistic.recordRemove('deleted')
+
+    const effects = orderOptimistic.effectsAfter(marker)
+    expect(effects.map((effect) => effect.type)).toEqual([
+      'upsert',
+      'upsert',
+      'remove',
+    ])
+    expect(
+      effects
+        .filter((effect) => effect.type === 'upsert')
+        .map((effect) => (effect.type === 'upsert' ? effect.order.version : -1)),
+    ).toEqual([2, 3])
   })
 })

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 import { requestOrdersResync } from '@/services/orderResync'
+import type { LocalMutationEffect } from '@/services/orderOptimistic'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 import {
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   hasPending: vi.fn(),
   captureSnapshotMarker: vi.fn(),
   idsToProtect: vi.fn(),
+  effectsAfter: vi.fn(),
 }))
 
 vi.mock('@/services/orderRealtime', () => ({
@@ -43,6 +45,7 @@ vi.mock('@/services/orderOptimistic', () => ({
     hasPending: mocks.hasPending,
     captureSnapshotMarker: mocks.captureSnapshotMarker,
     idsToProtect: mocks.idsToProtect,
+    effectsAfter: mocks.effectsAfter,
   },
 }))
 
@@ -138,6 +141,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
       .mockReset()
       .mockReturnValue({ seq: 0, pendingIds: [] })
     mocks.idsToProtect.mockReset().mockReturnValue(new Set())
+    mocks.effectsAfter.mockReset().mockReturnValue([])
   })
 
   afterEach(() => {
@@ -334,6 +338,122 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     const order = useOrderStore.getState().ordersById['a']
     expect(order?.version).toBe(11)
     expect(order?.note).toBe('authoritative-snapshot')
+  })
+
+  it('keeps an edit-form update that completes during the snapshot', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+    const confirmed: LocalMutationEffect = {
+      type: 'upsert',
+      order: makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 11,
+        note: 'form-update-confirmed',
+      }),
+      seq: 1,
+    }
+    mocks.effectsAfter.mockReturnValue([confirmed])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The form's PUT succeeds while the snapshot is in flight: the
+    // authoritative v11 response lands in the store and in the journal, but
+    // no WS echo is buffered before the snapshot commits.
+    act(() => {
+      useOrderStore.getState().upsertOrder(confirmed.order)
+    })
+
+    // The snapshot (read at v10, before the PUT) returns the stale state.
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 10,
+          note: 'stale-snapshot',
+        }),
+      ])
+      await flushAsync()
+    })
+
+    // The stale snapshot must not downgrade the confirmed update.
+    const order = useOrderStore.getState().ordersById['a']
+    expect(order?.version).toBe(11)
+    expect(order?.note).toBe('form-update-confirmed')
+  })
+
+  it('keeps an order created during the snapshot', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.idsToProtect.mockReturnValue(new Set(['c']))
+    const created: LocalMutationEffect = {
+      type: 'upsert',
+      order: makeOrder('c', '2025-01-03T00:00:00+08:00', {
+        version: 1,
+        note: 'created',
+      }),
+      seq: 1,
+    }
+    mocks.effectsAfter.mockReturnValue([created])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The POST response confirms the new order while the snapshot is in
+    // flight; its WS echo has not arrived yet.
+    act(() => {
+      useOrderStore.getState().upsertOrder(created.order)
+    })
+
+    // The snapshot was read before the create and does not contain c.
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00'),
+        makeOrder('b', '2025-01-02T00:00:00+08:00'),
+      ])
+      await flushAsync()
+    })
+
+    // The stale snapshot must not drop the freshly created order.
+    expect(useOrderStore.getState().ordersById['c']).toEqual(created.order)
+  })
+
+  it('keeps an order deleted during the snapshot absent', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+    mocks.effectsAfter.mockReturnValue([{ type: 'remove', id: 'a', seq: 1 }])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    // The DELETE succeeds while the snapshot is in flight: the store already
+    // dropped a, and its WS remove event has not arrived yet.
+    act(() => {
+      useOrderStore.getState().removeOrder('a')
+    })
+
+    // The snapshot was read before the delete and still contains a.
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+      ])
+      await flushAsync()
+    })
+
+    // The stale snapshot must not resurrect the deleted order.
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
   })
 
   it('lets a newer realtime upsert win over a completed local mutation (success path)', async () => {

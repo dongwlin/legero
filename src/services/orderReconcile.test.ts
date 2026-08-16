@@ -7,6 +7,7 @@ import { DEFAULT_ORDER_FORM_VALUE, STEP_STATUS, type OrderRecord } from '@/types
 dayjs.extend(utc)
 dayjs.extend(timezone)
 import {
+  applyLocalMutationEffects,
   compactRealtimeEvents,
   createOrderEventBuffer,
   isNewerOrder,
@@ -14,6 +15,7 @@ import {
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
 } from './orderReconcile'
+import type { LocalMutationEffect } from './orderOptimistic'
 
 const makeOrder = (
   id: string,
@@ -340,6 +342,126 @@ describe('version ordering primitives', () => {
 
     expect(pickLatestOrder(a, b)).toBe(a)
     expect(pickLatestOrder(b, a)).toBe(b)
+  })
+})
+
+describe('applyLocalMutationEffects', () => {
+  const effect = (
+    order: OrderRecord,
+    seq = 1,
+  ): LocalMutationEffect => ({ type: 'upsert', order, seq })
+  const removeEffect = (id: string, seq = 1): LocalMutationEffect => ({
+    type: 'remove',
+    id,
+    seq,
+  })
+
+  it('applies a confirmed upsert over a stale snapshot record', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+
+    const result = applyLocalMutationEffects(snapshot, [
+      effect(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'confirmed-update',
+        }),
+      ),
+    ])
+
+    expect(result).toEqual([
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 11,
+        note: 'confirmed-update',
+      }),
+    ])
+  })
+
+  it('adds an order the snapshot does not contain (confirmed create)', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00'),
+      makeOrder('b', '2025-01-02T00:00:00+08:00'),
+    ]
+    const created = makeOrder('c', '2025-01-03T00:00:00+08:00', {
+      note: 'confirmed-create',
+    })
+
+    expect(applyLocalMutationEffects(snapshot, [effect(created)])).toEqual([
+      ...snapshot,
+      created,
+    ])
+  })
+
+  it('does not apply an upsert effect when the snapshot record is strictly newer', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 12,
+        note: 'snapshot-v12',
+      }),
+    ]
+
+    const result = applyLocalMutationEffects(snapshot, [
+      effect(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'stale-effect',
+        }),
+      ),
+    ])
+
+    expect(result).toEqual(snapshot)
+  })
+
+  it('treats an equal-version effect as the same server commit (idempotent)', () => {
+    const result = applyLocalMutationEffects(
+      [
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'snapshot',
+        }),
+      ],
+      [
+        effect(
+          makeOrder('a', '2025-01-01T00:00:00+08:00', {
+            version: 11,
+            note: 'echo',
+          }),
+        ),
+      ],
+    )
+
+    expect(result[0]?.version).toBe(11)
+  })
+
+  it('keeps a confirmed delete absent even when the snapshot still contains the order', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+
+    expect(applyLocalMutationEffects(snapshot, [removeEffect('a')])).toEqual([])
+  })
+
+  it('applies a mix of confirmed upserts and removes', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 9 }),
+      makeOrder('b', '2025-01-02T00:00:00+08:00', { version: 9 }),
+    ]
+    const created = makeOrder('c', '2025-01-03T00:00:00+08:00')
+
+    const result = applyLocalMutationEffects(snapshot, [
+      removeEffect('b'),
+      effect(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 10,
+          note: 'updated',
+        }),
+      ),
+      effect(created),
+    ])
+
+    expect(result.map((order) => order.id).sort()).toEqual(['a', 'c'])
+    expect(result.find((order) => order.id === 'a')?.version).toBe(10)
   })
 })
 
