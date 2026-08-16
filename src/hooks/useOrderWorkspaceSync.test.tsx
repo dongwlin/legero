@@ -10,6 +10,7 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 import { requestOrdersResync } from '@/services/orderResync'
 import type { LocalMutationEffect } from '@/services/orderOptimistic'
+import { orderTombstones } from '@/services/orderTombstones'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 import {
@@ -128,6 +129,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
   beforeEach(() => {
     resetStores()
     subscriptionCallbacks = null
+    orderTombstones.reset()
     mocks.subscribeToWorkspaceOrders.mockReset().mockImplementation(
       (options: SubscriptionCallbacks) => {
         subscriptionCallbacks = options
@@ -1657,5 +1659,221 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     const order = useOrderStore.getState().ordersById['a']
     expect(order?.version).toBe(12)
     expect(order?.note).toBe('remote-v12')
+  })
+})
+
+describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
+  beforeEach(() => {
+    resetStores()
+    subscriptionCallbacks = null
+    orderTombstones.reset()
+    mocks.subscribeToWorkspaceOrders.mockReset().mockImplementation(
+      (options: SubscriptionCallbacks) => {
+        subscriptionCallbacks = options
+        return { close: vi.fn() }
+      },
+    )
+    mocks.unsubscribe.mockReset().mockResolvedValue(undefined)
+    mocks.listOrders.mockReset().mockResolvedValue([])
+    mocks.hasPending.mockReset().mockReturnValue(false)
+    mocks.captureSnapshotMarker
+      .mockReset()
+      .mockReturnValue({ seq: 0, pendingIds: [] })
+    mocks.idsToProtect.mockReset().mockReturnValue(new Set())
+    mocks.effectsAfter.mockReset().mockReturnValue([])
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  const waitForFrame = async () => {
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve())
+      })
+    })
+  }
+
+  it('does not let a delayed realtime upsert resurrect an order removed via the normal realtime path', async () => {
+    // Review blocker, Case 1: no reconciliation in flight. The remove applies
+    // through the ordinary rAF batch, then a stale delayed upsert of the same
+    // id arrives in a LATER batch — with no session tombstone it would look
+    // like a brand-new record (the store has no current entry) and resurrect
+    // the deleted order. The two events must live in different rAF batches,
+    // otherwise the flush order (upserts then removes) would mask the bug.
+    mocks.listOrders.mockResolvedValue([
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 }),
+    ])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    await act(async () => {
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']?.version).toBe(11)
+
+    act(() => {
+      ws.onRemove('a')
+    })
+    await waitForFrame()
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+
+    // Delayed realtime upsert arrives in a different rAF batch.
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+    await waitForFrame()
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+  })
+
+  it('does not let a delayed realtime upsert resurrect an order after a confirmed local delete', async () => {
+    // Review blocker, Case 2: local DELETE succeeds with no snapshot in
+    // flight, then a delayed realtime upsert of the deleted id arrives. The
+    // local delete registers the same session-wide tombstone as a realtime
+    // remove, so the upsert must not be treated as a new record.
+    mocks.listOrders.mockResolvedValue([
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 }),
+    ])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    await act(async () => {
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']?.version).toBe(11)
+
+    // The local DELETE success path: store removal + shared tombstone.
+    act(() => {
+      useOrderStore.getState().removeOrder('a')
+      orderTombstones.markRemoved('a')
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+    await waitForFrame()
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+  })
+
+  it('drops a queued realtime upsert when a local delete confirms before the flush', async () => {
+    // The realtime upsert was already batched when the local DELETE confirmed
+    // before the rAF flush: the flush must not re-apply the queued event to
+    // the (now empty) store slot.
+    mocks.listOrders.mockResolvedValue([
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    await act(async () => {
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']?.version).toBe(10)
+
+    // The upsert is queued for the next rAF flush…
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'remote-v11',
+        }),
+      )
+    })
+
+    // …then the local DELETE confirms before the flush runs.
+    act(() => {
+      useOrderStore.getState().removeOrder('a')
+      orderTombstones.markRemoved('a')
+    })
+
+    await waitForFrame()
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+  })
+
+  it('keeps a session tombstone from the normal realtime path authoritative across a later reconciliation', async () => {
+    // The tombstone is not a reconciliation-window concept: a remove applied
+    // through the normal path must still win when a later reconciliation
+    // buffers a stale upsert of the same id over a snapshot that still
+    // contains the deleted order.
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const orderA = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 })
+
+    await act(async () => {
+      first.resolve([orderA])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeDefined()
+
+    // Realtime remove lands in the normal path (no reconciliation in flight).
+    act(() => {
+      ws.onRemove('a')
+    })
+    await waitForFrame()
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+
+    // A later reconciliation starts (reconnect); while its snapshot is in
+    // flight the server broadcasts a stale delayed upsert of the tombstoned
+    // id.
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    expect(mocks.listOrders).toHaveBeenCalledTimes(2)
+
+    act(() => {
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+
+    // The stale snapshot still contains the order: the session tombstone (not
+    // the buffered remove, which never arrived) must keep it absent.
+    await act(async () => {
+      second.resolve([orderA])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
   })
 })

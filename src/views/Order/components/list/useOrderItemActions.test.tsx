@@ -4,6 +4,7 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/services/apiClient'
 import { orderOptimistic } from '@/services/orderOptimistic'
+import { orderTombstones } from '@/services/orderTombstones'
 import { subscribeOrdersResync } from '@/services/orderResync'
 import { useOrderStore } from '@/store/order'
 import {
@@ -78,6 +79,7 @@ const resetStores = () => {
 describe('useOrderItemActions optimistic mutations', () => {
   beforeEach(() => {
     resetStores()
+    orderTombstones.reset()
     mocks.toggleStep.mockReset()
     mocks.toggleServed.mockReset()
     mocks.remove.mockReset()
@@ -265,6 +267,11 @@ describe('useOrderItemActions optimistic mutations', () => {
     expect(orderOptimistic.effectsAfter(marker)).toEqual([
       { type: 'remove', id: 'a', seq: expect.any(Number) },
     ])
+
+    // The same delete registers the session-wide terminal tombstone, so the
+    // normal realtime path (outside any reconciliation) cannot resurrect the
+    // id with a delayed upsert either.
+    expect(orderTombstones.has('a')).toBe(true)
   })
 
   it('does not let a late mutation response downgrade a newer realtime state', async () => {
