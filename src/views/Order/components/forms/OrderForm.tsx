@@ -3,8 +3,10 @@ import { CarbonAdd } from '@/components/Icon'
 import { Button, CloseButton, Modal, Separator, TextArea } from '@heroui/react'
 import { registerAndroidBackInterceptor } from '@/hooks/useAndroidBackButton'
 import { type OrderFormValue, type OrderRecord } from '@/types'
+import { isOrderConflictError } from '@/services/apiClient'
 import { rebuildOrderRecord } from '@/services/orderFactories'
 import { orderRepository } from '@/services/orderRepository'
+import { requestOrdersResync } from '@/services/orderResync'
 import { useOrderStore } from '@/store/order'
 import { useOrderForm, FormMode } from './useOrderForm'
 import { QuantitySelector } from '../selectors/QuantitySelector'
@@ -354,6 +356,14 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
       handleDialogClose(true)
     } catch (error) {
       setIsSubmitting(false)
+
+      // A 409 order_conflict means the edited order advanced on the server
+      // while the form was open: surface the error and refetch the
+      // authoritative state so the list no longer shows the stale version.
+      if (isOrderConflictError(error)) {
+        requestOrdersResync()
+      }
+
       setSubmitError(getErrorMessage(error))
     }
   }
