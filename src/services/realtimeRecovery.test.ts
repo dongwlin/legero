@@ -104,7 +104,7 @@ describe('realtimeRecovery (web fallback)', () => {
       if (originalDescriptor) {
         Object.defineProperty(navigator, 'onLine', originalDescriptor)
       } else {
-        delete (navigator as Record<string, unknown>).onLine
+        delete (navigator as unknown as Record<string, unknown>).onLine
       }
     }
   })
@@ -149,7 +149,7 @@ describe('realtimeRecovery (native)', () => {
     )
 
     const networkCallback = mocks.networkAddListener.mock.calls[0]?.[1] as (
-      status: { connected: boolean },
+      status: { connected: boolean; connectionType?: string },
     ) => void
     networkCallback({ connected: false, connectionType: 'none' })
     expect(handlers.onNetworkOffline).toHaveBeenCalledTimes(1)

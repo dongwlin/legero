@@ -7,6 +7,8 @@ import type {
   RealtimeSessionResponse,
 } from './apiTypes'
 import { orderDtoToOrderRecord } from './orderRecordMapper'
+import { startRealtimeRecoverySignals } from './realtimeRecovery'
+import type { RealtimeRecoveryHandlers } from './realtimeRecovery'
 import { realtimeSession } from './realtimeSession'
 
 type SubscriptionStatus =
@@ -54,6 +56,11 @@ export const READY_TIMEOUT_MS = 8_000
 // only then is the failure counter reset. Resetting on 'ready' would turn a
 // flapping connection into a fixed high-frequency reconnect loop.
 export const STABLE_CONNECTION_MS = 30_000
+
+// A socket that stays 'online' through a background session of at least this
+// length is presumed stale on return to the foreground (mobile OSes routinely
+// freeze or tear down background connections) and is rebuilt immediately.
+export const BACKGROUND_STALE_MS = 30_000
 
 export const INITIAL_RECONNECT_DELAY_MS = 1_000
 export const MAX_RECONNECT_DELAY_MS = 30_000
@@ -154,6 +161,10 @@ export const orderRealtime = {
     let stableConnectionTimer: number | null = null
     let sessionAbortController: AbortController | null = null
     let readyTimer: number | null = null
+    let stopRecoverySignals: (() => void) | null = null
+    let networkOnline = true
+    let isBackgrounded = false
+    let backgroundedAt = 0
 
     const isClosed = (): boolean => state === 'closed'
 
@@ -226,6 +237,14 @@ export const orderRealtime = {
       reconnectAttempts += 1
       clearStableConnectionTimer()
       clearReconnectTimer()
+
+      // While offline or backgrounded, timer-based retries are paused: they
+      // would burn battery on futile attempts. The recovery signals (network
+      // online, app foreground) drive the next attempt instead.
+      if (isBackgrounded || !networkOnline) {
+        return
+      }
+
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null
         void connect()
@@ -246,6 +265,108 @@ export const orderRealtime = {
       ) {
         activeSocket.close(code, reason)
       }
+    }
+
+    // Abandon the current attempt (socket and/or in-flight session request):
+    // bump the generation so late events from it are rejected, then tear down
+    // whatever is live. Used when the environment changes underneath the
+    // channel (network drop, network change, stale background socket).
+    const invalidateActiveSocket = (code: number, reason: string) => {
+      generation += 1
+      clearReadyTimer()
+      closeSocket(code, reason)
+      sessionAbortController?.abort()
+      sessionAbortController = null
+    }
+
+    const handleNetworkOffline = () => {
+      networkOnline = false
+
+      if (isClosed()) {
+        return
+      }
+
+      clearReconnectTimer()
+
+      if (state === 'online' || state === 'connecting') {
+        // A possibly half-open socket or an in-flight attempt: tear it down
+        // now instead of waiting for the OS to notice the dead interface.
+        invalidateActiveSocket(1000, 'network_offline')
+        state = 'reconnecting'
+      }
+    }
+
+    const handleNetworkOnline = () => {
+      networkOnline = true
+
+      if (isClosed() || isBackgrounded) {
+        return
+      }
+
+      clearReconnectTimer()
+
+      if (state === 'online') {
+        // The network identity changed (e.g. Wi-Fi -> cellular) without an
+        // offline event; the socket may be bound to a dead interface, so
+        // rebuild it for a guaranteed-fresh server state.
+        invalidateActiveSocket(1000, 'network_recovery')
+        void connect()
+        return
+      }
+
+      if (state === 'connecting') {
+        // An attempt is already in flight; let it finish.
+        return
+      }
+
+      // Break the backoff: a recovered network is a strong signal that the
+      // previous failures were environmental, not server-side.
+      reconnectAttempts = 0
+      void connect()
+    }
+
+    const handleAppBackground = () => {
+      isBackgrounded = true
+      backgroundedAt = Date.now()
+
+      if (isClosed()) {
+        return
+      }
+
+      // Pause timer-driven retries while backgrounded; recovery events resume
+      // the state machine.
+      clearReconnectTimer()
+    }
+
+    const handleAppForeground = () => {
+      isBackgrounded = false
+
+      if (isClosed() || !networkOnline) {
+        return
+      }
+
+      clearReconnectTimer()
+
+      if (state === 'online') {
+        // A long background session is presumed to have torn down the socket;
+        // rebuild it. Short backgrounds keep the healthy connection.
+        if (
+          backgroundedAt > 0 &&
+          Date.now() - backgroundedAt >= BACKGROUND_STALE_MS
+        ) {
+          invalidateActiveSocket(1000, 'foreground_recovery')
+          void connect()
+        }
+        return
+      }
+
+      if (state === 'connecting') {
+        // An attempt is already in flight; let it finish.
+        return
+      }
+
+      reconnectAttempts = 0
+      void connect()
     }
 
     const connect = async () => {
@@ -362,6 +483,14 @@ export const orderRealtime = {
       }
     }
 
+    const recoveryHandlers: RealtimeRecoveryHandlers = {
+      onNetworkOffline: handleNetworkOffline,
+      onNetworkOnline: handleNetworkOnline,
+      onAppBackground: handleAppBackground,
+      onAppForeground: handleAppForeground,
+    }
+    stopRecoverySignals = startRealtimeRecoverySignals(recoveryHandlers)
+
     void connect()
 
     return {
@@ -378,6 +507,8 @@ export const orderRealtime = {
         sessionAbortController?.abort()
         sessionAbortController = null
         closeSocket(1000, 'client_closed')
+        stopRecoverySignals?.()
+        stopRecoverySignals = null
         options.onSubscriptionStatus?.('CLOSED')
       },
     }

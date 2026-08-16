@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  BACKGROUND_STALE_MS,
   INITIAL_RECONNECT_DELAY_MS,
   MAX_RECONNECT_DELAY_MS,
   READY_TIMEOUT_MS,
@@ -29,6 +30,7 @@ const mocks = vi.hoisted(() => {
     ensureFreshAuthTokens: vi.fn(),
     getApiBaseUrl: vi.fn(),
     realtimeSessionCreate: vi.fn(),
+    startRealtimeRecoverySignals: vi.fn(),
   }
 })
 
@@ -40,6 +42,10 @@ vi.mock('./apiClient', () => ({
 
 vi.mock('./realtimeSession', () => ({
   realtimeSession: { create: mocks.realtimeSessionCreate },
+}))
+
+vi.mock('./realtimeRecovery', () => ({
+  startRealtimeRecoverySignals: mocks.startRealtimeRecoverySignals,
 }))
 
 class FakeWebSocket {
@@ -116,6 +122,16 @@ const subscribe = (extra: {
     onClear: extra.onClear ?? vi.fn(),
   })
 
+type RecoveryHandlers = {
+  onNetworkOffline: () => void
+  onNetworkOnline: () => void
+  onAppBackground: () => void
+  onAppForeground: () => void
+}
+
+const recoveryHandlers = (): RecoveryHandlers =>
+  mocks.startRealtimeRecoverySignals.mock.calls.at(-1)?.[0] as RecoveryHandlers
+
 describe('getReconnectDelayMs', () => {
   it('grows exponentially with full jitter and caps at the max delay', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
@@ -142,6 +158,9 @@ describe('orderRealtime connection lifecycle', () => {
     mocks.ensureFreshAuthTokens.mockReset().mockResolvedValue({ accessToken: 'access-1' })
     mocks.getApiBaseUrl.mockReset().mockReturnValue('http://localhost:8080')
     mocks.realtimeSessionCreate.mockReset().mockResolvedValue(SESSION)
+    mocks.startRealtimeRecoverySignals
+      .mockReset()
+      .mockReturnValue(() => {})
   })
 
   afterEach(() => {
@@ -545,5 +564,242 @@ describe('orderRealtime connection lifecycle', () => {
     socket.emit('order.upsert', { item: { id: 'o1' } })
 
     expect(onUpsert).not.toHaveBeenCalled()
+  })
+
+  it('unregisters recovery signals on close', async () => {
+    const stopRecoverySignals = vi.fn()
+    mocks.startRealtimeRecoverySignals.mockReturnValue(stopRecoverySignals)
+
+    const subscription = subscribe()
+    await flushAsync()
+
+    expect(mocks.startRealtimeRecoverySignals).toHaveBeenCalledTimes(1)
+    expect(stopRecoverySignals).not.toHaveBeenCalled()
+
+    subscription.close()
+    expect(stopRecoverySignals).toHaveBeenCalledTimes(1)
+  })
+
+  it('defers timer retries while offline and reconnects immediately on network recovery', async () => {
+    mocks.realtimeSessionCreate.mockRejectedValue(networkError())
+
+    const onSubscriptionStatus = vi.fn()
+    const subscription = subscribe({ onSubscriptionStatus })
+
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    // Network drops before the first backoff fires.
+    recoveryHandlers().onNetworkOffline()
+
+    // No timer-driven retries while offline.
+    await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 10)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    // Network returns: the backoff is broken and the next attempt is
+    // immediate, with no timer wait.
+    mocks.realtimeSessionCreate.mockResolvedValue(SESSION)
+    recoveryHandlers().onNetworkOnline()
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('SUBSCRIBED')
+
+    subscription.close()
+  })
+
+  it('closes a half-open online socket when the network drops', async () => {
+    const subscription = subscribe()
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    recoveryHandlers().onNetworkOffline()
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'network_offline' }])
+
+    // No retries while offline; a network recovery event drives the next try.
+    await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 10)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('aborts an in-flight session request when the network drops', async () => {
+    mocks.realtimeSessionCreate.mockImplementation((signal?: AbortSignal) => {
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'))
+        })
+      })
+    })
+
+    const subscription = subscribe()
+    await flushAsync()
+
+    const signal = mocks.realtimeSessionCreate.mock.calls[0]?.[0] as
+      | AbortSignal
+      | undefined
+    expect(signal).toBeDefined()
+    expect(signal?.aborted).toBe(false)
+
+    recoveryHandlers().onNetworkOffline()
+    expect(signal?.aborted).toBe(true)
+
+    // Offline: no timer retries. Network recovery reconnects immediately.
+    await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 10)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    mocks.realtimeSessionCreate.mockResolvedValue(SESSION)
+    recoveryHandlers().onNetworkOnline()
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it('rebuilds an online socket after a network identity change', async () => {
+    const onSubscriptionStatus = vi.fn()
+    const subscription = subscribe({ onSubscriptionStatus })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('SUBSCRIBED')
+
+    // Wi-Fi -> cellular often arrives as a change event without an offline
+    // transition; the old socket is rebuilt to guarantee fresh server state.
+    recoveryHandlers().onNetworkOnline()
+    await flushAsync()
+
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'network_recovery' }])
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    const nextSocket = latestSocket()
+    nextSocket.open()
+    nextSocket.emit('ready')
+    expect(onSubscriptionStatus).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it('pauses timer retries while backgrounded and reconnects immediately on foreground', async () => {
+    mocks.realtimeSessionCreate.mockRejectedValue(networkError())
+    const onSubscriptionStatus = vi.fn()
+    const subscription = subscribe({ onSubscriptionStatus })
+
+    await flushAsync()
+    await vi.advanceTimersByTimeAsync(500)
+    await flushAsync()
+
+    const attemptsBeforeBackground = mocks.realtimeSessionCreate.mock.calls.length
+    expect(attemptsBeforeBackground).toBeGreaterThan(1)
+
+    recoveryHandlers().onAppBackground()
+
+    // No timer-driven retries while backgrounded.
+    await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 10)
+    expect(mocks.realtimeSessionCreate.mock.calls.length).toBe(attemptsBeforeBackground)
+
+    // Foreground resumes with an immediate attempt.
+    mocks.realtimeSessionCreate.mockResolvedValue(SESSION)
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate.mock.calls.length).toBe(attemptsBeforeBackground + 1)
+
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('SUBSCRIBED')
+
+    subscription.close()
+  })
+
+  it('rebuilds a stale online socket after a long background', async () => {
+    const subscription = subscribe()
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    recoveryHandlers().onAppBackground()
+    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS)
+
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'foreground_recovery' }])
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it('keeps a healthy online socket after a short background', async () => {
+    const subscription = subscribe()
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    recoveryHandlers().onAppBackground()
+    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS - 1_000)
+
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+
+    expect(socket.closeCalls).toHaveLength(0)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('does not reconnect on foreground while the network is still offline', async () => {
+    mocks.realtimeSessionCreate.mockRejectedValue(networkError())
+    const subscription = subscribe()
+
+    await flushAsync()
+    recoveryHandlers().onNetworkOffline()
+    recoveryHandlers().onAppBackground()
+
+    await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 5)
+
+    // Foreground without network must not trigger an attempt.
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    // Once the network returns, the attempt is immediate.
+    mocks.realtimeSessionCreate.mockResolvedValue(SESSION)
+    recoveryHandlers().onNetworkOnline()
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it('coalesces simultaneous recovery events into a single connection flow', async () => {
+    mocks.realtimeSessionCreate.mockRejectedValue(networkError())
+    const subscription = subscribe()
+
+    await flushAsync()
+    await vi.advanceTimersByTimeAsync(500)
+    await flushAsync()
+
+    const attemptsBefore = mocks.realtimeSessionCreate.mock.calls.length
+
+    // Network online and app foreground fire back to back (e.g. airplane mode
+    // off while returning to the app): only one new attempt is started.
+    recoveryHandlers().onNetworkOnline()
+    recoveryHandlers().onAppForeground()
+    recoveryHandlers().onNetworkOnline()
+    await flushAsync()
+
+    expect(mocks.realtimeSessionCreate.mock.calls.length).toBe(attemptsBefore + 1)
+
+    subscription.close()
   })
 })
