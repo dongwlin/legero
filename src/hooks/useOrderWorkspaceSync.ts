@@ -4,6 +4,11 @@ import {
   orderRealtime,
   type OrderRealtimeSubscription,
 } from '@/services/orderRealtime'
+import {
+  createOrderEventBuffer,
+  reconcileSnapshotWithEvents,
+  type RealtimeOrderEvent,
+} from '@/services/orderReconcile'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 import { orderOptimistic } from '@/services/orderOptimistic'
@@ -39,6 +44,16 @@ export const useOrderWorkspaceSync = () => {
     const pendingRemoves = new Set<string>()
     let flushRafId: number | null = null
 
+    // Realtime events received while a snapshot request is in flight are
+    // buffered here and replayed over the snapshot when it lands, so the
+    // snapshot can never clobber updates that arrived after it was read
+    // (issue #12). Every syncSnapshot() run is a reconciliation: the
+    // initial subscribe and every reconnect use the same mechanism.
+    const eventBuffer = createOrderEventBuffer()
+    let syncInFlight = false
+    let pendingReconcile = false
+    let pendingReconcileShouldBlock = false
+
     const flushBatched = () => {
       flushRafId = null
 
@@ -70,13 +85,50 @@ export const useOrderWorkspaceSync = () => {
       flushRafId = window.requestAnimationFrame(flushBatched)
     }
 
+    // Failure recovery for a failed snapshot: buffered events must not be
+    // dropped — apply them as ordinary updates on top of whatever the store
+    // currently holds, then surface the error. The next successful
+    // reconciliation (retry or reconnect) restores the full server state.
+    const applyBufferedEvents = (events: RealtimeOrderEvent[]) => {
+      const store = useOrderStore.getState()
+
+      for (const event of events) {
+        if (event.type === 'upsert') {
+          store.upsertOrder(event.order)
+        } else if (event.type === 'remove') {
+          store.removeOrder(event.id)
+        } else {
+          store.clearOrders()
+        }
+      }
+    }
+
     const syncSnapshot = async (shouldBlock: boolean) => {
+      if (syncInFlight) {
+        // A new sync requested while one is already in flight (a reconnect
+        // SUBSCRIBED or a clear event): run it once the current one settles,
+        // keeping the most conservative blocking behaviour.
+        pendingReconcile = true
+        pendingReconcileShouldBlock = pendingReconcileShouldBlock || shouldBlock
+        return
+      }
+
+      syncInFlight = true
+
       if (shouldBlock) {
         setHydrationState({
           status: 'loading',
           errorMessage: null,
         })
       }
+
+      // From this point until the snapshot lands, realtime upsert/remove/
+      // clear events are buffered in arrival order instead of being applied,
+      // so the snapshot cannot overwrite them. Flush anything received
+      // before the reconciliation started first (those events predate the
+      // snapshot read and are already covered by it).
+      flushBatched()
+      eventBuffer.beginReconciliation()
 
       try {
         const nextOrders = await orderRepository.list('all')
@@ -85,11 +137,19 @@ export const useOrderWorkspaceSync = () => {
           return
         }
 
-        setOrders(nextOrders)
+        // The snapshot is the base state; buffered events are newer and win.
+        setOrders(
+          reconcileSnapshotWithEvents(
+            nextOrders,
+            eventBuffer.endReconciliation(),
+          ),
+        )
       } catch (error) {
         if (isDisposed) {
           return
         }
+
+        applyBufferedEvents(eventBuffer.endReconciliation())
 
         if (shouldBlock) {
           setHydrationState({
@@ -97,6 +157,15 @@ export const useOrderWorkspaceSync = () => {
             errorMessage: getErrorMessage(error),
           })
         }
+      } finally {
+        syncInFlight = false
+      }
+
+      if (pendingReconcile) {
+        pendingReconcile = false
+        const nextShouldBlock = pendingReconcileShouldBlock
+        pendingReconcileShouldBlock = false
+        void syncSnapshot(nextShouldBlock)
       }
     }
 
@@ -118,18 +187,39 @@ export const useOrderWorkspaceSync = () => {
                 return
               }
 
+              if (eventBuffer.isReconciling) {
+                eventBuffer.push({ type: 'upsert', order })
+                return
+              }
+
               pendingUpserts.set(order.id, order)
               scheduleBatchFlush()
             }
           },
           onRemove: (id) => {
             if (!isDisposed) {
+              if (eventBuffer.isReconciling) {
+                eventBuffer.push({ type: 'remove', id })
+                return
+              }
+
               pendingRemoves.add(id)
               scheduleBatchFlush()
             }
           },
           onClear: () => {
             if (!isDisposed) {
+              if (eventBuffer.isReconciling) {
+                // A clear that arrives while a snapshot is in flight: buffer
+                // it so the reconciliation replays it (otherwise the
+                // snapshot would resurrect cleared orders), and schedule the
+                // follow-up snapshot the clear already implied (before_today
+                // keeps part of the list).
+                eventBuffer.push({ type: 'clear' })
+                pendingReconcile = true
+                return
+              }
+
               void syncSnapshot(false)
             }
           },
