@@ -42,11 +42,11 @@ export const pickLatestOrder = (
  * - For each order id only one event survives. Between upserts the strictly
  *   higher server version wins regardless of arrival order (an equal version
  *   keeps the earlier arrival — it is the same server state), so a delayed
- *   stale event can never overwrite a newer one. A remove wins over any
- *   prior upsert, and an upsert that follows a remove is a recreation —
- *   unless the remove itself followed a prior upsert of this stream, in
- *   which case the trailing upsert is a stale event and must not resurrect
- *   the order.
+ *   stale event can never overwrite a newer one. Once a remove appears for
+ *   an id it is a terminal tombstone for the rest of the window: the Legero
+ *   backend never reuses an order id (orders are created with a fresh uuid),
+ *   so a trailing upsert is not a recreation but a stale, delayed event and
+ *   must not resurrect the order, while an earlier upsert is superseded.
  * - Every clear op itself survives, so the replay can apply its semantics to
  *   the snapshot.
  *
@@ -72,9 +72,11 @@ export const compactRealtimeEvents = (
     lastClearAllIndex === -1 ? events : events.slice(lastClearAllIndex)
   const clearIndices = new Set<number>()
   const winnerIndexById = new Map<string, number>()
-  // Tracks ids whose remove followed a prior upsert in this stream: a later
-  // upsert for such an id is a stale, delayed event, not a recreation.
-  const removedAfterUpsert = new Set<string>()
+  // Once a remove appears for an id it is a terminal tombstone inside this
+  // reconciliation window: the backend never reuses an order id, so ids
+  // arriving after the remove are not recreations but delayed/stale events
+  // that must not resurrect the order.
+  const removedIds = new Set<string>()
 
   for (let index = 0; index < tail.length; index += 1) {
     const event = tail[index]
@@ -85,37 +87,31 @@ export const compactRealtimeEvents = (
     }
 
     const id = event.type === 'upsert' ? event.order.id : event.id
-    const currentIndex = winnerIndexById.get(id)
-    const current =
-      currentIndex === undefined ? undefined : tail[currentIndex]
 
     if (event.type === 'remove') {
       winnerIndexById.set(id, index)
-
-      if (current?.type === 'upsert') {
-        removedAfterUpsert.add(id)
-      }
-
+      removedIds.add(id)
       continue
     }
 
-    if (current === undefined) {
+    if (removedIds.has(id)) {
+      continue
+    }
+
+    const currentIndex = winnerIndexById.get(id)
+
+    if (currentIndex === undefined) {
       winnerIndexById.set(id, index)
       continue
     }
 
-    if (current.type === 'remove') {
-      if (!removedAfterUpsert.has(id)) {
-        winnerIndexById.set(id, index)
-      }
+    const current = tail[currentIndex]
 
-      continue
-    }
-
-    if (event.type === 'upsert' && current.type === 'upsert') {
-      if (event.order.version > current.order.version) {
-        winnerIndexById.set(id, index)
-      }
+    if (
+      current.type === 'upsert' &&
+      event.order.version > current.order.version
+    ) {
+      winnerIndexById.set(id, index)
     }
   }
 

@@ -456,6 +456,41 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
   })
 
+  it('does not let a delayed buffered upsert resurrect an order removed during the snapshot', async () => {
+    // Review blocker, compaction: within one reconciliation window the WS
+    // events are remove a followed by a stale delayed upsert of a. Since
+    // the backend never reuses an order id, the remove is a terminal
+    // tombstone and the trailing upsert must be dropped.
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    act(() => {
+      ws.onRemove('a')
+      ws.onUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'stale-delayed',
+        }),
+      )
+    })
+
+    await act(async () => {
+      snapshot.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+      ])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+  })
+
   it('lets a newer realtime upsert win over a completed local mutation (success path)', async () => {
     const snapshot = deferred<OrderRecord[]>()
     mocks.listOrders.mockReturnValue(snapshot.promise)

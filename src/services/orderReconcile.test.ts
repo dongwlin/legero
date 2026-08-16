@@ -97,9 +97,12 @@ describe('compactRealtimeEvents', () => {
     expect(compactRealtimeEvents([upsert('a'), remove('a')])).toEqual([remove('a')])
   })
 
-  it('lets a trailing upsert win over an earlier remove of the same id', () => {
+  it('does not let a delayed upsert resurrect an order removed earlier in the window', () => {
+    // The backend never reuses an order id, so a remove is a terminal
+    // tombstone for its id: a trailing upsert is a stale/delayed event, not
+    // a recreation.
     expect(compactRealtimeEvents([remove('a'), upsert('a', 'v1')])).toEqual([
-      upsert('a', 'v1'),
+      remove('a'),
     ])
   })
 
@@ -109,6 +112,15 @@ describe('compactRealtimeEvents', () => {
         upsertVersion('a', 13, 'v13'),
         remove('a'),
         upsertVersion('a', 12, 'v12-delayed'),
+      ]),
+    ).toEqual([remove('a')])
+  })
+
+  it('drops even a higher-version upsert that trails a remove of the same id', () => {
+    expect(
+      compactRealtimeEvents([
+        remove('a'),
+        upsertVersion('a', 15, 'v15-delayed'),
       ]),
     ).toEqual([remove('a')])
   })
