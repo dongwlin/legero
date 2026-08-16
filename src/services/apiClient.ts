@@ -9,6 +9,16 @@ export { API_CONFIGURATION_ERROR, getApiBaseUrl, hasApiConfig } from './apiConfi
 const AUTH_STORAGE_KEY = 'legero.auth.tokens'
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 30_000
 
+// The refresh fetch is the one step in the auth flow that can hang (a dead
+// network stack can leave a fetch pending indefinitely). Without a bound, the
+// single-flight refreshPromise would pin every waiting caller — including
+// realtime reconnects — on the same hung request forever, because every
+// ensureFreshAuthTokens() call returns that same pending promise. Abort the
+// fetch after this window; the finally below then clears the single-flight
+// slot so the next caller starts a genuinely fresh refresh instead of
+// inheriting the hung one.
+export const AUTH_REFRESH_TIMEOUT_MS = 8_000
+
 type ApiErrorBody = {
   error?: {
     code?: string
@@ -277,6 +287,11 @@ export const refreshAuthTokens = async (): Promise<AuthTokens> => {
     throw new ApiError(401, 'unauthorized', 'Not authenticated.')
   }
 
+  const refreshAbortController = new AbortController()
+  const refreshAbortTimer = window.setTimeout(() => {
+    refreshAbortController.abort()
+  }, AUTH_REFRESH_TIMEOUT_MS)
+
   refreshPromise = executeRequest<RefreshResponse>(
     {
       path: '/api/auth/refresh',
@@ -285,6 +300,7 @@ export const refreshAuthTokens = async (): Promise<AuthTokens> => {
         refreshToken: current.refreshToken,
       },
       retry: false,
+      signal: refreshAbortController.signal,
     },
     null,
   )
@@ -304,7 +320,11 @@ export const refreshAuthTokens = async (): Promise<AuthTokens> => {
       throw error
     })
     .finally(() => {
+      // Abort or not, the single-flight slot must be released so the next
+      // caller can start a fresh refresh: otherwise a hung request would be
+      // inherited by every retry forever.
       refreshPromise = null
+      window.clearTimeout(refreshAbortTimer)
     })
 
   return refreshPromise

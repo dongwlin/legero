@@ -1,4 +1,9 @@
-import { ApiError, ensureFreshAuthTokens, getApiBaseUrl } from './apiClient'
+import {
+  AUTH_REFRESH_TIMEOUT_MS,
+  ApiError,
+  ensureFreshAuthTokens,
+  getApiBaseUrl,
+} from './apiClient'
 import type {
   ClearWorkspaceMode,
   OrderDTO,
@@ -70,11 +75,12 @@ export type OrderRealtimeSubscription = {
 export const SESSION_TIMEOUT_MS = 5_000
 export const READY_TIMEOUT_MS = 8_000
 
-// ensureFreshAuthTokens() is single-flight and its refresh fetch has no
-// timeout of its own: a hung refresh would pin the channel in 'connecting'
-// forever, because every new ensureFreshAuthTokens() call returns the same
-// pending promise. Bound our wait so the state machine can move on and retry.
-export const AUTH_REFRESH_TIMEOUT_MS = 8_000
+// ensureFreshAuthTokens() is single-flight, but apiClient now bounds its own
+// refresh fetch with AUTH_REFRESH_TIMEOUT_MS and releases the single-flight
+// slot on abort, so the next attempt starts a genuinely fresh refresh. The
+// wrapper here is defense-in-depth: even if that bound is ever regressed, a
+// hung refresh must not pin the channel in 'connecting' forever — the state
+// machine moves on and retries.
 
 // A connection is only considered stable after staying online for this long;
 // only then is the failure counter reset. Resetting on 'ready' would turn a

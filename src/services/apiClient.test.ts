@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  AUTH_REFRESH_TIMEOUT_MS,
   apiRequest,
   clearStoredAuthTokens,
   getStoredAuthTokens,
@@ -253,3 +254,93 @@ describe('apiRequest token_expired refresh flow', () => {
     expect(mockFetch).toHaveBeenCalledTimes(3)
   })
 })
+
+describe('refreshAuthTokens timeout', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setStoredApiBaseUrl(BASE_URL)
+    persistAuthTokens(TOKENS)
+    mockFetch.mockReset()
+    vi.stubGlobal('fetch', mockFetch)
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    clearStoredAuthTokens()
+  })
+
+  const hangingFetch = (signal?: AbortSignal | null) =>
+    new Promise<Response>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'))
+      })
+    })
+
+  it('aborts a hung refresh fetch after the timeout and keeps the stored tokens', async () => {
+    mockFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      hangingFetch(init?.signal),
+    )
+
+    const refresh = refreshAuthTokens()
+    // Attach the rejection matcher up front: the abort fires while the fake
+    // timers advance, and a late handler would surface as an unhandled
+    // rejection.
+    const refreshResult = expect(refresh).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+
+    await vi.advanceTimersByTimeAsync(AUTH_REFRESH_TIMEOUT_MS - 1)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await refreshResult
+
+    // An abort is transient: the stored tokens must survive so the session
+    // can be restored once connectivity returns.
+    expect(getStoredAuthTokens()).toEqual(TOKENS)
+  })
+
+  it('releases the single-flight slot on abort so the next call starts a fresh refresh', async () => {
+    mockFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      hangingFetch(init?.signal),
+    )
+
+    const first = refreshAuthTokens()
+    const firstResult = expect(first).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    await vi.advanceTimersByTimeAsync(AUTH_REFRESH_TIMEOUT_MS)
+    await firstResult
+
+    // Without the slot being cleared, this second call would return the same
+    // hung promise and never see the server again.
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse(200, { ...TOKENS, accessToken: 'access-2' }),
+    )
+
+    const second = await refreshAuthTokens()
+    expect(second.accessToken).toBe('access-2')
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not abort a refresh that settled before the timeout', async () => {
+    let signal: AbortSignal | null | undefined
+    mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+      signal = init?.signal
+      return Promise.resolve(
+        jsonResponse(200, { ...TOKENS, accessToken: 'access-2' }),
+      )
+    })
+
+    await expect(refreshAuthTokens()).resolves.toMatchObject({
+      accessToken: 'access-2',
+    })
+    expect(signal?.aborted).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(AUTH_REFRESH_TIMEOUT_MS * 2)
+    expect(signal?.aborted).toBe(false)
+  })
+})
+
