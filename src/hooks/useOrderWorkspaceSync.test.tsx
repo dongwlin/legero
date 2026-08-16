@@ -1,7 +1,13 @@
 /* @vitest-environment jsdom */
 
 import { act, cleanup, renderHook } from '@testing-library/react'
+import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 import {
@@ -58,6 +64,14 @@ const makeOrder = (
   completedAt: null,
   ...overrides,
 })
+
+// The current calendar day in the business timezone (Asia/Shanghai), as the
+// server's before_today clear boundary uses the same definition.
+const todayKeyInShanghai = (): string =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+
+const todayOrder = (id: string): OrderRecord =>
+  makeOrder(id, `${todayKeyInShanghai()}T10:00:00+08:00`)
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
@@ -312,6 +326,87 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     expect(useOrderStore.getState().ordersById).toEqual({})
+    expect(useOrderStore.getState().status).toBe('ready')
+  })
+
+  it('keeps today orders when a before_today clear is received during the snapshot', async () => {
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    expect(mocks.listOrders).toHaveBeenCalledTimes(1)
+
+    const today = todayOrder('today')
+    const yesterday = makeOrder('yesterday', '2020-01-01T10:00:00+08:00')
+
+    act(() => {
+      ws.onClear({ clearedCount: 1, mode: 'before_today' })
+    })
+
+    await act(async () => {
+      first.resolve([today, yesterday])
+      await flushAsync()
+    })
+
+    // The reconciled snapshot drops pre-today orders but keeps today's, and
+    // the clear-triggered follow-up snapshot is already in flight.
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+    expect(useOrderStore.getState().ordersById['yesterday']).toBeUndefined()
+    expect(mocks.listOrders).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      second.resolve([today])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+    expect(useOrderStore.getState().ordersById['yesterday']).toBeUndefined()
+    expect(useOrderStore.getState().status).toBe('ready')
+  })
+
+  it('keeps today orders even when the follow-up snapshot after a before_today clear fails', async () => {
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const today = todayOrder('today')
+    const yesterday = makeOrder('yesterday', '2020-01-01T10:00:00+08:00')
+
+    act(() => {
+      ws.onClear({ clearedCount: 1, mode: 'before_today' })
+    })
+
+    await act(async () => {
+      first.resolve([today, yesterday])
+      await flushAsync()
+    })
+
+    // The non-blocking follow-up snapshot fails: the locally-reconciled
+    // state must survive — today's order stays, yesterday's stays gone.
+    await act(async () => {
+      second.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['today']).toEqual(today)
+    expect(useOrderStore.getState().ordersById['yesterday']).toBeUndefined()
     expect(useOrderStore.getState().status).toBe('ready')
   })
 

@@ -9,6 +9,8 @@ import {
   reconcileSnapshotWithEvents,
   type RealtimeOrderEvent,
 } from '@/services/orderReconcile'
+import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import type { ClearWorkspaceMode } from '@/services/apiTypes'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 import { orderOptimistic } from '@/services/orderOptimistic'
@@ -127,6 +129,22 @@ export const useOrderWorkspaceSync = () => {
       return [...ordersById.values()]
     }
 
+    // Applies a clear event's semantics to the store: 'all' empties the
+    // workspace, 'before_today' keeps only orders created on the current
+    // business day (the server deleted everything older).
+    const applyClearToStore = (mode: ClearWorkspaceMode) => {
+      const store = useOrderStore.getState()
+
+      if (mode === 'all') {
+        store.clearOrders()
+        return
+      }
+
+      store.setOrders(
+        Object.values(store.ordersById).filter((order) => isOrderCreatedToday(order)),
+      )
+    }
+
     // Failure recovery for a failed snapshot: buffered events must not be
     // dropped — apply them as ordinary updates on top of whatever the store
     // currently holds, then surface the error. The next successful
@@ -136,16 +154,27 @@ export const useOrderWorkspaceSync = () => {
       const pendingIds = collectPendingUpsertIds(events)
 
       for (const event of events) {
-        if (event.type === 'upsert') {
-          // Defer upserts for orders with an in-flight optimistic mutation:
-          // their completion (or rollback) owns the authoritative state.
-          if (!pendingIds.has(event.order.id)) {
-            store.upsertOrder(event.order)
+        switch (event.type) {
+          case 'upsert':
+            // Defer upserts for orders with an in-flight optimistic
+            // mutation: their completion (or rollback) owns the
+            // authoritative state.
+            if (!pendingIds.has(event.order.id)) {
+              store.upsertOrder(event.order)
+            }
+            break
+          case 'remove':
+            store.removeOrder(event.id)
+            break
+          case 'clear':
+            applyClearToStore(event.mode)
+            break
+          default: {
+            const exhaustive: never = event
+            throw new Error(
+              'Unknown realtime event: ' + JSON.stringify(exhaustive),
+            )
           }
-        } else if (event.type === 'remove') {
-          store.removeOrder(event.id)
-        } else {
-          store.clearOrders()
         }
       }
     }
@@ -263,7 +292,7 @@ export const useOrderWorkspaceSync = () => {
               scheduleBatchFlush()
             }
           },
-          onClear: () => {
+          onClear: (event) => {
             if (!isDisposed) {
               if (eventBuffer.isReconciling) {
                 // A clear that arrives while a snapshot is in flight: buffer
@@ -271,7 +300,7 @@ export const useOrderWorkspaceSync = () => {
                 // snapshot would resurrect cleared orders), and schedule the
                 // follow-up snapshot the clear already implied (before_today
                 // keeps part of the list).
-                eventBuffer.push({ type: 'clear' })
+                eventBuffer.push({ type: 'clear', mode: event.mode })
                 pendingReconcile = true
                 return
               }
