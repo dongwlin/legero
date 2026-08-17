@@ -89,42 +89,50 @@ export const orderRepository = {
     return sortOrdersByTimeline(response.items.map(orderDtoToOrderRecord))
   },
 
-  async update(id: string, record: OrderRecord): Promise<OrderRecord> {
+  async update(
+    id: string,
+    record: OrderRecord,
+    expectedVersion: number,
+  ): Promise<OrderRecord> {
     const response = await apiRequest<OrderItemResponse>({
       path: `/api/orders/${id}`,
       method: 'PUT',
       auth: true,
       body: {
         form: normalizeOrderFormValue(orderRecordToOrderFormValue(record)),
+        expectedVersion,
       },
     })
 
     return orderDtoToOrderRecord(response.item)
   },
 
-  async toggleStep(id: string, step: OrderStepKey, _record: OrderRecord): Promise<OrderRecord> {
-    void _record
-
+  async toggleStep(
+    id: string,
+    step: OrderStepKey,
+    expectedVersion: number,
+  ): Promise<OrderRecord> {
     const response = await apiRequest<OrderItemResponse>({
       path: `/api/orders/${id}/actions/toggle-step`,
       method: 'POST',
       auth: true,
       body: {
         step,
+        expectedVersion,
       },
     })
 
     return orderDtoToOrderRecord(response.item)
   },
 
-  async toggleServed(id: string, _record: OrderRecord): Promise<OrderRecord> {
-    void _record
-
+  async toggleServed(id: string, expectedVersion: number): Promise<OrderRecord> {
     const response = await apiRequest<OrderItemResponse>({
       path: `/api/orders/${id}/actions/toggle-served`,
       method: 'POST',
       auth: true,
-      body: {},
+      body: {
+        expectedVersion,
+      },
     })
 
     return orderDtoToOrderRecord(response.item)

@@ -20,7 +20,7 @@ import {
 
 type OrderRecordMetadata = Pick<
   OrderRecord,
-  'id' | 'displayNo' | 'createdAt' | 'updatedAt' | 'completedAt'
+  'id' | 'displayNo' | 'version' | 'createdAt' | 'updatedAt' | 'completedAt'
 >
 
 type OrderRecordStatusFields = Pick<
@@ -99,6 +99,7 @@ export const composeOrderRecord = (
   return synchronizeOrderCompletion({
     ...normalizedFormValue,
     id: metadata.id,
+    version: metadata.version,
     displayNo: metadata.displayNo ?? deriveDisplayNoFromId(metadata.id),
     totalPriceCents: calculateOrderTotalPriceCents(normalizedFormValue),
     stapleStepStatusCode: statusFields.stapleStepStatusCode,
@@ -111,7 +112,10 @@ export const composeOrderRecord = (
 
 export const createOrderRecord = (
   formValue: OrderFormValue,
-  metadata: Pick<OrderRecordMetadata, 'id' | 'displayNo' | 'createdAt' | 'updatedAt'>,
+  metadata: Pick<
+    OrderRecordMetadata,
+    'id' | 'displayNo' | 'version' | 'createdAt' | 'updatedAt'
+  >,
 ): OrderRecord => {
   const normalizedFormValue = normalizeOrderFormValue(formValue)
 
@@ -136,6 +140,7 @@ export const rebuildOrderRecord = (
     {
       id: baseRecord.id,
       displayNo: baseRecord.displayNo,
+      version: baseRecord.version,
       createdAt: baseRecord.createdAt,
       updatedAt: baseRecord.updatedAt,
       completedAt: null,

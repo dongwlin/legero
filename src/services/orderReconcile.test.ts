@@ -1,0 +1,729 @@
+import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
+import { describe, expect, it } from 'vitest'
+import { DEFAULT_ORDER_FORM_VALUE, STEP_STATUS, type OrderRecord } from '@/types'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+import {
+  applyLocalRemoveEffects,
+  applyLocalUpsertEffects,
+  compactRealtimeEvents,
+  confirmedRemoveIds,
+  createOrderEventBuffer,
+  isNewerOrder,
+  pickLatestOrder,
+  reconcileSnapshotWithEvents,
+  type RealtimeOrderEvent,
+} from './orderReconcile'
+import type { LocalMutationEffect } from './orderOptimistic'
+
+const makeOrder = (
+  id: string,
+  createdAt: string,
+  overrides: Partial<OrderRecord> = {},
+): OrderRecord => ({
+  ...DEFAULT_ORDER_FORM_VALUE,
+  id,
+  version: 1,
+  displayNo: id,
+  totalPriceCents: 1500,
+  stapleStepStatusCode: STEP_STATUS.notStarted,
+  meatStepStatusCode: STEP_STATUS.notStarted,
+  createdAt,
+  updatedAt: createdAt,
+  completedAt: null,
+  ...overrides,
+})
+
+const upsert = (id: string, note?: string): RealtimeOrderEvent => ({
+  type: 'upsert',
+  order: makeOrder(id, '2025-01-01T00:00:00+08:00', note ? { note } : {}),
+})
+
+const upsertVersion = (
+  id: string,
+  version: number,
+  note?: string,
+): RealtimeOrderEvent => ({
+  type: 'upsert',
+  order: makeOrder(id, '2025-01-01T00:00:00+08:00', {
+    version,
+    ...(note ? { note } : {}),
+  }),
+})
+
+const remove = (id: string): RealtimeOrderEvent => ({ type: 'remove', id })
+
+// The current calendar day in the business timezone (Asia/Shanghai), as the
+// server's before_today clear boundary uses the same definition.
+const todayKeyInShanghai = (): string =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+
+const clearAll: RealtimeOrderEvent = { type: 'clear', mode: 'all' }
+// A before_today clear carries the business-day key pinned when it was
+// received — the replay judges orders against that pinned day, never the
+// live date.
+const clearBeforeToday: RealtimeOrderEvent = {
+  type: 'clear',
+  mode: 'before_today',
+  clearDateKey: todayKeyInShanghai(),
+}
+
+const todayOrder = (id: string, overrides: Partial<OrderRecord> = {}): OrderRecord =>
+  makeOrder(id, `${todayKeyInShanghai()}T10:00:00+08:00`, overrides)
+
+const yesterdayOrder = (id: string, overrides: Partial<OrderRecord> = {}): OrderRecord =>
+  makeOrder(id, '2025-01-01T10:00:00+08:00', overrides)
+
+describe('compactRealtimeEvents', () => {
+  it('drops earlier duplicate upserts, keeping the newest per id', () => {
+    expect(
+      compactRealtimeEvents([upsertVersion('a', 1, 'v1'), upsertVersion('a', 2, 'v2')]),
+    ).toEqual([upsertVersion('a', 2, 'v2')])
+  })
+
+  it('keeps the highest version even when an older event arrives later', () => {
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 12, 'v12'),
+        upsertVersion('a', 11, 'v11-delayed'),
+      ]),
+    ).toEqual([upsertVersion('a', 12, 'v12')])
+  })
+
+  it('collapses duplicate upserts with the same version as idempotent', () => {
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 11, 'first'),
+        upsertVersion('a', 11, 'echo'),
+      ]),
+    ).toEqual([upsertVersion('a', 11, 'first')])
+  })
+
+  it('lets a trailing remove win over an earlier upsert of the same id', () => {
+    expect(compactRealtimeEvents([upsert('a'), remove('a')])).toEqual([remove('a')])
+  })
+
+  it('does not let a delayed upsert resurrect an order removed earlier in the window', () => {
+    // The backend never reuses an order id, so a remove is a terminal
+    // tombstone for its id: a trailing upsert is a stale/delayed event, not
+    // a recreation.
+    expect(compactRealtimeEvents([remove('a'), upsert('a', 'v1')])).toEqual([
+      remove('a'),
+    ])
+  })
+
+  it('does not let a stale upsert resurrect an order removed after an upsert', () => {
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 13, 'v13'),
+        remove('a'),
+        upsertVersion('a', 12, 'v12-delayed'),
+      ]),
+    ).toEqual([remove('a')])
+  })
+
+  it('drops even a higher-version upsert that trails a remove of the same id', () => {
+    expect(
+      compactRealtimeEvents([
+        remove('a'),
+        upsertVersion('a', 15, 'v15-delayed'),
+      ]),
+    ).toEqual([remove('a')])
+  })
+
+  it('preserves the relative order of surviving events for distinct ids', () => {
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 1, 'v1'),
+        remove('b'),
+        upsertVersion('a', 2, 'v2'),
+        upsert('c'),
+      ]),
+    ).toEqual([remove('b'), upsertVersion('a', 2, 'v2'), upsert('c')])
+  })
+
+  it('drops everything before the last full clear but keeps the clear itself', () => {
+    expect(
+      compactRealtimeEvents([
+        upsert('a'),
+        clearAll,
+        upsert('b'),
+        remove('c'),
+      ]),
+    ).toEqual([clearAll, upsert('b'), remove('c')])
+  })
+
+  it('drops a post-clear upsert of an id the window saw before the full clear', () => {
+    // A full clear is a terminal delete of the ids known before it — exactly
+    // like a remove: the backend never reuses an order id, so a post-clear
+    // upsert is a stale/delayed event, not a recreation.
+    expect(
+      compactRealtimeEvents([
+        upsertVersion('a', 5, 'pre-clear'),
+        clearAll,
+        upsertVersion('a', 20, 'stale-delayed'),
+      ]),
+    ).toEqual([clearAll])
+  })
+
+  it('drops a post-clear upsert of an id removed before the full clear', () => {
+    expect(
+      compactRealtimeEvents([
+        remove('a'),
+        clearAll,
+        upsertVersion('a', 2, 'stale-delayed'),
+      ]),
+    ).toEqual([clearAll])
+  })
+
+  it('keeps a post-clear upsert of an id unseen before the full clear (fresh creation)', () => {
+    // An order created after the clear uses a fresh uuid, so it is not
+    // tombstoned by the clear and survives normally.
+    expect(compactRealtimeEvents([clearAll, upsert('fresh')])).toEqual([
+      clearAll,
+      upsert('fresh'),
+    ])
+  })
+
+  it('keeps only the latest clear and the events after it', () => {
+    expect(
+      compactRealtimeEvents([upsert('a'), clearAll, upsert('b'), clearAll, upsert('c')]),
+    ).toEqual([clearAll, upsert('c')])
+  })
+
+  it('returns an empty list for no events and a lone clear for a trailing clear', () => {
+    expect(compactRealtimeEvents([])).toEqual([])
+    expect(compactRealtimeEvents([upsert('a'), clearAll])).toEqual([clearAll])
+  })
+
+  it('keeps events before a before_today clear (they may touch today orders)', () => {
+    expect(
+      compactRealtimeEvents([upsert('a'), clearBeforeToday, upsert('b')]),
+    ).toEqual([upsert('a'), clearBeforeToday, upsert('b')])
+  })
+
+  it('keeps a trailing before_today clear', () => {
+    expect(compactRealtimeEvents([upsert('a'), clearBeforeToday])).toEqual([
+      upsert('a'),
+      clearBeforeToday,
+    ])
+  })
+
+  it('only a full clear makes earlier events moot, not a before_today clear', () => {
+    expect(
+      compactRealtimeEvents([
+        upsert('a'),
+        clearBeforeToday,
+        upsert('b'),
+        clearAll,
+        upsert('c'),
+      ]),
+    ).toEqual([clearAll, upsert('c')])
+  })
+})
+
+describe('reconcileSnapshotWithEvents', () => {
+  it('returns the snapshot untouched when no events were buffered', () => {
+    const snapshot = [makeOrder('a', '2025-01-01T00:00:00+08:00')]
+
+    expect(reconcileSnapshotWithEvents(snapshot, [])).toEqual(snapshot)
+  })
+
+  it('overlays buffered upserts on the snapshot, adding new orders', () => {
+    const snapshot = [makeOrder('a', '2025-01-01T00:00:00+08:00')]
+    const updated = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 2,
+      note: 'newer',
+    })
+    const created = makeOrder('b', '2025-01-02T00:00:00+08:00')
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      upsert('a'),
+      { type: 'upsert', order: updated },
+      { type: 'upsert', order: created },
+    ])
+
+    expect(result.map((order) => order.id).sort()).toEqual(['a', 'b'])
+    expect(result.find((order) => order.id === 'a')?.note).toBe('newer')
+    expect(result.find((order) => order.id === 'b')).toEqual(created)
+  })
+
+  it('removes snapshot orders deleted while the snapshot was in flight', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00'),
+      makeOrder('b', '2025-01-02T00:00:00+08:00'),
+    ]
+
+    expect(reconcileSnapshotWithEvents(snapshot, [remove('a')])).toEqual([
+      snapshot[1]
+    ])
+  })
+
+  it('resolves the issue race: snapshot cannot clobber events received during the fetch', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00'),
+      makeOrder('c', '2025-01-03T00:00:00+08:00'),
+    ]
+    const created = makeOrder('b', '2025-01-02T00:00:00+08:00')
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      { type: 'upsert', order: created },
+      remove('a'),
+    ])
+
+    expect(result.map((order) => order.id).sort()).toEqual(['b', 'c'])
+  })
+
+  it('does not let a stale buffered upsert downgrade a newer snapshot record', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 13,
+        note: 'snapshot-v13',
+      }),
+    ]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      upsertVersion('a', 12, 'stale-v12'),
+    ])
+
+    expect(result).toEqual(snapshot)
+  })
+
+  it('overlays a buffered upsert with a strictly higher version than the snapshot', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      upsertVersion('a', 12, 'remote-v12'),
+    ])
+
+    expect(result).toEqual([makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 12, note: 'remote-v12' })])
+  })
+
+  it('applies a full clear over the snapshot and keeps only later fresh events', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00'),
+      makeOrder('b', '2025-01-02T00:00:00+08:00'),
+    ]
+    const created = makeOrder('c', '2025-01-04T00:00:00+08:00')
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      upsert('b'),
+      clearAll,
+      { type: 'upsert', order: created },
+    ])
+
+    // A fresh id created after the clear survives; the pre-clear state is
+    // wiped regardless of the stale snapshot base.
+    expect(result).toEqual([created])
+  })
+
+  it('does not let a stale post-clear upsert resurrect an order known before the full clear', () => {
+    // A full clear is a terminal delete of every id the client knew at clear
+    // time — including the snapshot base, which was requested before the
+    // clear event arrived. The backend never reuses an order id, so a
+    // post-clear upsert of 'a' (present in the snapshot) is a stale, delayed
+    // event, not a recreation, and must not resurrect the order.
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+      makeOrder('b', '2025-01-02T00:00:00+08:00'),
+    ]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      upsert('b'),
+      clearAll,
+      upsertVersion('a', 20, 'stale-delayed'),
+    ])
+
+    expect(result).toEqual([])
+  })
+
+  it('a before_today clear drops only orders created before today', () => {
+    const snapshot = [todayOrder('today'), yesterdayOrder('yesterday')]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [clearBeforeToday])
+
+    expect(result).toEqual([snapshot[0]])
+  })
+
+  it('a before_today clear keeps newer upserts of today orders received before it', () => {
+    const updated = todayOrder('a', { note: 'v2' })
+
+    const result = reconcileSnapshotWithEvents(
+      [todayOrder('a'), yesterdayOrder('b')],
+      [
+        { type: 'upsert', order: updated },
+        clearBeforeToday,
+      ],
+    )
+
+    expect(result).toEqual([updated])
+  })
+
+  it('a before_today clear after a full clear keeps only post-clear events', () => {
+    const result = reconcileSnapshotWithEvents(
+      [todayOrder('a'), yesterdayOrder('b')],
+      [clearAll, clearBeforeToday],
+    )
+
+    expect(result).toEqual([])
+  })
+
+  it('does not let a delayed upsert resurrect an old order after a before_today clear', () => {
+    // Review blocker P1: a before_today clear is a terminal delete of every
+    // order created before the current business day. An upsert arriving after
+    // the clear whose `createdAt` is on a previous day cannot be a legitimate
+    // fresh creation (the backend never recreates a deleted id), so it must
+    // not resurrect the order from the snapshot base — regardless of how high
+    // its server version is.
+    const snapshot = [yesterdayOrder('yesterday', { version: 5 })]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      clearBeforeToday,
+      {
+        type: 'upsert',
+        order: yesterdayOrder('yesterday', { version: 20, note: 'stale-delayed' }),
+      },
+    ])
+
+    expect(result).toEqual([])
+  })
+
+  it('keeps an upsert of a genuinely today-created order after a before_today clear', () => {
+    // The date-based guard must not over-block: an order created today after
+    // the clear (fresh business-day work) survives it.
+    const snapshot = [yesterdayOrder('yesterday')]
+    const fresh = todayOrder('fresh')
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      clearBeforeToday,
+      { type: 'upsert', order: fresh },
+    ])
+
+    expect(result).toEqual([fresh])
+  })
+
+  it('replays a before_today clear against its pinned cutoff, not the live date', () => {
+    // Review blocker P1: the cutoff is the business-day key pinned when the
+    // clear was received, so a snapshot that lands after midnight replays
+    // the same semantics — an order created on the clear's own day survives
+    // even though the live "today" has rolled past it. The pinned date is in
+    // the past on purpose: only the pinned comparison (never the live-clock
+    // `isOrderCreatedToday`) keeps the clear's own day in scope.
+    const snapshot = [
+      makeOrder('a', '2020-08-17T10:00:00+08:00'),
+      makeOrder('b', '2020-08-16T10:00:00+08:00'),
+    ]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      { type: 'clear', mode: 'before_today', clearDateKey: '2020-08-17' },
+    ])
+
+    expect(result).toEqual([snapshot[0]])
+  })
+
+  it('keeps accepting delayed upserts created on or after the pinned cutoff', () => {
+    // Review blocker P1: an order created on the clear's business day is not
+    // in the clear's deletion scope, so its delayed (higher-version) upsert
+    // must survive even when the live date has moved on.
+    const orderA = makeOrder('a', '2020-08-17T10:00:00+08:00', { version: 1 })
+
+    const result = reconcileSnapshotWithEvents([], [
+      { type: 'clear', mode: 'before_today', clearDateKey: '2020-08-17' },
+      { type: 'upsert', order: { ...orderA, version: 2 } },
+    ])
+
+    expect(result).toEqual([{ ...orderA, version: 2 }])
+  })
+})
+
+describe('version ordering primitives', () => {
+  it('isNewerOrder compares exclusively by version', () => {
+    const older = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 })
+    const newer = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 })
+
+    expect(isNewerOrder(newer, older)).toBe(true)
+    expect(isNewerOrder(older, newer)).toBe(false)
+    expect(isNewerOrder(newer, { ...newer })).toBe(false)
+  })
+
+  it('pickLatestOrder returns the higher-version order', () => {
+    const older = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 5 })
+    const newer = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 9 })
+
+    expect(pickLatestOrder(older, newer)).toBe(newer)
+    expect(pickLatestOrder(newer, older)).toBe(newer)
+  })
+
+  it('same-second updatedAt cannot compete with versions: higher version wins', () => {
+    // Both records share the identical updatedAt (the race timestamps could
+    // not distinguish); only version can order them.
+    const sharedUpdatedAt = '2026-08-16T14:20:30+08:00'
+    const local = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 11,
+      updatedAt: sharedUpdatedAt,
+      note: 'local',
+    })
+    const remote = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 12,
+      updatedAt: sharedUpdatedAt,
+      note: 'remote',
+    })
+
+    expect(isNewerOrder(remote, local)).toBe(true)
+    expect(pickLatestOrder(local, remote)).toBe(remote)
+  })
+
+  it('an equal version is idempotent under pickLatestOrder', () => {
+    const a = makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 12 })
+    const b = { ...a, note: 'echo' }
+
+    expect(pickLatestOrder(a, b)).toBe(a)
+    expect(pickLatestOrder(b, a)).toBe(b)
+  })
+})
+
+describe('applyLocalUpsertEffects', () => {
+  const effect = (
+    order: OrderRecord,
+    seq = 1,
+  ): LocalMutationEffect => ({ type: 'upsert', order, seq })
+  const removeEffect = (id: string, seq = 1): LocalMutationEffect => ({
+    type: 'remove',
+    id,
+    seq,
+  })
+
+  it('applies a confirmed upsert over a stale snapshot record', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+
+    const result = applyLocalUpsertEffects(snapshot, [
+      effect(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'confirmed-update',
+        }),
+      ),
+    ])
+
+    expect(result).toEqual([
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 11,
+        note: 'confirmed-update',
+      }),
+    ])
+  })
+
+  it('adds an order the snapshot does not contain (confirmed create)', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00'),
+      makeOrder('b', '2025-01-02T00:00:00+08:00'),
+    ]
+    const created = makeOrder('c', '2025-01-03T00:00:00+08:00', {
+      note: 'confirmed-create',
+    })
+
+    expect(applyLocalUpsertEffects(snapshot, [effect(created)])).toEqual([
+      ...snapshot,
+      created,
+    ])
+  })
+
+  it('does not apply an upsert effect when the snapshot record is strictly newer', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', {
+        version: 12,
+        note: 'snapshot-v12',
+      }),
+    ]
+
+    const result = applyLocalUpsertEffects(snapshot, [
+      effect(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'stale-effect',
+        }),
+      ),
+    ])
+
+    expect(result).toEqual(snapshot)
+  })
+
+  it('treats an equal-version effect as the same server commit (idempotent)', () => {
+    const result = applyLocalUpsertEffects(
+      [
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 11,
+          note: 'snapshot',
+        }),
+      ],
+      [
+        effect(
+          makeOrder('a', '2025-01-01T00:00:00+08:00', {
+            version: 11,
+            note: 'echo',
+          }),
+        ),
+      ],
+    )
+
+    expect(result[0]?.version).toBe(11)
+  })
+
+  it('applies a mix of confirmed upserts and ignores remove effects', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 9 }),
+      makeOrder('b', '2025-01-02T00:00:00+08:00', { version: 9 }),
+    ]
+    const created = makeOrder('c', '2025-01-03T00:00:00+08:00')
+
+    const result = applyLocalUpsertEffects(snapshot, [
+      removeEffect('b'),
+      effect(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', {
+          version: 10,
+          note: 'updated',
+        }),
+      ),
+      effect(created),
+    ])
+
+    expect(result.map((order) => order.id).sort()).toEqual(['a', 'b', 'c'])
+    expect(result.find((order) => order.id === 'a')?.version).toBe(10)
+  })
+})
+
+describe('applyLocalRemoveEffects / confirmedRemoveIds', () => {
+  const removeEffect = (id: string, seq = 1): LocalMutationEffect => ({
+    type: 'remove',
+    id,
+    seq,
+  })
+  const upsertEffect = (order: OrderRecord, seq = 1): LocalMutationEffect => ({
+    type: 'upsert',
+    order,
+    seq,
+  })
+
+  it('keeps a confirmed delete absent even when the reconciled list contains the order', () => {
+    const orders = [makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 })]
+
+    expect(applyLocalRemoveEffects(orders, [removeEffect('a')])).toEqual([])
+  })
+
+  it('extracts only the removed ids from an effect journal', () => {
+    expect(
+      confirmedRemoveIds([
+        removeEffect('b'),
+        upsertEffect(makeOrder('a', '2025-01-01T00:00:00+08:00')),
+        removeEffect('c'),
+      ]),
+    ).toEqual(['b', 'c'])
+  })
+
+  it('removes all ids with a confirmed remove, keeping untouched orders', () => {
+    const orders = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 }),
+      makeOrder('b', '2025-01-02T00:00:00+08:00', { version: 11 }),
+    ]
+
+    expect(applyLocalRemoveEffects(orders, [removeEffect('a', 7)])).toEqual([
+      orders[1],
+    ])
+  })
+
+  it('is idempotent for duplicate removal effects of the same id', () => {
+    const orders = [makeOrder('a', '2025-01-01T00:00:00+08:00')]
+
+    expect(
+      applyLocalRemoveEffects(orders, [removeEffect('a', 5), removeEffect('a', 9)]),
+    ).toEqual([])
+  })
+})
+
+describe('remove tombstone across the full reconcile pipeline', () => {
+  const removeEffect = (id: string, seq = 1): LocalMutationEffect => ({
+    type: 'remove',
+    id,
+    seq,
+  })
+
+  it('keeps a confirmed delete absent even when a buffered realtime upsert predates it', () => {
+    // Review blocker, success path: a buffered remote upsert lands before
+    // the local DELETE confirms; the old pipeline replayed the upsert after
+    // the remove and resurrected the order.
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+    const effects = [removeEffect('a', 2)]
+
+    const result = applyLocalRemoveEffects(
+      reconcileSnapshotWithEvents(
+        applyLocalUpsertEffects(snapshot, effects),
+        [upsertVersion('a', 11, 'remote-v11')],
+      ),
+      effects,
+    )
+
+    expect(result).toEqual([])
+  })
+
+  it('lets a confirmed delete win over a buffered upsert even when the upsert has a higher version', () => {
+    const snapshot = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 10 }),
+    ]
+    const effects = [removeEffect('a', 2)]
+
+    const result = applyLocalRemoveEffects(
+      reconcileSnapshotWithEvents(
+        applyLocalUpsertEffects(snapshot, effects),
+        [upsertVersion('a', 20, 'remote-v20')],
+      ),
+      effects,
+    )
+
+    expect(result).toEqual([])
+  })
+})
+
+describe('createOrderEventBuffer', () => {
+  it('drops events pushed outside a reconciliation', () => {
+    const buffer = createOrderEventBuffer()
+
+    buffer.push(upsert('a'))
+
+    expect(buffer.endReconciliation()).toEqual([])
+  })
+
+  it('buffers events in arrival order and returns them compacted on end', () => {
+    const buffer = createOrderEventBuffer()
+
+    buffer.beginReconciliation()
+    buffer.push(upsert('a', 'v1'))
+    buffer.push(remove('b'))
+    buffer.push(upsertVersion('a', 2, 'v2'))
+
+    expect(buffer.isReconciling).toBe(true)
+    expect(buffer.endReconciliation()).toEqual([remove('b'), upsertVersion('a', 2, 'v2')])
+    expect(buffer.isReconciling).toBe(false)
+  })
+
+  it('resets the buffer on begin, discarding the previous reconciliation', () => {
+    const buffer = createOrderEventBuffer()
+
+    buffer.beginReconciliation()
+    buffer.push(upsert('a'))
+    buffer.endReconciliation()
+
+    buffer.beginReconciliation()
+    buffer.push(remove('b'))
+
+    expect(buffer.endReconciliation()).toEqual([remove('b')])
+  })
+})

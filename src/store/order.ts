@@ -80,9 +80,25 @@ interface OrderState {
   lastHydratedAt: string | null
   status: OrderStoreStatus
   errorMessage: string | null
+  /**
+   * Monotonic counter of reconciliation commits (`setOrders` calls): a
+   * consumer that requested an authoritative resync can tell a commit that
+   * landed after its request from one that predates it.
+   */
+  orderSyncSeq: number
   setOrders: (orders: OrderRecord[]) => void
   upsertOrder: (item: OrderRecord) => void
   upsertOrders: (items: OrderRecord[]) => void
+  /**
+   * Authoritative merge: applies `item` only when it is strictly newer than
+   * the store's record for the same id (higher server `version`). An equal
+   * version is the same server commit (idempotent) and a lower version is
+   * stale — neither may overwrite the store. This is the single entry point
+   * for every authoritative write path: realtime upserts, mutation
+   * responses, snapshot replay and failure recovery.
+   */
+  upsertIfNewer: (item: OrderRecord) => void
+  upsertOrdersIfNewer: (items: OrderRecord[]) => void
   removeOrder: (id: string) => void
   clearOrders: () => void
   resetSyncState: () => void
@@ -108,6 +124,7 @@ export const useOrderStore = create<OrderState>()(
       lastHydratedAt: null,
       status: 'idle',
       errorMessage: null,
+      orderSyncSeq: 0,
       setOrders: (orders) =>
         set((state) => {
           const sorted = sortOrdersByTimeline(orders)
@@ -122,6 +139,7 @@ export const useOrderStore = create<OrderState>()(
             lastHydratedAt: new Date().toISOString(),
             status: 'ready' as const,
             errorMessage: null,
+            orderSyncSeq: state.orderSyncSeq + 1,
             ...createQuickCalcState(nextSelectedOrderIds),
           }
         }),
@@ -185,6 +203,36 @@ export const useOrderStore = create<OrderState>()(
             errorMessage: null,
           }
         }),
+      upsertOrdersIfNewer: (items) => {
+        if (items.length === 0) {
+          return
+        }
+
+        const state = get()
+        const toApply = new Map<string, OrderRecord>()
+
+        for (const item of items) {
+          const current = toApply.get(item.id) ?? state.ordersById[item.id]
+
+          if (!current || item.version > current.version) {
+            toApply.set(item.id, item)
+          }
+        }
+
+        if (toApply.size > 0) {
+          state.upsertOrders([...toApply.values()])
+        }
+      },
+      upsertIfNewer: (item) => {
+        const state = get()
+        const existing = state.ordersById[item.id]
+
+        if (existing && item.version <= existing.version) {
+          return
+        }
+
+        state.upsertOrder(item)
+      },
       removeOrder: (id) =>
         set((state) => {
           const newOrdersById = { ...state.ordersById }
@@ -220,6 +268,7 @@ export const useOrderStore = create<OrderState>()(
           status: 'idle',
           errorMessage: null,
           updateTargetID: '',
+          orderSyncSeq: 0,
           ...createQuickCalcState(EMPTY_QUICK_CALC_SELECTION),
         }),
       setFilter: (filter) => set({ filter }),

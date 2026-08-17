@@ -3,8 +3,12 @@ import { CarbonAdd } from '@/components/Icon'
 import { Button, CloseButton, Modal, Separator, TextArea } from '@heroui/react'
 import { registerAndroidBackInterceptor } from '@/hooks/useAndroidBackButton'
 import { type OrderFormValue, type OrderRecord } from '@/types'
+import { isOrderConflictError } from '@/services/apiClient'
 import { rebuildOrderRecord } from '@/services/orderFactories'
 import { orderRepository } from '@/services/orderRepository'
+import { orderOptimistic } from '@/services/orderOptimistic'
+import { orderTombstones } from '@/services/orderTombstones'
+import { requestOrdersResync } from '@/services/orderResync'
 import { useOrderStore } from '@/store/order'
 import { useOrderForm, FormMode } from './useOrderForm'
 import { QuantitySelector } from '../selectors/QuantitySelector'
@@ -39,7 +43,11 @@ interface OrderFormContentProps {
   mode: FormMode
   submitError: string | null
   submitButtonText: string
-  onSubmit: (formValue: OrderFormValue, quantity: number) => Promise<void>
+  onSubmit: (
+    formValue: OrderFormValue,
+    quantity: number,
+    baseVersion: number | undefined,
+  ) => Promise<void>
 }
 
 const OrderFormContent: React.FC<OrderFormContentProps> = ({
@@ -74,12 +82,20 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
     showTakeoutOptions,
   } = useOrderForm(initialItem, mode)
 
+  // The server version the user's edit session was opened on. `OrderForm`
+  // remounts this component per session via `key={formSessionKey}`, so the
+  // value stays pinned even when realtime advances the store's record while
+  // the form is open: expectedVersion must describe the state the user
+  // actually edited, not the latest store version at submit time, otherwise
+  // a concurrent update would silently pass the OCC check.
+  const [baseVersion] = useState(() => initialItem?.version)
+
   const handleNoteChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     updateFormValue('note', event.target.value)
   }
 
   const handleSubmit = () => {
-    void onSubmit(formValue, num || 1)
+    void onSubmit(formValue, num || 1, baseVersion)
   }
 
   return (
@@ -271,15 +287,40 @@ const OrderFormContent: React.FC<OrderFormContentProps> = ({
 }
 
 const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
-  const upsertOrder = useOrderStore((state) => state.upsertOrder)
-  const upsertOrders = useOrderStore((state) => state.upsertOrders)
+  const upsertIfNewer = useOrderStore((state) => state.upsertIfNewer)
+  const upsertOrdersIfNewer = useOrderStore((state) => state.upsertOrdersIfNewer)
   const updateTargetID = useOrderStore((state) => state.updateTargetID)
   const setUpdateTargetID = useOrderStore((state) => state.setUpdateTargetID)
-  const findOrder = useOrderStore((state) => state.findOrder)
+  // The live record the edit session is editing, or undefined while the
+  // target is missing (deleted) or no session is open. Used both to render
+  // the form and to detect when the resynced record supersedes a conflicted
+  // version below.
+  const activeRecordFromStore = useOrderStore((state) =>
+    mode === 'edit' && updateTargetID
+      ? state.ordersById[updateTargetID]
+      : undefined,
+  )
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createSessionId, setCreateSessionId] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // A pending 409 conflict refresh: the version that conflicted plus the
+  // reconciliation sequence at the time (so a commit that lands AFTER the
+  // resync request can be told apart from one that predates it), waiting for
+  // the resynced record to supersede the conflicted version. Bumped into the
+  // session key below so OrderFormContent remounts (re-initializing form
+  // values AND the pinned baseVersion) from the fresh record once the store
+  // advances past it — or the session closes if the resync reveals the order
+  // was deleted.
+  const [conflictRefresh, setConflictRefresh] = useState<{
+    conflictedVersion: number
+    syncSeqAtConflict: number
+  } | null>(null)
+  // Monotonic per-completed-refresh counter: the edit session key advances
+  // only when a conflict refresh actually completes, so a normal open session
+  // and a waiting conflict keep a stable key (no premature remount that would
+  // drop in-progress edits).
+  const [editSessionGeneration, setEditSessionGeneration] = useState(0)
 
   const handleDialogClose = useCallback(
     (force = false) => {
@@ -289,6 +330,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
 
       setIsSubmitting(false)
       setSubmitError(null)
+      setConflictRefresh(null)
 
       if (mode === 'create') {
         setIsCreateOpen(false)
@@ -320,17 +362,53 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const handleSubmit = async (
     formValue: OrderFormValue,
     quantity: number,
+    baseVersion: number | undefined,
   ): Promise<void> => {
     setIsSubmitting(true)
     setSubmitError(null)
 
     try {
       if (mode === 'create') {
+        // A full clear that commits while the POST is in flight may delete
+        // the freshly created order, and HTTP/WS arrival order does not tell
+        // us which state the response reflects. The clear cannot tombstone
+        // the id up front — the client only learns it when the response
+        // arrives — so the clear epoch is captured at submit: a clear that
+        // happened meanwhile means the response must not be blindly inserted
+        // as authoritative state. The resync decides instead whether the
+        // order still exists. The reverse arrival order — the response lands
+        // first, the clear event arrives later — is equally ambiguous: the
+        // fresh id rides the clear's pending barrier (see
+        // orderTombstones.confirmClearEpoch) and survives iff the
+        // post-clear follow-up snapshot confirms it, so the insert below is
+        // safe: a clear that caught the id either confirms its deletion or
+        // releases it as a legitimate survivor.
+        const clearEpochAtStart = orderTombstones.clearEpochValue()
         const persistedRecords = await orderRepository.createMany(
           formValue,
           quantity,
         )
-        upsertOrders(persistedRecords)
+
+        if (orderTombstones.clearEpochValue() !== clearEpochAtStart) {
+          requestOrdersResync()
+        } else {
+          // Authoritative merge: newly created records are absent from the
+          // store, so this applies them; it also guards the rare replay where
+          // the store somehow already holds the id at a higher version. The
+          // confirmed creates are journaled so an in-flight snapshot cannot
+          // drop them before their realtime echo arrives. Both are skipped
+          // for ids rejected by the session tombstones (e.g. a before_today
+          // clear racing the create).
+          const survivors = persistedRecords.filter(
+            (persistedRecord) =>
+              !orderTombstones.rejectsUpsert(persistedRecord),
+          )
+
+          upsertOrdersIfNewer(survivors)
+          for (const persistedRecord of survivors) {
+            orderOptimistic.recordUpsert(persistedRecord)
+          }
+        }
       } else {
         const activeRecord = activeItem ?? null
 
@@ -342,14 +420,51 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         const persistedRecord = await orderRepository.update(
           updateTargetID,
           nextRecord,
+          // Optimistic concurrency: the version the edit session was opened
+          // on (pinned by OrderFormContent), not the store's current version
+          // at submit time. A 409 order_conflict means someone else changed
+          // the order meanwhile and the form must be re-read.
+          baseVersion ?? activeRecord.version,
         )
 
-        upsertOrder(persistedRecord)
+        // The response is authoritative but may arrive after a realtime
+        // update with an even higher version (another client's commit): the
+        // version-aware merge keeps the higher version. The confirmed update
+        // is journaled so a snapshot overlapping this mutation cannot
+        // downgrade it when the WS echo has not arrived yet. Both are skipped
+        // when the id was terminally deleted while the request was in flight:
+        // a late PUT response must not resurrect a removed order (the backend
+        // never reuses an order id).
+        if (!orderTombstones.rejectsUpsert(persistedRecord)) {
+          upsertIfNewer(persistedRecord)
+          orderOptimistic.recordUpsert(persistedRecord)
+        }
       }
 
       handleDialogClose(true)
     } catch (error) {
       setIsSubmitting(false)
+
+      // A 409 order_conflict means the edited order advanced on the server
+      // while the form was open: surface the error and refetch the
+      // authoritative state so the list no longer shows the stale version.
+      if (isOrderConflictError(error)) {
+        requestOrdersResync()
+
+        // Also restart the edit session once the resync lands: staying in
+        // the modal and submitting again must carry the fresh
+        // expectedVersion, otherwise every retry re-409s on the stale pin.
+        // The restart re-initializes the form content from the fresh record
+        // — never a blend of the old content with a new base version, which
+        // would reintroduce the lost update OCC prevents.
+        if (mode === 'edit' && conflictRefresh === null && baseVersion !== undefined) {
+          setConflictRefresh({
+            conflictedVersion: baseVersion,
+            syncSeqAtConflict: useOrderStore.getState().orderSyncSeq,
+          })
+        }
+      }
+
       setSubmitError(getErrorMessage(error))
     }
   }
@@ -358,12 +473,83 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
   const formTitle = isCreateMode ? '创建订单' : '修改订单'
   const submitButtonText = isCreateMode ? '创建' : '修改'
   const activeItem =
-    !isCreateMode && updateTargetID ? findOrder(updateTargetID) : initialItem
+    !isCreateMode && updateTargetID ? activeRecordFromStore : initialItem
   const isOpen = isCreateMode ? isCreateOpen : Boolean(updateTargetID)
   const shouldRenderModal = isCreateMode || Boolean(updateTargetID)
   const formSessionKey = isCreateMode
     ? `create-${createSessionId}`
     : updateTargetID
+      ? `${updateTargetID}:${editSessionGeneration}`
+      : ''
+
+  // Conflict recovery inside a live edit session. Once the store record is
+  // strictly newer than the version that got the 409 (the resync commit
+  // landed), restart the edit session — the generation bumps, so
+  // OrderFormContent remounts and both the form values and the pinned
+  // baseVersion re-initialize from the authoritative record. The session
+  // never blends the old form content with a new base version. If instead a
+  // reconciliation landed after the 409 without the record at all, the
+  // authoritative state deleted the order: there is no fresh record to
+  // restart against, so the edit session closes. Absence alone is never
+  // enough — it must be confirmed by a commit that postdates the 409, so a
+  // transient gap during the resync does not kill the session. State is not
+  // touched synchronously in the effect body: the check runs on the store
+  // subscription (the resync commit setOrders) and in a microtask that
+  // catches an advance that already landed by the time the effect runs.
+  useEffect(() => {
+    if (conflictRefresh === null) {
+      return
+    }
+
+    // One resolution per conflict refresh: the store subscription can fire
+    // again because of the very state change the resolution performs (e.g.
+    // clearing updateTargetID), and the resolution must not re-run.
+    let settled = false
+
+    const restart = () => {
+      if (settled) {
+        return
+      }
+      settled = true
+      setConflictRefresh(null)
+      setEditSessionGeneration((generation) => generation + 1)
+    }
+
+    const closeSession = () => {
+      if (settled) {
+        return
+      }
+      settled = true
+      setConflictRefresh(null)
+      setUpdateTargetID('')
+    }
+
+    const settle = (
+      record: OrderRecord | undefined,
+      orderSyncSeq: number,
+    ) => {
+      if (
+        record === undefined &&
+        orderSyncSeq > conflictRefresh.syncSeqAtConflict
+      ) {
+        closeSession()
+      } else if (
+        record &&
+        record.version > conflictRefresh.conflictedVersion
+      ) {
+        restart()
+      }
+    }
+
+    queueMicrotask(() => {
+      const store = useOrderStore.getState()
+      settle(store.ordersById[updateTargetID], store.orderSyncSeq)
+    })
+
+    return useOrderStore.subscribe((state) => {
+      settle(state.ordersById[updateTargetID], state.orderSyncSeq)
+    })
+  }, [conflictRefresh, setUpdateTargetID, updateTargetID])
 
   useEffect(() => {
     if (!isOpen) {

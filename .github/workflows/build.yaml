@@ -34,6 +34,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Run unit tests
+        # The race-condition regression tests only guard the PR if they
+        # actually execute in CI; a green web/Android build alone would not
+        # catch a broken synchronization layer.
+        run: pnpm test
+
       - name: Build web assets
         run: pnpm run build
 

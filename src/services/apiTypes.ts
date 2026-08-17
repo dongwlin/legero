@@ -21,6 +21,7 @@ export type WorkspaceDTO = {
 
 export type OrderDTO = {
   id: string
+  version: number
   displayNo: string
   stapleTypeCode: number | null
   sizeCode: number
@@ -94,6 +95,15 @@ export type OrderDeletedEvent = {
 export type OrdersClearedEvent = {
   clearedCount: number
   mode: ClearWorkspaceMode
+  /**
+   * The business-day cutoff (YYYY-MM-DD in the workspace timezone) the
+   * server actually used when it executed the clear: every order created
+   * before this key was deleted. Carried for `before_today` clears so the
+   * client pins its barrier to the authoritative server date instead of
+   * deriving one from the (possibly skewed or already-midnight) receipt
+   * time. Absent for `all` clears (and older servers).
+   */
+  clearDateKey?: string
 }
 
 export type RealtimeSessionResponse = {

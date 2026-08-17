@@ -219,6 +219,60 @@ describe('orderRealtime connection lifecycle', () => {
     subscription.close()
   })
 
+  it('passes the server-provided before_today cutoff through the clear event', async () => {
+    const onClear = vi.fn()
+
+    const subscription = subscribe({ onClear })
+
+    await flushAsync()
+
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready', { serverTime: '2099-01-01T00:00:00.000Z' })
+
+    // The payload carries the authoritative business-day key the server used
+    // to execute the clear; the client must forward it verbatim.
+    socket.emit('order.cleared', {
+      clearedCount: 2,
+      mode: 'before_today',
+      clearDateKey: '2026-08-17',
+    })
+    expect(onClear).toHaveBeenCalledWith({
+      clearedCount: 2,
+      mode: 'before_today',
+      clearDateKey: '2026-08-17',
+    })
+
+    subscription.close()
+  })
+
+  it('omits a malformed clear date key from the forwarded clear event', async () => {
+    const onClear = vi.fn()
+
+    const subscription = subscribe({ onClear })
+
+    await flushAsync()
+
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready', { serverTime: '2099-01-01T00:00:00.000Z' })
+
+    // Anything that does not look like YYYY-MM-DD is not a trusted server
+    // cutoff and must not reach the barrier logic.
+    socket.emit('order.cleared', {
+      clearedCount: 2,
+      mode: 'before_today',
+      clearDateKey: '17-08-2026',
+    })
+    expect(onClear).toHaveBeenCalledWith({ clearedCount: 2, mode: 'before_today' })
+
+    expect(onClear).not.toHaveBeenCalledWith(
+      expect.objectContaining({ clearDateKey: expect.any(String) }),
+    )
+
+    subscription.close()
+  })
+
   it('keeps retrying past the old 3-attempt limit and recovers once the network returns', async () => {
     mocks.realtimeSessionCreate.mockRejectedValue(networkError())
 

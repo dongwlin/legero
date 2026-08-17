@@ -3,6 +3,7 @@ import type { OrderRecord } from '@/types'
 
 export const orderDtoToOrderRecord = (row: OrderDTO): OrderRecord => ({
   id: row.id,
+  version: row.version,
   displayNo: row.displayNo,
   stapleTypeCode: row.stapleTypeCode as OrderRecord['stapleTypeCode'],
   sizeCode: row.sizeCode as OrderRecord['sizeCode'],
