@@ -14,7 +14,10 @@ import {
   type RealtimeOrderEvent,
 } from '@/services/orderReconcile'
 import { getOrderDateKey } from '@/services/orderDomainUtils'
-import { orderOptimistic } from '@/services/orderOptimistic'
+import {
+  orderOptimistic,
+  type LocalMutationEffect,
+} from '@/services/orderOptimistic'
 import { orderTombstones } from '@/services/orderTombstones'
 import { subscribeOrdersResync } from '@/services/orderResync'
 import type { OrdersClearedEvent } from '@/services/apiTypes'
@@ -80,11 +83,35 @@ export const useOrderWorkspaceSync = () => {
     let pendingReconcile = false
     let pendingReconcileShouldBlock = false
     // Ids received in the current reconciliation window before its first
-    // clear event: they existed before the clear (the channel is ordered), so
-    // at the clear's receipt they are known to predate it and a full clear
-    // terminally deletes them. Reset per window (see syncSnapshot).
+    // clear event. WebSocket arrival order is not a cross-request commit
+    // sequence, so these ids are only ambiguous candidates for the pending
+    // clear barrier; they are never promoted directly to permanent
+    // tombstones. Reset per window (see syncSnapshot).
     let windowPreClearIds = new Set<string>()
+    // Keep the newest upsert seen before a clear in this reconciliation
+    // window. compactRealtimeEvents intentionally drops the pre-clear prefix
+    // after a full clear, but that compaction cannot decide whether the
+    // statement itself was pre- or post-clear without a server sequence. The
+    // clear epoch's guaranteed follow-up snapshot makes that decision later.
+    const windowPreClearUpserts = new Map<string, OrderRecord>()
     let windowSawClear = false
+    // Upserts for ids parked on a full-clear barrier are not ordinary stale
+    // events: a guaranteed post-clear snapshot may prove that the id survived.
+    // Retain the newest statement until that raw snapshot decides whether to
+    // discard it or replay it over the surviving record.
+    const pendingClearUpserts = new Map<string, OrderRecord>()
+
+    const stagePendingClearUpsert = (order: OrderRecord) => {
+      if (!orderTombstones.isPendingClear(order.id)) {
+        return
+      }
+
+      const current = pendingClearUpserts.get(order.id)
+
+      if (!current || order.version > current.version) {
+        pendingClearUpserts.set(order.id, order)
+      }
+    }
 
     const flushBatched = () => {
       flushRafId = null
@@ -174,6 +201,46 @@ export const useOrderWorkspaceSync = () => {
           ordersById.set(id, optimistic)
         }
       }
+
+      return [...ordersById.values()]
+    }
+
+    // Replays the upserts that were parked behind a full-clear barrier only
+    // after the guaranteed post-clear snapshot has made its raw-ID decision.
+    // Presence in the raw snapshot is the survivor proof; the replayed
+    // statement may then win by server version, but it can never resurrect a
+    // confirmed local remove or an id promoted to a permanent tombstone.
+    const replayConfirmedPendingClearUpserts = (
+      orders: OrderRecord[],
+      rawSnapshotIds: ReadonlySet<string>,
+      effects: LocalMutationEffect[],
+    ): OrderRecord[] => {
+      if (pendingClearUpserts.size === 0) {
+        return orders
+      }
+
+      const confirmedRemoveIdsSet = new Set(confirmedRemoveIds(effects))
+      const ordersById = new Map(orders.map((order) => [order.id, order]))
+
+      for (const [id, pendingOrder] of pendingClearUpserts) {
+        if (
+          !rawSnapshotIds.has(id) ||
+          confirmedRemoveIdsSet.has(id) ||
+          orderTombstones.rejectsUpsert(pendingOrder)
+        ) {
+          continue
+        }
+
+        const current = ordersById.get(id)
+
+        if (!current || pendingOrder.version > current.version) {
+          ordersById.set(id, pendingOrder)
+        }
+      }
+
+      // The epoch has been closed, so every staged statement has now been
+      // classified. Do not carry a stale pre-clear record into a later epoch.
+      pendingClearUpserts.clear()
 
       return [...ordersById.values()]
     }
@@ -343,6 +410,7 @@ export const useOrderWorkspaceSync = () => {
       // snapshot is guaranteed post-clear — a snapshot requested after the
       // clear event was received — and may confirm the barrier.
       windowPreClearIds = new Set()
+      windowPreClearUpserts.clear()
       windowSawClear = false
       const clearEpochAtStart = orderTombstones.clearEpochValue()
 
@@ -371,18 +439,34 @@ export const useOrderWorkspaceSync = () => {
         // snapshot never clobbers the local record.
         const events = eventBuffer.endReconciliation()
         const effects = orderOptimistic.effectsAfter(snapshotMarker)
+        // Only the raw guaranteed-post-clear snapshot can decide whether a
+        // pending id survived. Local mutation effects, buffered realtime
+        // events and optimistic overlays are intentionally excluded from this
+        // set: replaying one of them must never be allowed to prove its own
+        // survivor status (P1-2).
+        const rawSnapshotIds = new Set(nextOrders.map((order) => order.id))
+        const protectedIds = orderOptimistic.idsToProtect(snapshotMarker)
 
-        const reconciled = applyLocalRemoveEffects(
-          reconcileSnapshotWithEvents(
-            applyLocalUpsertEffects(nextOrders, effects),
-            events,
-          ),
-          effects,
-        )
-        const protectedOrders = overlayProtectedRecords(
-          reconciled,
-          orderOptimistic.idsToProtect(snapshotMarker),
-        )
+        // A mutation response/optimistic record can become visible through a
+        // local journal after the clear event, without ever passing through
+        // the realtime gate. Park those candidates before the raw snapshot
+        // makes its decision as well; otherwise applying the effect first
+        // could make an absent id look like a survivor (P1-2).
+        if (orderTombstones.isClearEpochOpen()) {
+          for (const id of protectedIds) {
+            orderTombstones.blockPendingClear(id)
+          }
+
+          for (const effect of effects) {
+            if (effect.type === 'upsert') {
+              orderTombstones.blockPendingClear(effect.order.id)
+            }
+          }
+        }
+
+        const confirmsClearEpoch =
+          orderTombstones.isClearEpochOpen() &&
+          orderTombstones.clearEpochValue() === clearEpochAtStart
 
         // A snapshot requested after the clear event was received reflects
         // the post-clear server state (the clear committed before its event
@@ -393,14 +477,34 @@ export const useOrderWorkspaceSync = () => {
         // arrived (`clearEpochAtStart` predates the bump) may carry pre-clear
         // state and must not confirm — its base ids keep riding the pending
         // barrier until the follow-up lands.
-        if (
-          orderTombstones.isClearEpochOpen() &&
-          orderTombstones.clearEpochValue() === clearEpochAtStart
-        ) {
-          orderTombstones.confirmClearEpoch(
-            new Set(protectedOrders.map((order) => order.id)),
+        if (confirmsClearEpoch) {
+          orderTombstones.confirmClearEpoch(rawSnapshotIds)
+        }
+
+        let reconciled = applyLocalRemoveEffects(
+          reconcileSnapshotWithEvents(
+            applyLocalUpsertEffects(nextOrders, effects),
+            events,
+          ),
+          effects,
+        )
+
+        // The raw snapshot has already classified the pending IDs. Only now
+        // can their staged realtime statements be replayed, and only for raw
+        // survivors. Version ordering still applies so a stale staged event
+        // cannot downgrade a newer snapshot/effect.
+        if (confirmsClearEpoch) {
+          reconciled = replayConfirmedPendingClearUpserts(
+            reconciled,
+            rawSnapshotIds,
+            effects,
           )
         }
+
+        const protectedOrders = overlayProtectedRecords(
+          reconciled,
+          protectedIds,
+        )
 
         setOrders(
           protectedOrders.filter((order) => !orderTombstones.rejectsUpsert(order)),
@@ -474,12 +578,22 @@ export const useOrderWorkspaceSync = () => {
         subscription = orderRealtime.subscribeToWorkspaceOrders({
           onUpsert: (order) => {
             if (!isDisposed) {
-              // Same-id remove and clear are terminal for the whole sync
-              // session — not just inside a reconciliation window: an upsert
-              // of a tombstoned id (the backend never reuses an order id) is
-              // always a stale/delayed event; after a before_today clear the
-              // same holds for any not-created-today upsert. Both are dropped
-              // before they can enter the buffer or the batch queue.
+              // A pending full-clear id is unresolved ambiguity, not a
+              // terminal tombstone. Retain its newest realtime statement for
+              // the guaranteed post-clear snapshot to classify; dropping it
+              // here would lose a legitimate post-clear update (P1-1).
+              if (orderTombstones.isPendingClear(order.id)) {
+                stagePendingClearUpsert(order)
+                return
+              }
+
+              // Same-id remove and clear-confirmed ids are terminal for the
+              // whole sync session — not just inside a reconciliation window:
+              // an upsert of a tombstoned id (the backend never reuses an
+              // order id) is always a stale/delayed event; after a
+              // before_today clear the same holds for any not-created-today
+              // upsert. Both are dropped before they can enter the buffer or
+              // the batch queue.
               if (orderTombstones.rejectsUpsert(order)) {
                 return
               }
@@ -488,11 +602,16 @@ export const useOrderWorkspaceSync = () => {
                 // Buffer the server event: at commit time it is replayed over
                 // the snapshot with version-aware merges, so it survives even
                 // when the order has an in-flight optimistic mutation. Ids
-                // received before this window's first clear are remembered —
-                // they predate the clear (the channel is ordered) and a full
-                // clear terminally deletes them at its receipt.
+                // received before this window's first clear are remembered as
+                // ambiguous candidates; WS arrival order is not a global
+                // cross-request commit sequence.
                 if (!windowSawClear) {
                   windowPreClearIds.add(order.id)
+                  const previous = windowPreClearUpserts.get(order.id)
+
+                  if (!previous || order.version > previous.version) {
+                    windowPreClearUpserts.set(order.id, order)
+                  }
                 }
                 eventBuffer.push({ type: 'upsert', order })
                 return
@@ -544,12 +663,12 @@ export const useOrderWorkspaceSync = () => {
                 // it so the reconciliation replays it (otherwise the
                 // snapshot would resurrect cleared orders), and schedule the
                 // follow-up snapshot the clear already implied (before_today
-                // keeps part of the list). Client-known ids are blocked at
-                // receipt — not at replay — so a stale delayed upsert of a
-                // cleared id that arrives later in the window is dropped at
-                // the onUpsert gate instead of entering the buffer. Ids
-                // received earlier in this window arrived before the clear
-                // over the ordered channel, so they existed pre-clear too.
+                // keeps part of the list). Client-known ids are parked at
+                // receipt — not promoted to permanent tombstones — so a
+                // later upsert can be retained until the raw follow-up
+                // snapshot decides survivor vs deletion. Ids received earlier
+                // in this window are equally ambiguous: WS arrival order is
+                // not a cross-request commit sequence (P1-3).
                 windowSawClear = true
 
                 // Pin the before_today cutoff to the SERVER's own business
@@ -564,7 +683,11 @@ export const useOrderWorkspaceSync = () => {
                   }
 
                   for (const id of windowPreClearIds) {
-                    orderTombstones.markRemoved(id)
+                    orderTombstones.blockPendingClear(id)
+                  }
+
+                  for (const order of windowPreClearUpserts.values()) {
+                    stagePendingClearUpsert(order)
                   }
 
                   // Open the full-clear epoch barrier: ids only discovered

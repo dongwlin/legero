@@ -103,3 +103,51 @@ describe('orderTombstones before_today barrier', () => {
     ).toBe(false)
   })
 })
+
+describe('orderTombstones full-clear pending barrier', () => {
+  beforeEach(() => {
+    orderTombstones.reset()
+  })
+
+  it('distinguishes pending clear from a permanent tombstone', () => {
+    orderTombstones.bumpClearEpoch()
+    orderTombstones.blockPendingClear('pending')
+
+    expect(orderTombstones.isPendingClear('pending')).toBe(true)
+    expect(orderTombstones.has('pending')).toBe(false)
+    expect(orderTombstones.rejectsUpsert(makeOrder('pending', '2020-08-17T10:00:00+08:00'))).toBe(
+      true,
+    )
+
+    orderTombstones.markRemoved('pending')
+    orderTombstones.blockPendingClear('pending')
+
+    expect(orderTombstones.isPendingClear('pending')).toBe(false)
+    expect(orderTombstones.has('pending')).toBe(true)
+  })
+
+  it('promotes only ids absent from the raw post-clear snapshot', () => {
+    orderTombstones.bumpClearEpoch()
+    orderTombstones.blockPendingClear('deleted')
+    orderTombstones.blockPendingClear('survivor')
+
+    orderTombstones.confirmClearEpoch(new Set(['survivor']))
+
+    expect(orderTombstones.has('deleted')).toBe(true)
+    expect(orderTombstones.has('survivor')).toBe(false)
+    expect(orderTombstones.isPendingClear('deleted')).toBe(false)
+    expect(orderTombstones.isPendingClear('survivor')).toBe(false)
+    expect(orderTombstones.isClearEpochOpen()).toBe(false)
+  })
+
+  it('clears pending ambiguity on reset without retaining a tombstone', () => {
+    orderTombstones.bumpClearEpoch()
+    orderTombstones.blockPendingClear('pending')
+
+    orderTombstones.reset()
+
+    expect(orderTombstones.isPendingClear('pending')).toBe(false)
+    expect(orderTombstones.has('pending')).toBe(false)
+    expect(orderTombstones.isClearEpochOpen()).toBe(false)
+  })
+})

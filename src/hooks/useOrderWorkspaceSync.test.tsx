@@ -2032,6 +2032,98 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     expect(orderTombstones.has('a')).toBe(true)
   })
 
+  it('replays a newer pending-clear upsert over an older raw survivor snapshot', async () => {
+    // Review blocker P1-1: the follow-up snapshot proves that C survived the
+    // clear at v1, while a realtime v2 arrives while that request is in
+    // flight. The pending barrier must retain v2 and replay it after the raw
+    // ID decision instead of dropping it as if it were a permanent tombstone.
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const initial = makeOrder('c', '2025-01-01T00:00:00+08:00', {
+      version: 1,
+      note: 'before-clear',
+    })
+
+    await act(async () => {
+      first.resolve([initial])
+      await flushAsync()
+    })
+
+    act(() => {
+      ws.onClear({ clearedCount: 1, mode: 'all' })
+      ws.onUpsert({ ...initial, version: 2, note: 'post-clear-v2' })
+    })
+
+    await act(async () => {
+      second.resolve([initial])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['c']?.version).toBe(2)
+    expect(useOrderStore.getState().ordersById['c']?.note).toBe('post-clear-v2')
+    expect(orderTombstones.has('c')).toBe(false)
+  })
+
+  it('uses raw post-clear snapshot ids before replaying local mutation effects', async () => {
+    // Review blocker P1-2: a mutation response for A lands after clear and is
+    // present in the local effect/optimistic overlay, but the guaranteed raw
+    // snapshot is empty. The overlay cannot prove survivor status; A must
+    // become a permanent tombstone and stay absent.
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    const initial = makeOrder('a', '2025-01-01T00:00:00+08:00', {
+      version: 1,
+      note: 'before-clear',
+    })
+
+    await act(async () => {
+      first.resolve([initial])
+      await flushAsync()
+    })
+
+    const lateMutation = {
+      type: 'upsert' as const,
+      order: { ...initial, version: 2, note: 'late-mutation-response' },
+      seq: 1,
+    }
+    mocks.effectsAfter.mockReturnValue([lateMutation])
+    mocks.idsToProtect.mockReturnValue(new Set(['a']))
+
+    act(() => {
+      ws.onClear({ clearedCount: 1, mode: 'all' })
+    })
+
+    await act(async () => {
+      second.resolve([])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(orderTombstones.has('a')).toBe(true)
+  })
+
   it('tombstones client-known ids when a full clear arrives during a snapshot', async () => {
     // Review blocker, clear(path 2): the clear is buffered while a snapshot
     // is in flight. Client-known ids must be tombstoned at receipt, not at
@@ -2313,12 +2405,11 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     expect(useOrderStore.getState().status).toBe('ready')
   })
 
-  it('tombstones ids buffered before a full clear for the whole session', async () => {
-    // Review blocker P1, buffer-known source: snapshot #1's window received
-    // an upsert of 'x' before the clear arrived, so 'x' existed pre-clear.
-    // The full clear terminally deletes it — not just inside window #1 (where
-    // the compaction drops it) but for every later window too, so a delayed
-    // upsert in the follow-up window cannot resurrect it.
+  it('parks ids buffered before a full clear until the raw follow-up snapshot', async () => {
+    // Review blocker P1-3: an upsert observed before a clear is not proof that
+    // the order committed before that clear. The transports have no global
+    // commit sequence, so the id remains pending until the raw follow-up
+    // snapshot decides whether it survived.
     const first = deferred<OrderRecord[]>()
     const second = deferred<OrderRecord[]>()
     mocks.listOrders
@@ -2338,8 +2429,9 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
       ws.onUpsert(orderX)
       ws.onClear({ clearedCount: 1, mode: 'all' })
     })
-    // The id seen before the clear in this window is tombstoned at receipt.
-    expect(orderTombstones.has('x')).toBe(true)
+    // The id seen before the clear in this window is pending, not permanent.
+    expect(orderTombstones.has('x')).toBe(false)
+    expect(orderTombstones.isPendingClear('x')).toBe(true)
 
     await act(async () => {
       first.resolve([])
@@ -2348,8 +2440,9 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     expect(useOrderStore.getState().ordersById['x']).toBeUndefined()
     expect(mocks.listOrders).toHaveBeenCalledTimes(2)
 
-    // The follow-up window receives another delayed upsert of the same id: it
-    // must not be treated as a fresh post-clear order.
+    // A clear-surviving post-clear snapshot releases the id and replays the
+    // newest pending statement; it must not have been permanently tombstoned
+    // merely because the WS upsert arrived before the clear event.
     act(() => {
       ws.onUpsert(
         makeOrder('x', '2025-01-01T00:00:00+08:00', {
@@ -2360,11 +2453,17 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     })
 
     await act(async () => {
-      second.resolve([])
+      second.resolve([
+        makeOrder('x', '2025-01-01T00:00:00+08:00', {
+          version: 12,
+          note: 'post-clear-survivor',
+        }),
+      ])
       await flushAsync()
     })
 
-    expect(useOrderStore.getState().ordersById['x']).toBeUndefined()
+    expect(useOrderStore.getState().ordersById['x']?.version).toBe(12)
+    expect(orderTombstones.has('x')).toBe(false)
   })
 
   it('lets a post-clear creation confirmed by the follow-up snapshot survive the clear epoch', async () => {

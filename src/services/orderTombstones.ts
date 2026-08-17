@@ -69,6 +69,11 @@ const pendingClearedIds = new Set<string>()
 export const orderTombstones = {
   /** Marks the id as terminally deleted for the rest of the sync session. */
   markRemoved(id: string): void {
+    // A terminal delete supersedes any unresolved full-clear ambiguity for
+    // this id. Keeping it in the pending set would make the realtime layer
+    // stage later upserts even though there is no survivor decision left to
+    // make.
+    pendingClearedIds.delete(id)
     removedOrderIds.add(id)
   },
 
@@ -127,12 +132,26 @@ export const orderTombstones = {
   },
 
   /**
+   * True when the id is blocked by an unresolved full-clear epoch. Pending
+   * clear is deliberately distinct from `has()`: the follow-up snapshot may
+   * prove that the id survived, so callers must retain (rather than discard)
+   * any newer upsert until that decision is made.
+   */
+  isPendingClear(id: string): boolean {
+    return pendingClearedIds.has(id)
+  },
+
+  /**
    * Parks an id that may have existed before the open full clear as a pending
    * tombstone: while the epoch is open, `rejectsUpsert` rejects it like a
    * confirmed tombstone, so a stale delayed upsert cannot resurrect it in a
    * later reconciliation window either.
    */
   blockPendingClear(id: string): void {
+    if (removedOrderIds.has(id)) {
+      return
+    }
+
     pendingClearedIds.add(id)
   },
 
