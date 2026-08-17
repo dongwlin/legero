@@ -16,6 +16,7 @@ import {
   SESSION_TIMEOUT_MS,
   SERVER_ACTIVITY_TIMEOUT_MS,
   STABLE_CONNECTION_MS,
+  getServerActivityTimeoutMs,
   getReconnectDelayMs,
   orderRealtime,
 } from './orderRealtime'
@@ -57,6 +58,11 @@ const jsonResponse = (status: number, body: unknown): Response =>
 
 const mockFetch = vi.fn()
 
+const HEARTBEAT_READY = {
+  capabilities: ['heartbeat'],
+  heartbeatIntervalMs: 20_000,
+}
+
 class FakeWebSocket {
   static CONNECTING = 0
   static OPEN = 1
@@ -89,9 +95,12 @@ class FakeWebSocket {
   }
 
   emit(eventType: string, data?: unknown) {
+    const payload =
+      eventType === 'ready' && data === undefined ? HEARTBEAT_READY : data
+
     this.onmessage?.(
       new MessageEvent('message', {
-        data: JSON.stringify({ type: eventType, data }),
+        data: JSON.stringify({ type: eventType, data: payload }),
       }),
     )
   }
@@ -286,7 +295,182 @@ describe('orderRealtime connection lifecycle', () => {
     subscription.close()
   })
 
-  it('pauses activity health checks in the background and judges on foreground', async () => {
+  it('keeps the remaining foreground activity budget across a short background', async () => {
+    const subscription = subscribe()
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    const foregroundElapsed = 20_000
+    await vi.advanceTimersByTimeAsync(foregroundElapsed)
+
+    recoveryHandlers().onAppBackground()
+    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS - 1_000)
+
+    // No heartbeat is dispatched while backgrounded. The hidden duration must
+    // not consume the activity watchdog's foreground budget.
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+    expect(socket.closeCalls).toHaveLength(0)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    const remainingForegroundBudget =
+      SERVER_ACTIVITY_TIMEOUT_MS - foregroundElapsed
+    await vi.advanceTimersByTimeAsync(remainingForegroundBudget - 1)
+    expect(socket.closeCalls).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flushAsync()
+    expect(socket.closeCalls).toEqual([
+      { code: 1000, reason: 'server_activity_timeout' },
+    ])
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it('does not start the watchdog for a legacy ready payload', async () => {
+    const subscription = subscribe()
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready', { serverTime: '2099-01-01T00:00:00.000Z' })
+
+    await vi.advanceTimersByTimeAsync(SERVER_ACTIVITY_TIMEOUT_MS * 2)
+    expect(socket.closeCalls).toHaveLength(0)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('uses the negotiated heartbeat interval for the watchdog timeout', async () => {
+    const subscription = subscribe()
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready', {
+      capabilities: ['heartbeat'],
+      heartbeatIntervalMs: 10_000,
+    })
+
+    const timeout = getServerActivityTimeoutMs(10_000)
+    await vi.advanceTimersByTimeAsync(timeout - 1)
+    expect(socket.closeCalls).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flushAsync()
+    expect(socket.closeCalls).toEqual([
+      { code: 1000, reason: 'server_activity_timeout' },
+    ])
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it.each([
+    {
+      name: 'without heartbeat capability',
+      data: { capabilities: [], heartbeatIntervalMs: 20_000 },
+    },
+    {
+      name: 'with a non-positive interval',
+      data: { capabilities: ['heartbeat'], heartbeatIntervalMs: 0 },
+    },
+    {
+      name: 'with a non-numeric interval',
+      data: { capabilities: ['heartbeat'], heartbeatIntervalMs: '20000' },
+    },
+    {
+      name: 'with a null/invalid interval value',
+      data: { capabilities: ['heartbeat'], heartbeatIntervalMs: null },
+    },
+    {
+      name: 'with an interval whose timeout exceeds timer limits',
+      data: { capabilities: ['heartbeat'], heartbeatIntervalMs: 2_147_483_648 },
+    },
+  ])('does not start the watchdog $name', async ({ data }) => {
+    const subscription = subscribe()
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready', data)
+
+    await vi.advanceTimersByTimeAsync(SERVER_ACTIVITY_TIMEOUT_MS * 2)
+    expect(socket.closeCalls).toHaveLength(0)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    subscription.close()
+  })
+
+  it('uses a monotonic clock for activity timeout despite wall-clock changes', async () => {
+    const subscription = subscribe()
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'))
+    await vi.advanceTimersByTimeAsync(SERVER_ACTIVITY_TIMEOUT_MS - 1)
+    expect(socket.closeCalls).toHaveLength(0)
+
+    // Moving wall time backwards must not postpone the monotonic watchdog.
+    vi.setSystemTime(new Date('2000-01-01T00:00:00.000Z'))
+    await vi.advanceTimersByTimeAsync(1)
+    await flushAsync()
+    expect(socket.closeCalls).toEqual([
+      { code: 1000, reason: 'server_activity_timeout' },
+    ])
+
+    subscription.close()
+  })
+
+  it('ignores a wall-clock jump during a short background', async () => {
+    const subscription = subscribe()
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    const foregroundElapsed = 20_000
+    await vi.advanceTimersByTimeAsync(foregroundElapsed)
+
+    recoveryHandlers().onAppBackground()
+
+    // Date.now() can jump while the app is suspended. The monotonic clock has
+    // advanced only by the short-background duration below, so this must not
+    // turn a retained socket into a long-background recovery or stale timeout.
+    const wallClockAtBackground = Date.now()
+    vi.setSystemTime(new Date(wallClockAtBackground + 60 * 60 * 1_000))
+    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS - 1_000)
+
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+    expect(socket.closeCalls).toHaveLength(0)
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
+
+    const remainingForegroundBudget =
+      SERVER_ACTIVITY_TIMEOUT_MS - foregroundElapsed
+    await vi.advanceTimersByTimeAsync(remainingForegroundBudget - 1)
+    expect(socket.closeCalls).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flushAsync()
+    expect(socket.closeCalls).toEqual([
+      { code: 1000, reason: 'server_activity_timeout' },
+    ])
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it('pauses activity health checks in the background and recovers on foreground', async () => {
     const subscription = subscribe()
 
     await flushAsync()
@@ -305,7 +489,7 @@ describe('orderRealtime connection lifecycle', () => {
     await flushAsync()
 
     expect(socket.closeCalls).toEqual([
-      { code: 1000, reason: 'server_activity_timeout' },
+      { code: 1000, reason: 'foreground_recovery' },
     ])
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
 

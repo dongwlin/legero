@@ -102,10 +102,23 @@ export const STABLE_CONNECTION_MS = 30_000
 export const BACKGROUND_STALE_MS = 30_000
 
 // Application-level server activity is the health signal for an online
-// socket. The backend emits a heartbeat more frequently than this window, and
-// business envelopes count as activity too. A socket that receives no valid
-// server envelope for the whole window is presumed half-open and rebuilt.
-export const SERVER_ACTIVITY_TIMEOUT_MS = 45_000
+// socket. The watchdog is enabled only after the server explicitly negotiates
+// its heartbeat capability and interval in the ready payload. Its timeout is
+// two heartbeat intervals plus a small tolerance. Keep the default export for
+// callers/tests that need the timeout corresponding to the backend's default
+// 20s heartbeat interval.
+export const HEARTBEAT_CAPABILITY = 'heartbeat'
+export const DEFAULT_HEARTBEAT_INTERVAL_MS = 20_000
+export const SERVER_ACTIVITY_TOLERANCE_MS = 5_000
+// Browsers clamp setTimeout delays above this signed 32-bit limit to a short
+// delay. Reject negotiated values whose derived watchdog timeout would exceed
+// it rather than accidentally spinning a reconnect loop.
+export const MAX_SERVER_ACTIVITY_TIMEOUT_MS = 2_147_483_647
+export const getServerActivityTimeoutMs = (heartbeatIntervalMs: number): number =>
+  heartbeatIntervalMs * 2 + SERVER_ACTIVITY_TOLERANCE_MS
+export const SERVER_ACTIVITY_TIMEOUT_MS = getServerActivityTimeoutMs(
+  DEFAULT_HEARTBEAT_INTERVAL_MS,
+)
 
 export const INITIAL_RECONNECT_DELAY_MS = 1_000
 export const MAX_RECONNECT_DELAY_MS = 30_000
@@ -191,6 +204,41 @@ const parseRealtimeEnvelope = (
   }
 }
 
+type ReadyPayload = {
+  capabilities?: unknown
+  heartbeatIntervalMs?: unknown
+}
+
+// A legacy or partially upgraded server may still send a valid ready
+// envelope without the heartbeat contract. In that case keep the socket
+// usable, but do not arm a watchdog whose timeout cannot be justified.
+const parseHeartbeatIntervalMs = (payload: unknown): number | null => {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null
+  }
+
+  const ready = payload as ReadyPayload
+  const capabilities = ready.capabilities
+  const interval = ready.heartbeatIntervalMs
+
+  if (
+    !Array.isArray(capabilities) ||
+    !capabilities.some((capability) => capability === HEARTBEAT_CAPABILITY) ||
+    typeof interval !== 'number' ||
+    !Number.isFinite(interval) ||
+    interval <= 0
+  ) {
+    return null
+  }
+
+  const timeout = getServerActivityTimeoutMs(interval)
+  return Number.isFinite(timeout) &&
+    timeout > 0 &&
+    timeout <= MAX_SERVER_ACTIVITY_TIMEOUT_MS
+    ? interval
+    : null
+}
+
 const buildWebSocketUrl = (ticket: string): string => {
   const url = new URL(getApiBaseUrl())
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -215,10 +263,11 @@ export const orderRealtime = {
     let readyTimer: number | null = null
     let serverActivityTimer: number | null = null
     let lastServerActivityAt: number | null = null
+    let serverActivityTimeoutMs: number | null = null
     let stopRecoverySignals: (() => void) | null = null
     let networkOnline = true
     let isBackgrounded = false
-    let backgroundedAt = 0
+    let backgroundedAt: number | null = null
 
     const isClosed = (): boolean => state === 'closed'
 
@@ -253,11 +302,13 @@ export const orderRealtime = {
     const resetServerActivity = () => {
       clearServerActivityTimer()
       lastServerActivityAt = null
+      serverActivityTimeoutMs = null
     }
 
     const isServerActivityStale = (): boolean =>
+      serverActivityTimeoutMs !== null &&
       lastServerActivityAt !== null &&
-      Date.now() - lastServerActivityAt >= SERVER_ACTIVITY_TIMEOUT_MS
+      performance.now() - lastServerActivityAt >= serverActivityTimeoutMs
 
     const startServerActivityTimer = (
       attemptSocket: WebSocket,
@@ -269,13 +320,14 @@ export const orderRealtime = {
         state !== 'online' ||
         isBackgrounded ||
         !networkOnline ||
-        lastServerActivityAt === null
+        lastServerActivityAt === null ||
+        serverActivityTimeoutMs === null
       ) {
         return
       }
 
-      const elapsed = Math.max(0, Date.now() - lastServerActivityAt)
-      const remaining = Math.max(0, SERVER_ACTIVITY_TIMEOUT_MS - elapsed)
+      const elapsed = Math.max(0, performance.now() - lastServerActivityAt)
+      const remaining = Math.max(0, serverActivityTimeoutMs - elapsed)
 
       serverActivityTimer = window.setTimeout(() => {
         serverActivityTimer = null
@@ -291,9 +343,10 @@ export const orderRealtime = {
           return
         }
 
-        // A clock adjustment or an activity event racing this callback can
-        // make the nominal timeout fire a little early. Re-arm from the
-        // recorded activity instead of reconnecting before the full window.
+        // A timer firing a little early or an activity event racing this
+        // callback can make the nominal timeout appear premature. Re-arm from
+        // the recorded activity instead of reconnecting before the full
+        // window.
         if (!isServerActivityStale()) {
           startServerActivityTimer(attemptSocket, attemptGeneration)
           return
@@ -311,7 +364,7 @@ export const orderRealtime = {
       attemptSocket: WebSocket,
       attemptGeneration: number,
     ) => {
-      lastServerActivityAt = Date.now()
+      lastServerActivityAt = performance.now()
 
       if (state === 'online') {
         startServerActivityTimer(attemptSocket, attemptGeneration)
@@ -459,7 +512,7 @@ export const orderRealtime = {
 
     const handleAppBackground = () => {
       isBackgrounded = true
-      backgroundedAt = Date.now()
+      backgroundedAt = performance.now()
 
       if (isClosed()) {
         return
@@ -479,9 +532,10 @@ export const orderRealtime = {
       // Consume the background duration immediately: a later duplicate or
       // spurious foreground signal must not re-judge the socket against this
       // background's timestamp.
+      const now = performance.now()
       const backgroundDuration =
-        backgroundedAt > 0 ? Date.now() - backgroundedAt : 0
-      backgroundedAt = 0
+        backgroundedAt !== null ? Math.max(0, now - backgroundedAt) : 0
+      backgroundedAt = null
 
       if (isClosed() || !networkOnline) {
         return
@@ -492,20 +546,33 @@ export const orderRealtime = {
       const staleAfterBackground = backgroundDuration >= BACKGROUND_STALE_MS
 
       if (state === 'online') {
-        if (isServerActivityStale()) {
-          invalidateActiveSocket(1000, 'server_activity_timeout')
+        // A long background session is presumed to have torn down the socket;
+        // rebuild it. This check intentionally precedes activity timeout: the
+        // foreground recovery reason is more accurate for a long suspension.
+        if (staleAfterBackground) {
+          invalidateActiveSocket(1000, 'foreground_recovery')
           void connect()
           return
         }
 
-        // A long background session is presumed to have torn down the socket;
-        // rebuild it. Short backgrounds keep the healthy connection.
-        if (staleAfterBackground) {
-          invalidateActiveSocket(1000, 'foreground_recovery')
+        // Pause the watchdog's budget while the app is hidden. Shifting the
+        // activity timestamp by the hidden duration preserves the remaining
+        // foreground budget. Clamp to now because a heartbeat dispatched while
+        // backgrounded may already have refreshed the timestamp; without the
+        // clamp this timestamp would incorrectly move into the future.
+        if (lastServerActivityAt !== null) {
+          lastServerActivityAt = Math.min(
+            now,
+            lastServerActivityAt + backgroundDuration,
+          )
+        }
+
+        if (isServerActivityStale()) {
+          invalidateActiveSocket(1000, 'server_activity_timeout')
           void connect()
         } else if (socket) {
-          // The watchdog was paused while hidden. Resume it from the last
-          // server activity when the socket is retained.
+          // The watchdog was paused while hidden. Resume it from the adjusted
+          // server activity timestamp when the socket is retained.
           startServerActivityTimer(socket, generation)
         }
         return
@@ -601,6 +668,14 @@ export const orderRealtime = {
           // Every valid server envelope is evidence that this socket can
           // still receive server data. This includes ready, heartbeat, known
           // business events, and future event types we do not dispatch yet.
+          if (parsed.eventType === 'ready') {
+            const heartbeatIntervalMs = parseHeartbeatIntervalMs(parsed.payload)
+            serverActivityTimeoutMs =
+              heartbeatIntervalMs === null
+                ? null
+                : getServerActivityTimeoutMs(heartbeatIntervalMs)
+          }
+
           recordServerActivity(nextSocket, currentGeneration)
 
           if (parsed.eventType === 'ready') {
