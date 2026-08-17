@@ -1994,15 +1994,18 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     })
     expect(useOrderStore.getState().ordersById['a']).toBeDefined()
 
-    // The clear applies immediately: the known ids are tombstoned first.
+    // The clear applies immediately: the known ids are parked on the pending
+    // barrier (not tombstoned — a store record may be a post-clear creation)
+    // and the store empties.
     act(() => {
       ws.onClear({ clearedCount: 1, mode: 'all' })
     })
     expect(useOrderStore.getState().ordersById).toEqual({})
-    expect(orderTombstones.has('a')).toBe(true)
+    expect(orderTombstones.isClearEpochOpen()).toBe(true)
+    expect(orderTombstones.has('a')).toBe(false)
 
     // A stale delayed upsert of the cleared id arrives while the follow-up
-    // snapshot is in flight: the receipt-time tombstone drops it at the
+    // snapshot is in flight: the pending barrier rejects it at the
     // onUpsert gate before it can enter the buffer.
     act(() => {
       ws.onUpsert(
@@ -2018,9 +2021,11 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
       await flushAsync()
     })
 
-    // The tombstone — not just the empty post-clear snapshot — keeps the
-    // order absent.
+    // The post-clear follow-up confirmed the cleared state: the pending id
+    // became a permanent tombstone — not just the empty post-clear snapshot —
+    // so the order stays absent.
     expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(orderTombstones.has('a')).toBe(true)
   })
 
   it('tombstones client-known ids when a full clear arrives during a snapshot', async () => {
@@ -2048,7 +2053,16 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     act(() => {
       ws.onClear({ clearedCount: 1, mode: 'all' })
     })
-    expect(orderTombstones.has('a')).toBe(true)
+    // 'a' is only store-known (a create/update response, not a causally
+    // ordered WS event), so the clear parks it on the pending barrier until
+    // the post-clear follow-up snapshot confirms its fate.
+    expect(orderTombstones.isClearEpochOpen()).toBe(true)
+    expect(orderTombstones.has('a')).toBe(false)
+    expect(
+      orderTombstones.rejectsUpsert(
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 12 }),
+      ),
+    ).toBe(true)
 
     act(() => {
       ws.onUpsert(
@@ -2396,6 +2410,68 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
 
     expect(useOrderStore.getState().ordersById['f']).toEqual(fresh)
     expect(orderTombstones.has('f')).toBe(false)
+    expect(useOrderStore.getState().status).toBe('ready')
+  })
+
+  it('lets a post-clear create whose response beat the delayed clear event survive the clear epoch', async () => {
+    // Review blocker P1: the server commits clear(all), then creates C. The
+    // create HTTP response arrives first (the epoch has not bumped yet), so
+    // C enters the store; the delayed clear WS event arrives afterwards. C
+    // is only "currently in the store" — NOT causally known to predate the
+    // clear — so it must ride the pending barrier, not a permanent
+    // tombstone, and the guaranteed-post-clear follow-up snapshot [C] must
+    // release it. With the old receipt-time markRemoved it would stay in
+    // the permanent tombstone registry and the order would be lost for the
+    // whole session (server = { C }, client = {}).
+    const first = deferred<OrderRecord[]>()
+    const second = deferred<OrderRecord[]>()
+    mocks.listOrders
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      first.resolve([
+        makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 11 }),
+      ])
+      await flushAsync()
+    })
+    expect(useOrderStore.getState().ordersById['a']).toBeDefined()
+
+    // C's create response lands before the clear event: the epoch is
+    // unchanged, so the create path inserts C into the store.
+    const orderC = makeOrder('c', '2025-01-02T00:00:00+08:00', { version: 1 })
+    act(() => {
+      useOrderStore.getState().upsertOrdersIfNewer([orderC])
+    })
+    expect(useOrderStore.getState().ordersById['c']).toEqual(orderC)
+
+    // The delayed clear(all) WS event arrives: C is parked on the pending
+    // barrier — not tombstoned — because it may be a post-clear creation.
+    act(() => {
+      ws.onClear({ clearedCount: 0, mode: 'all' })
+    })
+    expect(useOrderStore.getState().ordersById).toEqual({})
+    expect(orderTombstones.isClearEpochOpen()).toBe(true)
+    expect(orderTombstones.has('c')).toBe(false)
+
+    // The follow-up post-clear snapshot confirms C: it survives the clear
+    // and must not become a permanent tombstone.
+    await act(async () => {
+      second.resolve([orderC])
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['c']).toEqual(orderC)
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(orderTombstones.has('c')).toBe(false)
+    expect(orderTombstones.has('a')).toBe(true)
     expect(useOrderStore.getState().status).toBe('ready')
   })
 })

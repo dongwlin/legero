@@ -29,15 +29,19 @@ import type { OrderRecord } from '@/types'
  *
  * A full `clear(all)` is a terminal delete of every id that existed at clear
  * time, but the client cannot name all of them up front: ids only discovered
- * later — through the reconciliation buffer or the in-flight snapshot base —
- * are learned from sources that may predate the clear. While a follow-up
- * (guaranteed post-clear) snapshot is pending, those ids ride the clear epoch
- * as *pending* tombstones (`pendingClearedIds`, see bumpClearEpoch /
- * confirmClearEpoch) and are rejected by `rejectsUpsert` exactly like
- * confirmed ones; the follow-up then promotes the ones it does not contain to
- * terminal tombstones and lifts the barrier. This keeps the barrier
- * session-wide instead of letting it die with a single reconciliation, while
- * still letting a post-clear creation that the follow-up confirms survive.
+ * later — through the reconciliation buffer or the in-flight snapshot base,
+ * or already present in the store from an HTTP response that crossed the
+ * clear event — are learned from sources that are not causally ordered
+ * against the clear (HTTP and WebSocket are independent transports, so a
+ * store record may even be a post-clear creation that merely arrived first).
+ * While a follow-up (guaranteed post-clear) snapshot is pending, those ids
+ * ride the clear epoch as *pending* tombstones (`pendingClearedIds`, see
+ * bumpClearEpoch / confirmClearEpoch) and are rejected by `rejectsUpsert`
+ * exactly like confirmed ones; the follow-up then promotes the ones it does
+ * not contain to terminal tombstones and releases (and lifts the barrier
+ * for) the ones it does contain. This keeps the barrier session-wide instead
+ * of letting it die with a single reconciliation, while still letting a
+ * post-clear creation that the follow-up confirms survive.
  *
  * Module-level singleton shared by the workspace sync hook (realtime path)
  * and the mutation layer (local delete confirmation). reset() is called when

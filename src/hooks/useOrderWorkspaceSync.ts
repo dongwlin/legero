@@ -178,21 +178,35 @@ export const useOrderWorkspaceSync = () => {
     }
 
     // A clear is a terminal delete of the orders it removes at the moment it
-    // is received: ids the client currently knows are tombstoned so a delayed
-    // stale upsert of any of them — arriving via the batch queue, the
+    // is received: ids the client currently knows must be blocked so a
+    // delayed stale upsert of any of them — arriving via the batch queue, the
     // reconciliation buffer or a late HTTP response — can never resurrect an
     // order the server already deleted (the backend never reuses an order
     // id). The clear payload carries no deleted-id list, so only the
-    // client-known ids can be covered here; 'all' tombstones every known id,
-    // 'before_today' only those not created today (the server keeps today's
-    // orders). The reconciliation-window compaction and the date-based
-    // before_today guard close the rest of the resurrection window (see
-    // compactRealtimeEvents).
+    // client-known ids can be covered here. A full 'all' clear parks them on
+    // the pending barrier (blockPendingClear) instead of tombstoning them: a
+    // store record is NOT causally ordered against the clear — HTTP and
+    // WebSocket are independent transports, so it may be a post-clear
+    // creation whose response merely arrived first — and only the
+    // guaranteed-post-clear follow-up snapshot can tell (absent from it ->
+    // confirmed deleted, present -> a genuine survivor, released; see
+    // orderTombstones.confirmClearEpoch). A 'before_today' clear tombstones
+    // every known order not created today (the server keeps today's orders);
+    // the date-based guard closes the rest of that window. The
+    // reconciliation-window compaction and the before_today date guard cover
+    // the remaining resurrection sources (see compactRealtimeEvents).
     const tombstoneClearedIds = (mode: ClearWorkspaceMode) => {
       const store = useOrderStore.getState()
 
+      if (mode === 'all') {
+        for (const id of Object.keys(store.ordersById)) {
+          orderTombstones.blockPendingClear(id)
+        }
+        return
+      }
+
       for (const [id, order] of Object.entries(store.ordersById)) {
-        if (mode === 'all' || !isOrderCreatedToday(order)) {
+        if (!isOrderCreatedToday(order)) {
           orderTombstones.markRemoved(id)
         }
       }

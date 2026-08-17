@@ -376,7 +376,13 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
         // arrives — so the clear epoch is captured at submit: a clear that
         // happened meanwhile means the response must not be blindly inserted
         // as authoritative state. The resync decides instead whether the
-        // order still exists.
+        // order still exists. The reverse arrival order — the response lands
+        // first, the clear event arrives later — is equally ambiguous: the
+        // fresh id rides the clear's pending barrier (see
+        // orderTombstones.confirmClearEpoch) and survives iff the
+        // post-clear follow-up snapshot confirms it, so the insert below is
+        // safe: a clear that caught the id either confirms its deletion or
+        // releases it as a legitimate survivor.
         const clearEpochAtStart = orderTombstones.clearEpochValue()
         const persistedRecords = await orderRepository.createMany(
           formValue,
