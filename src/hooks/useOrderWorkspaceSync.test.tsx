@@ -57,7 +57,11 @@ vi.mock('@/services/orderOptimistic', () => ({
 type SubscriptionCallbacks = {
   onUpsert: (order: OrderRecord) => void
   onRemove: (id: string) => void
-  onClear: (event: { clearedCount: number; mode: string }) => void
+  onClear: (event: {
+    clearedCount: number
+    mode: string
+    clearDateKey?: string
+  }) => void
   onSubscriptionStatus: (status: string) => void
 }
 
@@ -2534,6 +2538,79 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
 
       const order = useOrderStore.getState().ordersById['a']
       expect(order?.version).toBe(2)
+      expect(orderTombstones.has('a')).toBe(false)
+      expect(useOrderStore.getState().status).toBe('ready')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('pins the barrier to the server-provided before_today cutoff across a cross-midnight WS delay', async () => {
+    // Review blocker P1: the server executes clear(before_today) on Aug 17
+    // (cutoff 2026-08-17; A created that day survives, old does not), but the
+    // WebSocket event only reaches the client after midnight on Aug 18. The
+    // authoritative cutoff carried in the payload — never the client receipt
+    // time — decides A's fate: with the old receipt-derived key the client
+    // would pin 2026-08-18 and wrongly tombstone A for the whole session.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-18T00:00:01+08:00'))
+    try {
+      const first = deferred<OrderRecord[]>()
+      const second = deferred<OrderRecord[]>()
+      mocks.listOrders
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise)
+
+      renderHook(() => useOrderWorkspaceSync())
+      const ws = subscriptionCallbacks!
+
+      act(() => {
+        ws.onSubscriptionStatus('SUBSCRIBED')
+      })
+
+      const orderA = makeOrder('a', '2026-08-17T10:00:00+08:00', { version: 1 })
+      const oldOrder = makeOrder('old', '2026-08-16T10:00:00+08:00')
+
+      await act(async () => {
+        first.resolve([orderA, oldOrder])
+        await flushAsync()
+      })
+      expect(useOrderStore.getState().ordersById['a']).toEqual(orderA)
+      expect(useOrderStore.getState().ordersById['old']).toBeDefined()
+
+      // The payload carries the server's authoritative cutoff; the client
+      // clock (already Aug 18) must not override it.
+      act(() => {
+        ws.onClear({
+          clearedCount: 1,
+          mode: 'before_today',
+          clearDateKey: '2026-08-17',
+        })
+      })
+
+      expect(useOrderStore.getState().ordersById['a']).toEqual(orderA)
+      expect(useOrderStore.getState().ordersById['old']).toBeUndefined()
+      expect(orderTombstones.beforeTodayClearDateKeyValue()).toBe('2026-08-17')
+      expect(orderTombstones.has('a')).toBe(false)
+      expect(orderTombstones.has('old')).toBe(true)
+
+      // A delayed update of A arriving during the follow-up stays accepted
+      // against the same server-pinned cutoff.
+      act(() => {
+        ws.onUpsert(
+          makeOrder('a', '2026-08-17T10:00:00+08:00', { version: 2 }),
+        )
+      })
+
+      await act(async () => {
+        second.resolve([
+          makeOrder('a', '2026-08-17T10:00:00+08:00', { version: 2 }),
+        ])
+        await flushAsync()
+      })
+
+      expect(useOrderStore.getState().ordersById['a']?.version).toBe(2)
+      expect(orderTombstones.beforeTodayClearDateKeyValue()).toBe('2026-08-17')
       expect(orderTombstones.has('a')).toBe(false)
       expect(useOrderStore.getState().status).toBe('ready')
     } finally {

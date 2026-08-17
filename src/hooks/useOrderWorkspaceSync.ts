@@ -17,6 +17,7 @@ import { getOrderDateKey } from '@/services/orderDomainUtils'
 import { orderOptimistic } from '@/services/orderOptimistic'
 import { orderTombstones } from '@/services/orderTombstones'
 import { subscribeOrdersResync } from '@/services/orderResync'
+import type { OrdersClearedEvent } from '@/services/apiTypes'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 import type { OrderRecord } from '@/types'
@@ -211,6 +212,24 @@ export const useOrderWorkspaceSync = () => {
         }
       }
     }
+
+    // Builds the in-memory clear event, pinning a before_today clear's
+    // cutoff to the business-day key the SERVER used when it executed the
+    // clear (carried in the payload). The receipt time is not the
+    // authoritative boundary — the server may have executed the clear just
+    // before midnight while the WebSocket event only arrives after it, and a
+    // skewed client clock would pin the wrong day — so the server key is
+    // used verbatim. Only when the payload omits it (older server without
+    // the field) does the receipt-time key step in as a best-effort
+    // approximation.
+    const buildClearEvent = (raw: OrdersClearedEvent): ClearRealtimeEvent =>
+      raw.mode === 'all'
+        ? { type: 'clear', mode: 'all' }
+        : {
+            type: 'clear',
+            mode: 'before_today',
+            clearDateKey: raw.clearDateKey ?? getOrderDateKey(new Date()),
+          }
 
     // Applies a clear event's semantics to the store: 'all' empties the
     // workspace, 'before_today' keeps only orders created on or after the
@@ -533,18 +552,11 @@ export const useOrderWorkspaceSync = () => {
                 // over the ordered channel, so they existed pre-clear too.
                 windowSawClear = true
 
-                // Pin the before_today cutoff to the business day the clear
-                // was received on: the raw server event carries no date, and
-                // the replay (this window and the failure-replay path) must
-                // judge orders against the clear's own day, not the live one.
-                const clearEvent: ClearRealtimeEvent =
-                  event.mode === 'all'
-                    ? { type: 'clear', mode: 'all' }
-                    : {
-                        type: 'clear',
-                        mode: 'before_today',
-                        clearDateKey: getOrderDateKey(new Date()),
-                      }
+                // Pin the before_today cutoff to the SERVER's own business
+                // day (buildClearEvent), so the replay (this window and the
+                // failure-replay path) judges orders against the day the
+                // clear actually happened, not the receipt time.
+                const clearEvent = buildClearEvent(event)
 
                 if (clearEvent.mode === 'all') {
                   for (const id of Object.keys(useOrderStore.getState().ordersById)) {
@@ -581,17 +593,7 @@ export const useOrderWorkspaceSync = () => {
               // and resurrect orders the server already deleted.
               flushBatched()
 
-              // Pin the receipt-time business-day key onto the clear event
-              // before applying it, so the same semantics survive the
-              // buffered/failure-replay paths unchanged.
-              const clearEvent: ClearRealtimeEvent =
-                event.mode === 'all'
-                  ? { type: 'clear', mode: 'all' }
-                  : {
-                      type: 'clear',
-                      mode: 'before_today',
-                      clearDateKey: getOrderDateKey(new Date()),
-                    }
+              const clearEvent = buildClearEvent(event)
               applyClearToStore(clearEvent)
               void syncSnapshot(false)
             }

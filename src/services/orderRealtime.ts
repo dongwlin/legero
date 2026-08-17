@@ -47,6 +47,15 @@ type RealtimeState = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'closed
 const normalizeClearMode = (mode: unknown): ClearWorkspaceMode =>
   mode === 'before_today' ? 'before_today' : 'all'
 
+// The server executes a before_today clear against its own business day and
+// carries that authoritative cutoff (YYYY-MM-DD) in the payload; anything
+// that does not look like a date key is treated as absent, and the consumer
+// then falls back to its receipt-time key as a best-effort approximation.
+const normalizeClearDateKey = (value: unknown): string | undefined =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value
+    : undefined
+
 const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const timer = window.setTimeout(() => {
@@ -134,12 +143,19 @@ const dispatchEvent = (
   if (eventType === 'order.cleared') {
     const clearedEvent = payload as OrdersClearedEvent | null
     const clearedCount = clearedEvent?.clearedCount
+    const clearDateKey = normalizeClearDateKey(clearedEvent?.clearDateKey)
 
     if (typeof clearedCount === 'number') {
-      options.onClear?.({
+      const clear: OrdersClearedEvent = {
         clearedCount,
         mode: normalizeClearMode(clearedEvent?.mode),
-      })
+      }
+
+      if (clearDateKey !== undefined) {
+        clear.clearDateKey = clearDateKey
+      }
+
+      options.onClear?.(clear)
     }
   }
 }
