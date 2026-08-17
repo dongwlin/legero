@@ -34,7 +34,6 @@ export const MeatSelector: React.FC<MeatSelectorProps> = ({
               key={meat.value}
               name={String(meat.value)}
               value={String(meat.value)}
-              className='rounded-xl border border-border/60 bg-background px-3 py-2.5 transition-colors duration-200 hover:bg-background-secondary data-[selected=true]:border-accent/40 data-[selected=true]:bg-accent-soft/45'
               isSelected={isSelected}
               variant='secondary'
               onChange={(checked) =>
@@ -45,10 +44,10 @@ export const MeatSelector: React.FC<MeatSelectorProps> = ({
                 )
               }
             >
-              <Checkbox.Control className='mt-0.5'>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>
+              <Checkbox.Content className='w-full rounded-xl border border-border/60 bg-background px-3 py-2.5 transition-colors duration-200 hover:bg-background-secondary data-[selected=true]:border-accent/40 data-[selected=true]:bg-accent-soft/45'>
+                <Checkbox.Control className='mt-0.5'>
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
                 <Label className='text-sm font-medium text-foreground md:text-[15px]'>
                   {meat.label}
                 </Label>
