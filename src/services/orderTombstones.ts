@@ -1,4 +1,4 @@
-import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import { getOrderDateKey } from '@/services/orderDomainUtils'
 import type { OrderRecord } from '@/types'
 
 /**
@@ -20,12 +20,17 @@ import type { OrderRecord } from '@/types'
  * holds everywhere, exactly like it already holds inside one buffered
  * reconciliation window (see compactRealtimeEvents).
  *
- * A `clear(before_today)` deletes every order created before the current
- * business day; because an upsert carries its own `createdAt`, that clear's
- * barrier needs no per-id bookkeeping — once the clear has been processed,
- * any later statement about a not-created-today order is stale by
- * construction (the server deletes those orders and never recreates an id),
- * so `rejectsUpsert` also checks the creation date.
+ * A `clear(before_today)` deletes every order created before the business
+ * day it was received on; because an upsert carries its own `createdAt` and
+ * the server never recreates a deleted id, that clear's barrier needs no
+ * per-id bookkeeping — once the clear has been processed, any later
+ * statement about an order created before the pinned cutoff is stale by
+ * construction, so `rejectsUpsert` also checks the creation date. The cutoff
+ * is the business-day key pinned at clear receipt (`beforeTodayClearDateKey`),
+ * never the live "today": a replay or a delayed upsert that crosses midnight
+ * must be judged against the day the clear actually happened, or it would
+ * wrongly delete the very orders the clear preserved (an order created on
+ * the clear's day stops being "today" the moment the clock rolls over).
  *
  * A full `clear(all)` is a terminal delete of every id that existed at clear
  * time, but the client cannot name all of them up front: ids only discovered
@@ -51,7 +56,10 @@ import type { OrderRecord } from '@/types'
  */
 const removedOrderIds = new Set<string>()
 
-let beforeTodayCleared = false
+// The business-date cutoff (YYYY-MM-DD in Asia/Shanghai) of the last
+// before_today clear, pinned when the clear was received. null until one
+// has been seen this session.
+let beforeTodayClearDateKey: string | null = null
 
 // --- full-clear epoch barrier ---
 let clearEpoch = 0
@@ -70,18 +78,28 @@ export const orderTombstones = {
   },
 
   /**
-   * Registers that a `before_today` clear was processed this session: from
-   * then on, `rejectsUpsert` drops every upsert of an order that was not
-   * created today (the server deleted those orders and never recreates an
-   * id).
+   * Registers that a `before_today` clear was processed this session, pinned
+   * to the business-day key of the moment it was received (`clearDateKey`,
+   * e.g. '2026-08-17'). From then on, `rejectsUpsert` drops every upsert of
+   * an order created before that cutoff (the server deleted those orders and
+   * never recreates an id). The pinned key — not the live date — keeps the
+   * barrier stable across midnight and across delayed replays.
    */
-  markBeforeTodayClear(): void {
-    beforeTodayCleared = true
+  markBeforeTodayClear(clearDateKey: string): void {
+    beforeTodayClearDateKey = clearDateKey
   },
 
   /** True when a `before_today` clear was processed this session. */
   isBeforeTodayCleared(): boolean {
-    return beforeTodayCleared
+    return beforeTodayClearDateKey !== null
+  },
+
+  /**
+   * The business-date cutoff pinned by the (last) before_today clear, or
+   * null when none was processed this session.
+   */
+  beforeTodayClearDateKeyValue(): string | null {
+    return beforeTodayClearDateKey
   },
 
   /**
@@ -144,24 +162,25 @@ export const orderTombstones = {
    * True when an upsert of `order` must not be accepted this session: its id
    * is terminally deleted (realtime remove, confirmed local DELETE), it may
    * have been deleted by an unconfirmed full clear (pending epoch tombstone),
-   * or a `before_today` clear deleted every not-created-today order. Used by
-   * every upsert gate — the realtime handler, the rAF batch flush, the
-   * reconciliation commit filter, the failure replay and the late mutation
-   * response paths — so a stale statement can never resurrect a deleted
-   * order at any layer.
+   * or a `before_today` clear deleted every order created before its pinned
+   * cutoff. Used by every upsert gate — the realtime handler, the rAF batch
+   * flush, the reconciliation commit filter, the failure replay and the late
+   * mutation response paths — so a stale statement can never resurrect a
+   * deleted order at any layer.
    */
   rejectsUpsert(order: OrderRecord): boolean {
     return (
       removedOrderIds.has(order.id) ||
       pendingClearedIds.has(order.id) ||
-      (beforeTodayCleared && !isOrderCreatedToday(order))
+      (beforeTodayClearDateKey !== null &&
+        getOrderDateKey(order.createdAt) < beforeTodayClearDateKey)
     )
   },
 
   /** Drops all tombstones (workspace sync session teardown). */
   reset(): void {
     removedOrderIds.clear()
-    beforeTodayCleared = false
+    beforeTodayClearDateKey = null
     pendingClearedIds.clear()
     clearEpochOpen = false
     clearEpoch = 0

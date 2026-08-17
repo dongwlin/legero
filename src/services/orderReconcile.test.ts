@@ -56,13 +56,20 @@ const upsertVersion = (
 
 const remove = (id: string): RealtimeOrderEvent => ({ type: 'remove', id })
 
-const clearAll: RealtimeOrderEvent = { type: 'clear', mode: 'all' }
-const clearBeforeToday: RealtimeOrderEvent = { type: 'clear', mode: 'before_today' }
-
 // The current calendar day in the business timezone (Asia/Shanghai), as the
 // server's before_today clear boundary uses the same definition.
 const todayKeyInShanghai = (): string =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+
+const clearAll: RealtimeOrderEvent = { type: 'clear', mode: 'all' }
+// A before_today clear carries the business-day key pinned when it was
+// received — the replay judges orders against that pinned day, never the
+// live date.
+const clearBeforeToday: RealtimeOrderEvent = {
+  type: 'clear',
+  mode: 'before_today',
+  clearDateKey: todayKeyInShanghai(),
+}
 
 const todayOrder = (id: string, overrides: Partial<OrderRecord> = {}): OrderRecord =>
   makeOrder(id, `${todayKeyInShanghai()}T10:00:00+08:00`, overrides)
@@ -398,6 +405,39 @@ describe('reconcileSnapshotWithEvents', () => {
     ])
 
     expect(result).toEqual([fresh])
+  })
+
+  it('replays a before_today clear against its pinned cutoff, not the live date', () => {
+    // Review blocker P1: the cutoff is the business-day key pinned when the
+    // clear was received, so a snapshot that lands after midnight replays
+    // the same semantics — an order created on the clear's own day survives
+    // even though the live "today" has rolled past it. The pinned date is in
+    // the past on purpose: only the pinned comparison (never the live-clock
+    // `isOrderCreatedToday`) keeps the clear's own day in scope.
+    const snapshot = [
+      makeOrder('a', '2020-08-17T10:00:00+08:00'),
+      makeOrder('b', '2020-08-16T10:00:00+08:00'),
+    ]
+
+    const result = reconcileSnapshotWithEvents(snapshot, [
+      { type: 'clear', mode: 'before_today', clearDateKey: '2020-08-17' },
+    ])
+
+    expect(result).toEqual([snapshot[0]])
+  })
+
+  it('keeps accepting delayed upserts created on or after the pinned cutoff', () => {
+    // Review blocker P1: an order created on the clear's business day is not
+    // in the clear's deletion scope, so its delayed (higher-version) upsert
+    // must survive even when the live date has moved on.
+    const orderA = makeOrder('a', '2020-08-17T10:00:00+08:00', { version: 1 })
+
+    const result = reconcileSnapshotWithEvents([], [
+      { type: 'clear', mode: 'before_today', clearDateKey: '2020-08-17' },
+      { type: 'upsert', order: { ...orderA, version: 2 } },
+    ])
+
+    expect(result).toEqual([{ ...orderA, version: 2 }])
   })
 })
 

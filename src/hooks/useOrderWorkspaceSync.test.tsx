@@ -2474,4 +2474,70 @@ describe('useOrderWorkspaceSync session-wide terminal tombstones', () => {
     expect(orderTombstones.has('a')).toBe(true)
     expect(useOrderStore.getState().status).toBe('ready')
   })
+
+  it('accepts a delayed update of a clear-surviving order after the clock passes midnight', async () => {
+    // Review blocker P1: a before_today clear must be judged against the
+    // business day pinned when it was received, not the live date. At Aug 17
+    // 23:50 an order created Aug 17 survives the clear; once the clock rolls
+    // into Aug 18 its legitimate delayed update must still be accepted —
+    // with the old dynamic `isOrderCreatedToday` guard it would be rejected
+    // because its createdAt is no longer "today".
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-17T23:50:00+08:00'))
+    try {
+      const first = deferred<OrderRecord[]>()
+      const second = deferred<OrderRecord[]>()
+      mocks.listOrders
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise)
+
+      renderHook(() => useOrderWorkspaceSync())
+      const ws = subscriptionCallbacks!
+
+      act(() => {
+        ws.onSubscriptionStatus('SUBSCRIBED')
+      })
+
+      const orderA = makeOrder('a', '2026-08-17T10:00:00+08:00', { version: 1 })
+
+      await act(async () => {
+        first.resolve([orderA])
+        await flushAsync()
+      })
+      expect(useOrderStore.getState().ordersById['a']).toEqual(orderA)
+
+      // The clear arrives at 23:50 on Aug 17: the cutoff is pinned to
+      // 2026-08-17, so A (created that day) survives and is not tombstoned.
+      act(() => {
+        ws.onClear({ clearedCount: 0, mode: 'before_today' })
+      })
+      expect(useOrderStore.getState().ordersById['a']).toEqual(orderA)
+      expect(orderTombstones.beforeTodayClearDateKeyValue()).toBe('2026-08-17')
+      expect(orderTombstones.has('a')).toBe(false)
+
+      // Midnight passes while the clear's follow-up snapshot is in flight; a
+      // legitimate version-2 update of A arrives. The pinned cutoff still
+      // accepts it (the live date no longer matches A's creation day).
+      vi.setSystemTime(new Date('2026-08-18T00:05:00+08:00'))
+      act(() => {
+        ws.onUpsert(
+          makeOrder('a', '2026-08-17T10:00:00+08:00', { version: 2 }),
+        )
+      })
+
+      await act(async () => {
+        second.resolve([
+          makeOrder('a', '2026-08-17T10:00:00+08:00', { version: 2 }),
+        ])
+        await flushAsync()
+      })
+
+      const order = useOrderStore.getState().ordersById['a']
+      expect(order?.version).toBe(2)
+      expect(orderTombstones.has('a')).toBe(false)
+      expect(useOrderStore.getState().status).toBe('ready')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

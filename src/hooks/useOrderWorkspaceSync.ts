@@ -10,13 +10,13 @@ import {
   confirmedRemoveIds,
   createOrderEventBuffer,
   reconcileSnapshotWithEvents,
+  type ClearRealtimeEvent,
   type RealtimeOrderEvent,
 } from '@/services/orderReconcile'
-import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import { getOrderDateKey } from '@/services/orderDomainUtils'
 import { orderOptimistic } from '@/services/orderOptimistic'
 import { orderTombstones } from '@/services/orderTombstones'
 import { subscribeOrdersResync } from '@/services/orderResync'
-import type { ClearWorkspaceMode } from '@/services/apiTypes'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
 import type { OrderRecord } from '@/types'
@@ -191,52 +191,57 @@ export const useOrderWorkspaceSync = () => {
     // guaranteed-post-clear follow-up snapshot can tell (absent from it ->
     // confirmed deleted, present -> a genuine survivor, released; see
     // orderTombstones.confirmClearEpoch). A 'before_today' clear tombstones
-    // every known order not created today (the server keeps today's orders);
-    // the date-based guard closes the rest of that window. The
-    // reconciliation-window compaction and the before_today date guard cover
-    // the remaining resurrection sources (see compactRealtimeEvents).
-    const tombstoneClearedIds = (mode: ClearWorkspaceMode) => {
+    // every known order created before its pinned business-day cutoff (the
+    // server keeps orders created on or after that day); the date guard
+    // closes the rest of that window. The reconciliation-window compaction
+    // and the before_today date guard cover the remaining resurrection
+    // sources (see compactRealtimeEvents).
+    // A before_today clear is a terminal delete of every order created
+    // before its pinned business-day cutoff: ids the client currently knows
+    // from that range are tombstoned at receipt, so a delayed stale upsert
+    // of any of them — via the batch queue, the reconciliation buffer or a
+    // late HTTP response — can never resurrect an order the server already
+    // deleted (the backend never reuses an order id).
+    const tombstoneBeforeTodayIds = (clearDateKey: string) => {
       const store = useOrderStore.getState()
 
-      if (mode === 'all') {
-        for (const id of Object.keys(store.ordersById)) {
-          orderTombstones.blockPendingClear(id)
-        }
-        return
-      }
-
       for (const [id, order] of Object.entries(store.ordersById)) {
-        if (!isOrderCreatedToday(order)) {
+        if (getOrderDateKey(order.createdAt) < clearDateKey) {
           orderTombstones.markRemoved(id)
         }
       }
     }
 
     // Applies a clear event's semantics to the store: 'all' empties the
-    // workspace, 'before_today' keeps only orders created on the current
-    // business day (the server deleted everything older). Both register the
-    // terminal deletion barrier for the ids the client knows before the
-    // store is touched, so a later stale statement for any of them is
-    // dropped at the gates instead of being applied to the (now empty or
-    // filtered) store slots. A full clear additionally opens the clear epoch
-    // barrier: ids whose existence is only learned later — through the
-    // in-flight snapshot base — may still predate the clear, and they stay
-    // blocked until a post-clear snapshot confirms the cleared state.
-    const applyClearToStore = (mode: ClearWorkspaceMode) => {
+    // workspace, 'before_today' keeps only orders created on or after the
+    // event's pinned business-day cutoff (the server deleted everything
+    // older). Both register the terminal deletion barrier for the ids the
+    // client knows before the store is touched, so a later stale statement
+    // for any of them is dropped at the gates instead of being applied to
+    // the (now empty or filtered) store slots. A full clear additionally
+    // opens the clear epoch barrier: ids whose existence is only learned
+    // later — through the in-flight snapshot base or a response that crossed
+    // the clear event — may still predate the clear, and they stay blocked
+    // until a post-clear snapshot confirms the cleared state.
+    const applyClearToStore = (clearEvent: ClearRealtimeEvent) => {
       const store = useOrderStore.getState()
 
-      if (mode === 'all') {
-        tombstoneClearedIds('all')
+      if (clearEvent.mode === 'all') {
+        for (const id of Object.keys(store.ordersById)) {
+          orderTombstones.blockPendingClear(id)
+        }
         orderTombstones.bumpClearEpoch()
         store.clearOrders()
         return
       }
 
-      tombstoneClearedIds('before_today')
-      orderTombstones.markBeforeTodayClear()
+      tombstoneBeforeTodayIds(clearEvent.clearDateKey)
+      orderTombstones.markBeforeTodayClear(clearEvent.clearDateKey)
 
       store.setOrders(
-        Object.values(store.ordersById).filter((order) => isOrderCreatedToday(order)),
+        Object.values(store.ordersById).filter(
+          (order) => getOrderDateKey(order.createdAt) >= clearEvent.clearDateKey,
+        ),
       )
     }
 
@@ -255,8 +260,8 @@ export const useOrderWorkspaceSync = () => {
       for (const event of events) {
         switch (event.type) {
           case 'upsert':
-            // A tombstoned id (or a not-created-today order after a
-            // before_today clear) is terminally deleted for the whole
+            // A tombstoned id (or an order created before a before_today
+            // clear's pinned cutoff) is terminally deleted for the whole
             // session: a buffered stale upsert must not resurrect it during
             // failure replay either.
             if (!orderTombstones.rejectsUpsert(event.order)) {
@@ -267,7 +272,10 @@ export const useOrderWorkspaceSync = () => {
             store.removeOrder(event.id)
             break
           case 'clear':
-            applyClearToStore(event.mode)
+            // The buffered event carries the before_today cutoff pinned at
+            // receipt, so replaying it applies the same semantics even when
+            // the clock has since moved past the clear's business day.
+            applyClearToStore(event)
             break
           default: {
             const exhaustive: never = event
@@ -517,7 +525,7 @@ export const useOrderWorkspaceSync = () => {
                 // it so the reconciliation replays it (otherwise the
                 // snapshot would resurrect cleared orders), and schedule the
                 // follow-up snapshot the clear already implied (before_today
-                // keeps part of the list). Client-known ids are tombstoned at
+                // keeps part of the list). Client-known ids are blocked at
                 // receipt — not at replay — so a stale delayed upsert of a
                 // cleared id that arrives later in the window is dropped at
                 // the onUpsert gate instead of entering the buffer. Ids
@@ -525,8 +533,23 @@ export const useOrderWorkspaceSync = () => {
                 // over the ordered channel, so they existed pre-clear too.
                 windowSawClear = true
 
-                if (event.mode === 'all') {
-                  tombstoneClearedIds('all')
+                // Pin the before_today cutoff to the business day the clear
+                // was received on: the raw server event carries no date, and
+                // the replay (this window and the failure-replay path) must
+                // judge orders against the clear's own day, not the live one.
+                const clearEvent: ClearRealtimeEvent =
+                  event.mode === 'all'
+                    ? { type: 'clear', mode: 'all' }
+                    : {
+                        type: 'clear',
+                        mode: 'before_today',
+                        clearDateKey: getOrderDateKey(new Date()),
+                      }
+
+                if (clearEvent.mode === 'all') {
+                  for (const id of Object.keys(useOrderStore.getState().ordersById)) {
+                    orderTombstones.blockPendingClear(id)
+                  }
 
                   for (const id of windowPreClearIds) {
                     orderTombstones.markRemoved(id)
@@ -539,11 +562,11 @@ export const useOrderWorkspaceSync = () => {
                   // snapshot confirms the cleared state.
                   orderTombstones.bumpClearEpoch()
                 } else {
-                  tombstoneClearedIds('before_today')
-                  orderTombstones.markBeforeTodayClear()
+                  tombstoneBeforeTodayIds(clearEvent.clearDateKey)
+                  orderTombstones.markBeforeTodayClear(clearEvent.clearDateKey)
                 }
 
-                eventBuffer.push({ type: 'clear', mode: event.mode })
+                eventBuffer.push(clearEvent)
                 pendingReconcile = true
                 return
               }
@@ -557,7 +580,19 @@ export const useOrderWorkspaceSync = () => {
               // inside syncSnapshot() would re-apply them after the clear
               // and resurrect orders the server already deleted.
               flushBatched()
-              applyClearToStore(event.mode)
+
+              // Pin the receipt-time business-day key onto the clear event
+              // before applying it, so the same semantics survive the
+              // buffered/failure-replay paths unchanged.
+              const clearEvent: ClearRealtimeEvent =
+                event.mode === 'all'
+                  ? { type: 'clear', mode: 'all' }
+                  : {
+                      type: 'clear',
+                      mode: 'before_today',
+                      clearDateKey: getOrderDateKey(new Date()),
+                    }
+              applyClearToStore(clearEvent)
               void syncSnapshot(false)
             }
           },

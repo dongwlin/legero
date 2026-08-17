@@ -1,5 +1,4 @@
-import type { ClearWorkspaceMode } from '@/services/apiTypes'
-import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import { getOrderDateKey } from '@/services/orderDomainUtils'
 import type { LocalMutationEffect } from '@/services/orderOptimistic'
 import { orderTombstones } from '@/services/orderTombstones'
 import type { OrderRecord } from '@/types'
@@ -10,11 +9,20 @@ import type { OrderRecord } from '@/types'
  * During snapshot reconciliation these are buffered in arrival order instead
  * of being applied to the store, so the snapshot cannot clobber updates that
  * happened after it was read (issue #12).
+ *
+ * A `before_today` clear carries `clearDateKey`: the business-day key pinned
+ * when the clear was received. The raw server event has no date, and the
+ * client cannot re-derive one later (replay may cross midnight), so the
+ * receipt-time key travels with the event to keep the replay semantics
+ * stable.
  */
 export type RealtimeOrderEvent =
   | { type: 'upsert'; order: OrderRecord }
   | { type: 'remove'; id: string }
-  | { type: 'clear'; mode: ClearWorkspaceMode }
+  | { type: 'clear'; mode: 'all' }
+  | { type: 'clear'; mode: 'before_today'; clearDateKey: string }
+
+export type ClearRealtimeEvent = Extract<RealtimeOrderEvent, { type: 'clear' }>
 
 /**
  * For the same order id the authoritative server states are ordered
@@ -181,12 +189,14 @@ export const reconcileSnapshotWithEvents = (
   // reuses an order id, so a later upsert of any of them is stale and must
   // not resurrect the order.
   const tombstonedByClear = new Set<string>()
-  // True once a before_today clear was replayed: the server dropped every
-  // order created before the current business day. An upsert arriving after
-  // it with a `createdAt` on a previous day cannot be a legitimate fresh
-  // creation (the server never recreates a deleted id), so it is dropped —
-  // only upserts of genuinely today-created orders survive the clear.
-  let beforeTodayClearedInWindow = false
+  // The pinned cutoff of a before_today clear replayed so far: the server
+  // dropped every order created before that business-day key. An upsert
+  // arriving after it with a `createdAt` before the cutoff cannot be a
+  // legitimate fresh creation (the server never recreates a deleted id), so
+  // it is dropped — only upserts created on or after the pinned key survive
+  // the clear. The key is pinned at receipt and travels with the event, so
+  // the replay is stable even when the live date rolled past it.
+  let beforeTodayClearDateKey: string | null = null
 
   for (const event of compactRealtimeEvents(events)) {
     switch (event.type) {
@@ -195,7 +205,10 @@ export const reconcileSnapshotWithEvents = (
           break
         }
 
-        if (beforeTodayClearedInWindow && !isOrderCreatedToday(event.order)) {
+        if (
+          beforeTodayClearDateKey !== null &&
+          getOrderDateKey(event.order.createdAt) < beforeTodayClearDateKey
+        ) {
           break
         }
 
@@ -229,12 +242,12 @@ export const reconcileSnapshotWithEvents = (
 
           ordersById.clear()
         } else {
-          // before_today: the server keeps only orders created on the
-          // current business day (Asia/Shanghai), so drop everything older.
-          beforeTodayClearedInWindow = true
+          // before_today: the server keeps only orders created on or after
+          // the pinned business-day key, so drop everything older.
+          beforeTodayClearDateKey = event.clearDateKey
 
           for (const [id, order] of ordersById) {
-            if (!isOrderCreatedToday(order)) {
+            if (getOrderDateKey(order.createdAt) < event.clearDateKey) {
               ordersById.delete(id)
             }
           }
