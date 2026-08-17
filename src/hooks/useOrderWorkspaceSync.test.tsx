@@ -56,6 +56,7 @@ vi.mock('@/services/orderOptimistic', () => ({
 
 type SubscriptionCallbacks = {
   onUpsert: (order: OrderRecord) => void
+  onUpsertMany: (orders: OrderRecord[]) => void
   onRemove: (id: string) => void
   onClear: (event: {
     clearedCount: number
@@ -1290,6 +1291,86 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     const order = useOrderStore.getState().ordersById['a']
     expect(order?.version).toBe(12)
     expect(order?.note).toBe('v12')
+  })
+
+  it('applies a compact upsert batch in one animation frame and store update', async () => {
+    mocks.listOrders.mockResolvedValue([])
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+
+    await act(async () => {
+      await flushAsync()
+    })
+
+    const upsertOrders = vi.spyOn(useOrderStore.getState(), 'upsertOrders')
+    const requestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame')
+    const batch = [
+      makeOrder('a', '2025-01-01T00:00:00+08:00', { version: 2 }),
+      makeOrder('b', '2025-01-02T00:00:00+08:00', { version: 4 }),
+      makeOrder('c', '2025-01-03T00:00:00+08:00', { version: 6 }),
+    ]
+
+    try {
+      act(() => {
+        ws.onUpsertMany(batch)
+      })
+
+      expect(requestAnimationFrame).toHaveBeenCalledTimes(1)
+
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          window.requestAnimationFrame(() => resolve())
+        })
+      })
+
+      expect(upsertOrders).toHaveBeenCalledTimes(1)
+      expect(upsertOrders).toHaveBeenCalledWith(batch)
+      expect(Object.keys(useOrderStore.getState().ordersById)).toEqual([
+        'a',
+        'b',
+        'c',
+      ])
+    } finally {
+      requestAnimationFrame.mockRestore()
+      upsertOrders.mockRestore()
+    }
+  })
+
+  it('buffers and replays every item from a compact batch during reconciliation', async () => {
+    const snapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValue(snapshot.promise)
+
+    renderHook(() => useOrderWorkspaceSync())
+    const ws = subscriptionCallbacks!
+
+    act(() => {
+      ws.onSubscriptionStatus('SUBSCRIBED')
+    })
+    expect(mocks.listOrders).toHaveBeenCalledTimes(1)
+
+    const orderA = makeOrder('a', '2025-01-01T00:00:00+08:00')
+    const orderB = makeOrder('b', '2025-01-02T00:00:00+08:00', { version: 3 })
+    const orderC = makeOrder('c', '2025-01-03T00:00:00+08:00', { version: 4 })
+
+    act(() => {
+      ws.onUpsertMany([orderB, orderC])
+    })
+
+    await act(async () => {
+      snapshot.resolve([orderA])
+      await flushAsync()
+    })
+
+    const { ordersById, status } = useOrderStore.getState()
+    expect(ordersById['a']).toEqual(orderA)
+    expect(ordersById['b']).toEqual(orderB)
+    expect(ordersById['c']).toEqual(orderC)
+    expect(status).toBe('ready')
   })
 
   it('applies a clear immediately when no reconciliation is in flight, even if the follow-up snapshot fails', async () => {

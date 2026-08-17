@@ -7,6 +7,7 @@ import {
   clearStoredAuthTokens,
   persistAuthTokens,
 } from './apiClient'
+import type { OrderRecord } from '@/types'
 import { setStoredApiBaseUrl } from './apiConfig'
 import {
   BACKGROUND_STALE_MS,
@@ -134,12 +135,14 @@ const latestSocket = () =>
 const subscribe = (extra: {
   onSubscriptionStatus?: (status: string) => void
   onUpsert?: () => void
+  onUpsertMany?: (orders: OrderRecord[]) => void
   onRemove?: () => void
   onClear?: () => void
 } = {}) =>
   orderRealtime.subscribeToWorkspaceOrders({
     onSubscriptionStatus: extra.onSubscriptionStatus ?? vi.fn(),
     onUpsert: extra.onUpsert ?? vi.fn(),
+    onUpsertMany: extra.onUpsertMany ?? vi.fn(),
     onRemove: extra.onRemove ?? vi.fn(),
     onClear: extra.onClear ?? vi.fn(),
   })
@@ -212,7 +215,9 @@ describe('orderRealtime connection lifecycle', () => {
     )
 
     const socket = latestSocket()
-    expect(socket.url).toBe('ws://localhost:8080/api/ws?ticket=ticket-1')
+    expect(socket.url).toBe(
+      'ws://localhost:8080/api/ws?ticket=ticket-1&capabilities=order.upsert_many',
+    )
 
     socket.open()
     socket.emit('ready', { serverTime: '2099-01-01T00:00:00.000Z' })
@@ -229,6 +234,90 @@ describe('orderRealtime connection lifecycle', () => {
 
     socket.emit('order.cleared', { clearedCount: 3, mode: 'all' })
     expect(onClear).toHaveBeenCalledWith({ clearedCount: 3, mode: 'all' })
+
+    subscription.close()
+  })
+
+  it('dispatches a legacy order.upsert on an active socket', async () => {
+    const onUpsert = vi.fn()
+    const onUpsertMany = vi.fn()
+    const subscription = subscribe({ onUpsert, onUpsertMany })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+    socket.emit('order.upsert', { item: { id: 'o1', version: 7 } })
+
+    expect(onUpsert).toHaveBeenCalledTimes(1)
+    expect(onUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'o1', version: 7 }),
+    )
+    expect(onUpsertMany).not.toHaveBeenCalled()
+    expect(socket.closeCalls).toHaveLength(0)
+
+    subscription.close()
+  })
+
+  it('dispatches a valid order.upsert_many envelope through one mapped callback', async () => {
+    const onUpsert = vi.fn()
+    const onUpsertMany = vi.fn()
+    const subscription = subscribe({ onUpsert, onUpsertMany })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    socket.emit('order.upsert_many', {
+      items: [
+        { id: 'o1', version: 3 },
+        { id: 'o2', version: 4 },
+      ],
+    })
+
+    expect(onUpsertMany).toHaveBeenCalledTimes(1)
+    expect(onUpsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'o1', version: 3 }),
+      expect.objectContaining({ id: 'o2', version: 4 }),
+    ])
+    expect(onUpsert).not.toHaveBeenCalled()
+
+    subscription.close()
+  })
+
+  it('ignores malformed or empty order.upsert_many payloads without interrupting the socket', async () => {
+    const onUpsertMany = vi.fn()
+    const onRemove = vi.fn()
+    const subscription = subscribe({ onUpsertMany, onRemove })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    socket.emit('order.upsert_many', null)
+    socket.emit('order.upsert_many', { items: [] })
+    socket.emit('order.upsert_many', { items: 'not-an-array' })
+    socket.emit('order.upsert_many', {
+      items: [
+        null,
+        { id: '', version: 1 },
+        { id: 'invalid-version', version: '2' },
+        { id: 'o1', version: 1 },
+      ],
+    })
+
+    expect(onUpsertMany).toHaveBeenCalledTimes(1)
+    expect(onUpsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'o1', version: 1 }),
+    ])
+
+    // A later business event proves malformed batches do not close or poison
+    // the active connection.
+    socket.emit('order.deleted', { id: 'o1' })
+    expect(onRemove).toHaveBeenCalledWith('o1')
+    expect(socket.closeCalls).toHaveLength(0)
 
     subscription.close()
   })

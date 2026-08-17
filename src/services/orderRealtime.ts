@@ -36,6 +36,7 @@ type WorkspaceOrderRealtimeOptions = {
   onRemove: (id: string) => void
   onSubscriptionStatus?: (status: SubscriptionStatus) => void
   onUpsert: (order: ReturnType<typeof orderDtoToOrderRecord>) => void
+  onUpsertMany?: (orders: ReturnType<typeof orderDtoToOrderRecord>[]) => void
 }
 
 // Connection lifecycle. The realtime channel is meant to run for as long as
@@ -55,6 +56,20 @@ const normalizeClearDateKey = (value: unknown): string | undefined =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? value
     : undefined
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+
+// Batch payloads are untrusted WebSocket data. The mapper intentionally stays
+// a typed DTO-to-domain conversion, so only items with the identity and
+// version fields needed by the authoritative merge are admitted here. Other
+// malformed entries are ignored without affecting the rest of the batch.
+const isValidOrderDTO = (value: unknown): value is OrderDTO =>
+  isObjectRecord(value) &&
+  typeof value.id === 'string' &&
+  value.id.trim() !== '' &&
+  typeof value.version === 'number' &&
+  Number.isFinite(value.version)
 
 const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
   new Promise<T>((resolve, reject) => {
@@ -108,6 +123,10 @@ export const BACKGROUND_STALE_MS = 30_000
 // callers/tests that need the timeout corresponding to the backend's default
 // 20s heartbeat interval.
 export const HEARTBEAT_CAPABILITY = 'heartbeat'
+// Clients must opt into the compact batch event through the WebSocket query
+// string. The server advertises this capability in `ready`, but the
+// advertisement alone does not enable batch delivery.
+export const ORDER_UPSERT_MANY_CAPABILITY = 'order.upsert_many'
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 20_000
 export const SERVER_ACTIVITY_TOLERANCE_MS = 5_000
 // Browsers clamp setTimeout delays above this signed 32-bit limit to a short
@@ -142,8 +161,38 @@ const dispatchEvent = (
   if (eventType === 'order.upsert') {
     const item = (payload as OrderUpsertEvent | null)?.item
 
-    if (item) {
+    // Keep the legacy branch permissive for older servers/tests that may
+    // carry a partial object, while rejecting primitive/null malformed data
+    // before the typed mapper is called.
+    if (item !== null && typeof item === 'object') {
       options.onUpsert(orderDtoToOrderRecord(item))
+    }
+
+    return
+  }
+
+  if (eventType === ORDER_UPSERT_MANY_CAPABILITY) {
+    const items = isObjectRecord(payload) ? payload.items : undefined
+
+    if (!Array.isArray(items)) {
+      return
+    }
+
+    const orders = items.filter(isValidOrderDTO).map(orderDtoToOrderRecord)
+
+    if (orders.length === 0) {
+      return
+    }
+
+    // Keep a compatibility fallback for consumers that only implement the
+    // legacy callback. The workspace hook supplies onUpsertMany so the whole
+    // envelope enters its rAF queue in one callback.
+    if (options.onUpsertMany) {
+      options.onUpsertMany(orders)
+    } else {
+      for (const order of orders) {
+        options.onUpsert(order)
+      }
     }
 
     return
@@ -246,6 +295,7 @@ const buildWebSocketUrl = (ticket: string): string => {
   url.search = ''
   url.hash = ''
   url.searchParams.set('ticket', ticket)
+  url.searchParams.set('capabilities', ORDER_UPSERT_MANY_CAPABILITY)
   return url.toString()
 }
 
