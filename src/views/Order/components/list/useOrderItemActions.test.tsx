@@ -421,4 +421,83 @@ describe('useOrderItemActions optimistic mutations', () => {
     expect(orderOptimistic.hasPending('a')).toBe(false)
     expect(result.current.mutationError).toBe('Failed to fetch')
   })
+
+  it('keeps a successful mutation behind a pending full-clear barrier', async () => {
+    const record = makeOrder('a', { version: 10, note: 'original' })
+    useOrderStore.getState().upsertOrder(record)
+
+    const marker = orderOptimistic.captureSnapshotMarker()
+    const pendingResponse = deferred<OrderRecord>()
+    mocks.toggleStep.mockReturnValue(pendingResponse.promise)
+
+    const { result } = renderHook(() => useOrderItemActions(record))
+
+    act(() => {
+      result.current.handleToggleStapleStep()
+    })
+
+    // A full clear removes the client-known id, but the follow-up snapshot
+    // has not settled yet, so the id is unresolved rather than permanent.
+    act(() => {
+      orderTombstones.bumpClearEpoch()
+      orderTombstones.blockPendingClear('a')
+      useOrderStore.getState().removeOrder('a')
+    })
+
+    await act(async () => {
+      pendingResponse.resolve(
+        makeOrder('a', {
+          version: 11,
+          note: 'authoritative-success',
+          stapleStepStatusCode: STEP_STATUS.completed,
+        }),
+      )
+      await flushAsync()
+    })
+
+    // The success is retained for reconciliation, but it cannot resurrect
+    // the order before the raw post-clear snapshot decides its identity.
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(orderOptimistic.effectsAfter(marker)).toEqual([
+      {
+        type: 'upsert',
+        order: expect.objectContaining({
+          id: 'a',
+          version: 11,
+          note: 'authoritative-success',
+        }),
+        seq: expect.any(Number),
+      },
+    ])
+    expect(orderOptimistic.hasPending('a')).toBe(false)
+  })
+
+  it('does not roll back into a pending full-clear barrier after failure', async () => {
+    const record = makeOrder('a', { version: 10, note: 'original' })
+    useOrderStore.getState().upsertOrder(record)
+
+    const pendingFailure = deferred<OrderRecord>()
+    mocks.toggleStep.mockReturnValue(pendingFailure.promise)
+
+    const { result } = renderHook(() => useOrderItemActions(record))
+
+    act(() => {
+      result.current.handleToggleStapleStep()
+    })
+
+    act(() => {
+      orderTombstones.bumpClearEpoch()
+      orderTombstones.blockPendingClear('a')
+      useOrderStore.getState().removeOrder('a')
+    })
+
+    await act(async () => {
+      pendingFailure.reject(new Error('Failed to fetch'))
+      await flushAsync()
+    })
+
+    expect(useOrderStore.getState().ordersById['a']).toBeUndefined()
+    expect(orderOptimistic.hasPending('a')).toBe(false)
+    expect(result.current.mutationError).toBe('Failed to fetch')
+  })
 })

@@ -77,15 +77,25 @@ export const useOrderItemActions = (
             // resurrect the deleted order, and it must not join the effect
             // journal either (the tombstone keeps it absent at snapshot
             // commit, and recording it would only mask future bugs).
-            if (!orderTombstones.has(record.id)) {
+            const isPendingClear = orderTombstones.isPendingClear(record.id)
+
+            if (
+              !orderTombstones.has(record.id) &&
+              (isPendingClear || !orderTombstones.rejectsUpsert(serverRecord))
+            ) {
               // The response is authoritative, but it may arrive after a
               // realtime update with an even higher server version (another
               // client's commit). The version-aware merge keeps the higher
               // version instead of overwriting the store blindly. The
               // confirmed result is journaled too, so a snapshot that
               // overlaps this mutation can never downgrade it even when the
-              // WS echo lags.
-              upsertIfNewer(serverRecord)
+              // WS echo lags. A pending full-clear is unresolved ambiguity:
+              // retain the authoritative response in the effect journal for
+              // the raw follow-up snapshot to classify, but do not put it
+              // back into the store before that decision.
+              if (!isPendingClear) {
+                upsertIfNewer(serverRecord)
+              }
               orderOptimistic.recordUpsert(serverRecord)
             }
           }
@@ -103,7 +113,7 @@ export const useOrderItemActions = (
             const current = useOrderStore.getState().ordersById[record.id]
 
             if (
-              !orderTombstones.has(record.id) &&
+              !orderTombstones.rejectsUpsert(record) &&
               (!current || current.version <= record.version)
             ) {
               upsertOrder(record)
