@@ -60,16 +60,69 @@ const normalizeClearDateKey = (value: unknown): string | undefined =>
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
 
-// Batch payloads are untrusted WebSocket data. The mapper intentionally stays
-// a typed DTO-to-domain conversion, so only items with the identity and
-// version fields needed by the authoritative merge are admitted here. Other
-// malformed entries are ignored without affecting the rest of the batch.
+type OrderDTOFieldValidator = (value: unknown) => boolean
+
+const isString = (value: unknown): value is string => typeof value === 'string'
+
+const isNonEmptyString = (value: unknown): value is string =>
+  isString(value) && value.trim() !== ''
+
+const isSafeInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value)
+
+const isPositiveSafeInteger = (value: unknown): value is number =>
+  isSafeInteger(value) && value > 0
+
+const isNullableSafeInteger = (value: unknown): value is number | null =>
+  value === null || isSafeInteger(value)
+
+const isSafeIntegerArray = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every(isSafeInteger)
+
+const isNullableString = (value: unknown): value is string | null =>
+  value === null || isString(value)
+
+// Keep this validator map exhaustive against OrderDTO: adding a required DTO
+// field is a compile-time error until its runtime rule is declared here too.
+// Batch payloads are untrusted WebSocket data, so the typed mapper only sees a
+// structurally complete DTO. Integer fields mirror the backend's Go integer
+// types; version is additionally required to be a safe positive integer.
+const ORDER_DTO_FIELD_VALIDATORS = {
+  id: isNonEmptyString,
+  version: isPositiveSafeInteger,
+  displayNo: isNonEmptyString,
+  stapleTypeCode: isNullableSafeInteger,
+  sizeCode: isSafeInteger,
+  customSizePriceCents: isNullableSafeInteger,
+  stapleAmountCode: isSafeInteger,
+  extraStapleUnits: isSafeInteger,
+  friedEggCount: isSafeInteger,
+  tofuSkewerCount: isSafeInteger,
+  selectedMeatCodes: isSafeIntegerArray,
+  greensCode: isSafeInteger,
+  scallionCode: isSafeInteger,
+  pepperCode: isSafeInteger,
+  diningMethodCode: isSafeInteger,
+  packagingCode: isNullableSafeInteger,
+  packagingMethodCode: isNullableSafeInteger,
+  totalPriceCents: isSafeInteger,
+  stapleStepStatusCode: isSafeInteger,
+  meatStepStatusCode: isSafeInteger,
+  note: isString,
+  createdAt: isNonEmptyString,
+  updatedAt: isNonEmptyString,
+  completedAt: isNullableString,
+} satisfies { [Field in keyof OrderDTO]: OrderDTOFieldValidator }
+
+const ORDER_DTO_FIELD_VALIDATOR_ENTRIES = Object.entries(
+  ORDER_DTO_FIELD_VALIDATORS,
+) as [keyof OrderDTO, OrderDTOFieldValidator][]
+
 const isValidOrderDTO = (value: unknown): value is OrderDTO =>
   isObjectRecord(value) &&
-  typeof value.id === 'string' &&
-  value.id.trim() !== '' &&
-  typeof value.version === 'number' &&
-  Number.isFinite(value.version)
+  ORDER_DTO_FIELD_VALIDATOR_ENTRIES.every(([field, validate]) =>
+    validate(value[field]),
+  )
 
 const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
   new Promise<T>((resolve, reject) => {

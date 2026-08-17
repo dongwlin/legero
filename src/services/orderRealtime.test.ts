@@ -7,6 +7,7 @@ import {
   clearStoredAuthTokens,
   persistAuthTokens,
 } from './apiClient'
+import type { OrderDTO } from './apiTypes'
 import type { OrderRecord } from '@/types'
 import { setStoredApiBaseUrl } from './apiConfig'
 import {
@@ -50,6 +51,34 @@ const EXPIRED_TOKENS = {
   ...TOKENS,
   accessTokenExpiresAt: '2000-01-01T00:00:00.000Z',
 }
+
+const makeOrderDto = (overrides: Partial<OrderDTO> = {}): OrderDTO => ({
+  id: 'order-1',
+  version: 1,
+  displayNo: 'A100',
+  stapleTypeCode: 4,
+  sizeCode: 2,
+  customSizePriceCents: null,
+  stapleAmountCode: 1,
+  extraStapleUnits: 0,
+  friedEggCount: 0,
+  tofuSkewerCount: 0,
+  selectedMeatCodes: [1, 2],
+  greensCode: 1,
+  scallionCode: 1,
+  pepperCode: 1,
+  diningMethodCode: 1,
+  packagingCode: null,
+  packagingMethodCode: null,
+  totalPriceCents: 1500,
+  stapleStepStatusCode: 2,
+  meatStepStatusCode: 3,
+  note: '',
+  createdAt: '2025-01-01T00:00:00+08:00',
+  updatedAt: '2025-01-01T00:00:05+08:00',
+  completedAt: null,
+  ...overrides,
+})
 
 const jsonResponse = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), {
@@ -247,7 +276,9 @@ describe('orderRealtime connection lifecycle', () => {
     const socket = latestSocket()
     socket.open()
     socket.emit('ready')
-    socket.emit('order.upsert', { item: { id: 'o1', version: 7 } })
+    socket.emit('order.upsert', {
+      item: makeOrderDto({ id: 'o1', version: 7 }),
+    })
 
     expect(onUpsert).toHaveBeenCalledTimes(1)
     expect(onUpsert).toHaveBeenCalledWith(
@@ -269,18 +300,15 @@ describe('orderRealtime connection lifecycle', () => {
     socket.open()
     socket.emit('ready')
 
+    const first = makeOrderDto({ id: 'o1', version: 3 })
+    const second = makeOrderDto({ id: 'o2', version: 4 })
+
     socket.emit('order.upsert_many', {
-      items: [
-        { id: 'o1', version: 3 },
-        { id: 'o2', version: 4 },
-      ],
+      items: [first, second],
     })
 
     expect(onUpsertMany).toHaveBeenCalledTimes(1)
-    expect(onUpsertMany).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'o1', version: 3 }),
-      expect.objectContaining({ id: 'o2', version: 4 }),
-    ])
+    expect(onUpsertMany).toHaveBeenCalledWith([first, second])
     expect(onUpsert).not.toHaveBeenCalled()
 
     subscription.close()
@@ -304,14 +332,25 @@ describe('orderRealtime connection lifecycle', () => {
         null,
         { id: '', version: 1 },
         { id: 'invalid-version', version: '2' },
-        { id: 'o1', version: 1 },
+        { id: 'partial', version: 1 },
+        makeOrderDto({ id: 'zero-version', version: 0 }),
+        makeOrderDto({ id: 'fractional-version', version: 1.5 }),
+        makeOrderDto({
+          id: 'unsafe-version',
+          version: Number.MAX_SAFE_INTEGER + 1,
+        }),
       ],
     })
 
+    expect(onUpsertMany).not.toHaveBeenCalled()
+
+    const valid = makeOrderDto({ id: 'o1', version: 1 })
+    socket.emit('order.upsert_many', {
+      items: [{ id: 'still-partial', version: 2 }, valid],
+    })
+
     expect(onUpsertMany).toHaveBeenCalledTimes(1)
-    expect(onUpsertMany).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'o1', version: 1 }),
-    ])
+    expect(onUpsertMany).toHaveBeenCalledWith([valid])
 
     // A later business event proves malformed batches do not close or poison
     // the active connection.
