@@ -36,6 +36,7 @@ type WorkspaceOrderRealtimeOptions = {
   onRemove: (id: string) => void
   onSubscriptionStatus?: (status: SubscriptionStatus) => void
   onUpsert: (order: ReturnType<typeof orderDtoToOrderRecord>) => void
+  onUpsertMany?: (orders: ReturnType<typeof orderDtoToOrderRecord>[]) => void
 }
 
 // Connection lifecycle. The realtime channel is meant to run for as long as
@@ -55,6 +56,73 @@ const normalizeClearDateKey = (value: unknown): string | undefined =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? value
     : undefined
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+
+type OrderDTOFieldValidator = (value: unknown) => boolean
+
+const isString = (value: unknown): value is string => typeof value === 'string'
+
+const isNonEmptyString = (value: unknown): value is string =>
+  isString(value) && value.trim() !== ''
+
+const isSafeInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value)
+
+const isPositiveSafeInteger = (value: unknown): value is number =>
+  isSafeInteger(value) && value > 0
+
+const isNullableSafeInteger = (value: unknown): value is number | null =>
+  value === null || isSafeInteger(value)
+
+const isSafeIntegerArray = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every(isSafeInteger)
+
+const isNullableString = (value: unknown): value is string | null =>
+  value === null || isString(value)
+
+// Keep this validator map exhaustive against OrderDTO: adding a required DTO
+// field is a compile-time error until its runtime rule is declared here too.
+// Batch payloads are untrusted WebSocket data, so the typed mapper only sees a
+// structurally complete DTO. Integer fields mirror the backend's Go integer
+// types; version is additionally required to be a safe positive integer.
+const ORDER_DTO_FIELD_VALIDATORS = {
+  id: isNonEmptyString,
+  version: isPositiveSafeInteger,
+  displayNo: isNonEmptyString,
+  stapleTypeCode: isNullableSafeInteger,
+  sizeCode: isSafeInteger,
+  customSizePriceCents: isNullableSafeInteger,
+  stapleAmountCode: isSafeInteger,
+  extraStapleUnits: isSafeInteger,
+  friedEggCount: isSafeInteger,
+  tofuSkewerCount: isSafeInteger,
+  selectedMeatCodes: isSafeIntegerArray,
+  greensCode: isSafeInteger,
+  scallionCode: isSafeInteger,
+  pepperCode: isSafeInteger,
+  diningMethodCode: isSafeInteger,
+  packagingCode: isNullableSafeInteger,
+  packagingMethodCode: isNullableSafeInteger,
+  totalPriceCents: isSafeInteger,
+  stapleStepStatusCode: isSafeInteger,
+  meatStepStatusCode: isSafeInteger,
+  note: isString,
+  createdAt: isNonEmptyString,
+  updatedAt: isNonEmptyString,
+  completedAt: isNullableString,
+} satisfies { [Field in keyof OrderDTO]: OrderDTOFieldValidator }
+
+const ORDER_DTO_FIELD_VALIDATOR_ENTRIES = Object.entries(
+  ORDER_DTO_FIELD_VALIDATORS,
+) as [keyof OrderDTO, OrderDTOFieldValidator][]
+
+const isValidOrderDTO = (value: unknown): value is OrderDTO =>
+  isObjectRecord(value) &&
+  ORDER_DTO_FIELD_VALIDATOR_ENTRIES.every(([field, validate]) =>
+    validate(value[field]),
+  )
 
 const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
   new Promise<T>((resolve, reject) => {
@@ -108,6 +176,10 @@ export const BACKGROUND_STALE_MS = 30_000
 // callers/tests that need the timeout corresponding to the backend's default
 // 20s heartbeat interval.
 export const HEARTBEAT_CAPABILITY = 'heartbeat'
+// Clients must opt into the compact batch event through the WebSocket query
+// string. The server advertises this capability in `ready`, but the
+// advertisement alone does not enable batch delivery.
+export const ORDER_UPSERT_MANY_CAPABILITY = 'order.upsert_many'
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 20_000
 export const SERVER_ACTIVITY_TOLERANCE_MS = 5_000
 // Browsers clamp setTimeout delays above this signed 32-bit limit to a short
@@ -142,8 +214,38 @@ const dispatchEvent = (
   if (eventType === 'order.upsert') {
     const item = (payload as OrderUpsertEvent | null)?.item
 
-    if (item) {
+    // Keep the legacy branch permissive for older servers/tests that may
+    // carry a partial object, while rejecting primitive/null malformed data
+    // before the typed mapper is called.
+    if (item !== null && typeof item === 'object') {
       options.onUpsert(orderDtoToOrderRecord(item))
+    }
+
+    return
+  }
+
+  if (eventType === ORDER_UPSERT_MANY_CAPABILITY) {
+    const items = isObjectRecord(payload) ? payload.items : undefined
+
+    if (!Array.isArray(items)) {
+      return
+    }
+
+    const orders = items.filter(isValidOrderDTO).map(orderDtoToOrderRecord)
+
+    if (orders.length === 0) {
+      return
+    }
+
+    // Keep a compatibility fallback for consumers that only implement the
+    // legacy callback. The workspace hook supplies onUpsertMany so the whole
+    // envelope enters its rAF queue in one callback.
+    if (options.onUpsertMany) {
+      options.onUpsertMany(orders)
+    } else {
+      for (const order of orders) {
+        options.onUpsert(order)
+      }
     }
 
     return
@@ -246,6 +348,7 @@ const buildWebSocketUrl = (ticket: string): string => {
   url.search = ''
   url.hash = ''
   url.searchParams.set('ticket', ticket)
+  url.searchParams.set('capabilities', ORDER_UPSERT_MANY_CAPABILITY)
   return url.toString()
 }
 

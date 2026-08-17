@@ -7,6 +7,8 @@ import {
   clearStoredAuthTokens,
   persistAuthTokens,
 } from './apiClient'
+import type { OrderDTO } from './apiTypes'
+import type { OrderRecord } from '@/types'
 import { setStoredApiBaseUrl } from './apiConfig'
 import {
   BACKGROUND_STALE_MS,
@@ -49,6 +51,34 @@ const EXPIRED_TOKENS = {
   ...TOKENS,
   accessTokenExpiresAt: '2000-01-01T00:00:00.000Z',
 }
+
+const makeOrderDto = (overrides: Partial<OrderDTO> = {}): OrderDTO => ({
+  id: 'order-1',
+  version: 1,
+  displayNo: 'A100',
+  stapleTypeCode: 4,
+  sizeCode: 2,
+  customSizePriceCents: null,
+  stapleAmountCode: 1,
+  extraStapleUnits: 0,
+  friedEggCount: 0,
+  tofuSkewerCount: 0,
+  selectedMeatCodes: [1, 2],
+  greensCode: 1,
+  scallionCode: 1,
+  pepperCode: 1,
+  diningMethodCode: 1,
+  packagingCode: null,
+  packagingMethodCode: null,
+  totalPriceCents: 1500,
+  stapleStepStatusCode: 2,
+  meatStepStatusCode: 3,
+  note: '',
+  createdAt: '2025-01-01T00:00:00+08:00',
+  updatedAt: '2025-01-01T00:00:05+08:00',
+  completedAt: null,
+  ...overrides,
+})
 
 const jsonResponse = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), {
@@ -134,12 +164,14 @@ const latestSocket = () =>
 const subscribe = (extra: {
   onSubscriptionStatus?: (status: string) => void
   onUpsert?: () => void
+  onUpsertMany?: (orders: OrderRecord[]) => void
   onRemove?: () => void
   onClear?: () => void
 } = {}) =>
   orderRealtime.subscribeToWorkspaceOrders({
     onSubscriptionStatus: extra.onSubscriptionStatus ?? vi.fn(),
     onUpsert: extra.onUpsert ?? vi.fn(),
+    onUpsertMany: extra.onUpsertMany ?? vi.fn(),
     onRemove: extra.onRemove ?? vi.fn(),
     onClear: extra.onClear ?? vi.fn(),
   })
@@ -212,7 +244,9 @@ describe('orderRealtime connection lifecycle', () => {
     )
 
     const socket = latestSocket()
-    expect(socket.url).toBe('ws://localhost:8080/api/ws?ticket=ticket-1')
+    expect(socket.url).toBe(
+      'ws://localhost:8080/api/ws?ticket=ticket-1&capabilities=order.upsert_many',
+    )
 
     socket.open()
     socket.emit('ready', { serverTime: '2099-01-01T00:00:00.000Z' })
@@ -229,6 +263,100 @@ describe('orderRealtime connection lifecycle', () => {
 
     socket.emit('order.cleared', { clearedCount: 3, mode: 'all' })
     expect(onClear).toHaveBeenCalledWith({ clearedCount: 3, mode: 'all' })
+
+    subscription.close()
+  })
+
+  it('dispatches a legacy order.upsert on an active socket', async () => {
+    const onUpsert = vi.fn()
+    const onUpsertMany = vi.fn()
+    const subscription = subscribe({ onUpsert, onUpsertMany })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+    socket.emit('order.upsert', {
+      item: makeOrderDto({ id: 'o1', version: 7 }),
+    })
+
+    expect(onUpsert).toHaveBeenCalledTimes(1)
+    expect(onUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'o1', version: 7 }),
+    )
+    expect(onUpsertMany).not.toHaveBeenCalled()
+    expect(socket.closeCalls).toHaveLength(0)
+
+    subscription.close()
+  })
+
+  it('dispatches a valid order.upsert_many envelope through one mapped callback', async () => {
+    const onUpsert = vi.fn()
+    const onUpsertMany = vi.fn()
+    const subscription = subscribe({ onUpsert, onUpsertMany })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    const first = makeOrderDto({ id: 'o1', version: 3 })
+    const second = makeOrderDto({ id: 'o2', version: 4 })
+
+    socket.emit('order.upsert_many', {
+      items: [first, second],
+    })
+
+    expect(onUpsertMany).toHaveBeenCalledTimes(1)
+    expect(onUpsertMany).toHaveBeenCalledWith([first, second])
+    expect(onUpsert).not.toHaveBeenCalled()
+
+    subscription.close()
+  })
+
+  it('ignores malformed or empty order.upsert_many payloads without interrupting the socket', async () => {
+    const onUpsertMany = vi.fn()
+    const onRemove = vi.fn()
+    const subscription = subscribe({ onUpsertMany, onRemove })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    socket.emit('order.upsert_many', null)
+    socket.emit('order.upsert_many', { items: [] })
+    socket.emit('order.upsert_many', { items: 'not-an-array' })
+    socket.emit('order.upsert_many', {
+      items: [
+        null,
+        { id: '', version: 1 },
+        { id: 'invalid-version', version: '2' },
+        { id: 'partial', version: 1 },
+        makeOrderDto({ id: 'zero-version', version: 0 }),
+        makeOrderDto({ id: 'fractional-version', version: 1.5 }),
+        makeOrderDto({
+          id: 'unsafe-version',
+          version: Number.MAX_SAFE_INTEGER + 1,
+        }),
+      ],
+    })
+
+    expect(onUpsertMany).not.toHaveBeenCalled()
+
+    const valid = makeOrderDto({ id: 'o1', version: 1 })
+    socket.emit('order.upsert_many', {
+      items: [{ id: 'still-partial', version: 2 }, valid],
+    })
+
+    expect(onUpsertMany).toHaveBeenCalledTimes(1)
+    expect(onUpsertMany).toHaveBeenCalledWith([valid])
+
+    // A later business event proves malformed batches do not close or poison
+    // the active connection.
+    socket.emit('order.deleted', { id: 'o1' })
+    expect(onRemove).toHaveBeenCalledWith('o1')
+    expect(socket.closeCalls).toHaveLength(0)
 
     subscription.close()
   })

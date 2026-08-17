@@ -564,6 +564,72 @@ export const useOrderWorkspaceSync = () => {
       }
     })
 
+    // Single and compact batch upserts share one gate so tombstones,
+    // reconciliation buffering and the normal rAF queue have identical
+    // semantics. A batch only schedules one frame after all of its valid
+    // records have been consolidated by id and version.
+    const handleUpserts = (orders: readonly OrderRecord[]) => {
+      if (isDisposed || orders.length === 0) {
+        return
+      }
+
+      let queuedUpsert = false
+
+      for (const order of orders) {
+        // A pending full-clear id is unresolved ambiguity, not a terminal
+        // tombstone. Retain its newest realtime statement for the guaranteed
+        // post-clear snapshot to classify; dropping it here would lose a
+        // legitimate post-clear update (P1-1).
+        if (orderTombstones.isPendingClear(order.id)) {
+          stagePendingClearUpsert(order)
+          continue
+        }
+
+        // Same-id remove and clear-confirmed ids are terminal for the whole
+        // sync session — not just inside a reconciliation window. An upsert
+        // of a tombstoned id (the backend never reuses an order id) is always
+        // a stale/delayed event; after a before_today clear the same holds for
+        // any not-created-today upsert. Both are dropped before they can enter
+        // the buffer or the batch queue.
+        if (orderTombstones.rejectsUpsert(order)) {
+          continue
+        }
+
+        if (eventBuffer.isReconciling) {
+          // Buffer the server event: at commit time it is replayed over the
+          // snapshot with version-aware merges, so it survives even when the
+          // order has an in-flight optimistic mutation. Ids received before
+          // this window's first clear are remembered as ambiguous candidates;
+          // WS arrival order is not a global cross-request commit sequence.
+          if (!windowSawClear) {
+            windowPreClearIds.add(order.id)
+            const previous = windowPreClearUpserts.get(order.id)
+
+            if (!previous || order.version > previous.version) {
+              windowPreClearUpserts.set(order.id, order)
+            }
+          }
+          eventBuffer.push({ type: 'upsert', order })
+          continue
+        }
+
+        // No pending gate: while a mutation is pending the optimistic record
+        // keeps the pre-mutation server version, so the flush's version
+        // comparison still accepts a strictly newer event (another client's
+        // commit) and rejects echoes/stale events. Batched upserts for the
+        // same id consolidate on the highest version at insertion.
+        const queued = pendingUpserts.get(order.id)
+        if (!queued || order.version > queued.version) {
+          pendingUpserts.set(order.id, order)
+          queuedUpsert = true
+        }
+      }
+
+      if (queuedUpsert) {
+        scheduleBatchFlush()
+      }
+    }
+
     const initialize = async () => {
       try {
         const shouldBlock = refreshKey > 0 || useOrderStore.getState().status !== 'ready'
@@ -576,62 +642,8 @@ export const useOrderWorkspaceSync = () => {
         }
 
         subscription = orderRealtime.subscribeToWorkspaceOrders({
-          onUpsert: (order) => {
-            if (!isDisposed) {
-              // A pending full-clear id is unresolved ambiguity, not a
-              // terminal tombstone. Retain its newest realtime statement for
-              // the guaranteed post-clear snapshot to classify; dropping it
-              // here would lose a legitimate post-clear update (P1-1).
-              if (orderTombstones.isPendingClear(order.id)) {
-                stagePendingClearUpsert(order)
-                return
-              }
-
-              // Same-id remove and clear-confirmed ids are terminal for the
-              // whole sync session — not just inside a reconciliation window:
-              // an upsert of a tombstoned id (the backend never reuses an
-              // order id) is always a stale/delayed event; after a
-              // before_today clear the same holds for any not-created-today
-              // upsert. Both are dropped before they can enter the buffer or
-              // the batch queue.
-              if (orderTombstones.rejectsUpsert(order)) {
-                return
-              }
-
-              if (eventBuffer.isReconciling) {
-                // Buffer the server event: at commit time it is replayed over
-                // the snapshot with version-aware merges, so it survives even
-                // when the order has an in-flight optimistic mutation. Ids
-                // received before this window's first clear are remembered as
-                // ambiguous candidates; WS arrival order is not a global
-                // cross-request commit sequence.
-                if (!windowSawClear) {
-                  windowPreClearIds.add(order.id)
-                  const previous = windowPreClearUpserts.get(order.id)
-
-                  if (!previous || order.version > previous.version) {
-                    windowPreClearUpserts.set(order.id, order)
-                  }
-                }
-                eventBuffer.push({ type: 'upsert', order })
-                return
-              }
-
-              // No pending gate: while a mutation is pending the optimistic
-              // record keeps the pre-mutation server version, so the flush's
-              // version comparison still accepts a strictly newer event
-              // (another client's commit) and rejects echoes/stale events.
-              // Batched upserts for the same id consolidate on the highest
-              // version at insertion: within one batch a delayed stale event
-              // must not displace the newer event it trails.
-              const queued = pendingUpserts.get(order.id)
-              if (!queued || order.version > queued.version) {
-                pendingUpserts.set(order.id, order)
-              }
-
-              scheduleBatchFlush()
-            }
-          },
+          onUpsert: (order) => handleUpserts([order]),
+          onUpsertMany: handleUpserts,
           onRemove: (id) => {
             if (!isDisposed) {
               // Register the terminal tombstone immediately — before the
