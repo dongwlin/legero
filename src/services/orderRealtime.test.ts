@@ -58,8 +58,12 @@ const jsonResponse = (status: number, body: unknown): Response =>
 
 const mockFetch = vi.fn()
 
-const HEARTBEAT_READY = {
-  capabilities: ['heartbeat'],
+// Mirrors the ready payload emitted by the paired backend contract. Keeping
+// this fixture explicit prevents tests from accidentally advertising a client-
+// only protocol shape that production servers do not send.
+const CURRENT_BACKEND_READY = {
+  serverTime: '2099-01-01T00:00:00.000Z',
+  capabilities: ['heartbeat', 'order.upsert_many'],
   heartbeatIntervalMs: 20_000,
 }
 
@@ -96,7 +100,7 @@ class FakeWebSocket {
 
   emit(eventType: string, data?: unknown) {
     const payload =
-      eventType === 'ready' && data === undefined ? HEARTBEAT_READY : data
+      eventType === 'ready' && data === undefined ? CURRENT_BACKEND_READY : data
 
     this.onmessage?.(
       new MessageEvent('message', {
@@ -271,7 +275,7 @@ describe('orderRealtime connection lifecycle', () => {
     subscription.close()
   })
 
-  it('hard-reconnects exactly once after server activity becomes stale', async () => {
+  it('enables the 45s watchdog from the current backend ready contract', async () => {
     const subscription = subscribe()
 
     await flushAsync()
@@ -430,7 +434,7 @@ describe('orderRealtime connection lifecycle', () => {
     subscription.close()
   })
 
-  it('ignores a wall-clock jump during a short background', async () => {
+  it('uses wall clock to recover after a suspended long background', async () => {
     const subscription = subscribe()
 
     await flushAsync()
@@ -438,32 +442,41 @@ describe('orderRealtime connection lifecycle', () => {
     socket.open()
     socket.emit('ready')
 
-    const foregroundElapsed = 20_000
-    await vi.advanceTimersByTimeAsync(foregroundElapsed)
-
     recoveryHandlers().onAppBackground()
 
-    // Date.now() can jump while the app is suspended. The monotonic clock has
-    // advanced only by the short-background duration below, so this must not
-    // turn a retained socket into a long-background recovery or stale timeout.
+    // During Android/WebView suspension, performance.now() may advance only a
+    // little (or not at all), while wall clock still reflects the real sleep.
     const wallClockAtBackground = Date.now()
-    vi.setSystemTime(new Date(wallClockAtBackground + 60 * 60 * 1_000))
-    await vi.advanceTimersByTimeAsync(BACKGROUND_STALE_MS - 1_000)
+    vi.setSystemTime(new Date(wallClockAtBackground + 10 * 60 * 1_000))
+    await vi.advanceTimersByTimeAsync(1_000)
 
     recoveryHandlers().onAppForeground()
     await flushAsync()
-    expect(socket.closeCalls).toHaveLength(0)
-    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
-
-    const remainingForegroundBudget =
-      SERVER_ACTIVITY_TIMEOUT_MS - foregroundElapsed
-    await vi.advanceTimersByTimeAsync(remainingForegroundBudget - 1)
-    expect(socket.closeCalls).toHaveLength(0)
-
-    await vi.advanceTimersByTimeAsync(1)
-    await flushAsync()
     expect(socket.closeCalls).toEqual([
-      { code: 1000, reason: 'server_activity_timeout' },
+      { code: 1000, reason: 'foreground_recovery' },
+    ])
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it('fails safe when the wall clock moves backwards during a background', async () => {
+    const subscription = subscribe()
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+
+    recoveryHandlers().onAppBackground()
+
+    const wallClockAtBackground = Date.now()
+    vi.setSystemTime(new Date(wallClockAtBackground - 10 * 60 * 1_000))
+    recoveryHandlers().onAppForeground()
+    await flushAsync()
+
+    expect(socket.closeCalls).toEqual([
+      { code: 1000, reason: 'foreground_recovery' },
     ])
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
 

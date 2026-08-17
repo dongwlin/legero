@@ -267,7 +267,8 @@ export const orderRealtime = {
     let stopRecoverySignals: (() => void) | null = null
     let networkOnline = true
     let isBackgrounded = false
-    let backgroundedAt: number | null = null
+    let backgroundedWallClockAt: number | null = null
+    let backgroundedMonotonicAt: number | null = null
 
     const isClosed = (): boolean => state === 'closed'
 
@@ -512,7 +513,8 @@ export const orderRealtime = {
 
     const handleAppBackground = () => {
       isBackgrounded = true
-      backgroundedAt = performance.now()
+      backgroundedWallClockAt = Date.now()
+      backgroundedMonotonicAt = performance.now()
 
       if (isClosed()) {
         return
@@ -532,10 +534,20 @@ export const orderRealtime = {
       // Consume the background duration immediately: a later duplicate or
       // spurious foreground signal must not re-judge the socket against this
       // background's timestamp.
-      const now = performance.now()
+      const nowMonotonic = performance.now()
+      const nowWallClock = Date.now()
+      const backgroundWallClockAt = backgroundedWallClockAt
+      const backgroundMonotonicAt = backgroundedMonotonicAt
       const backgroundDuration =
-        backgroundedAt !== null ? Math.max(0, now - backgroundedAt) : 0
-      backgroundedAt = null
+        backgroundWallClockAt !== null
+          ? nowWallClock - backgroundWallClockAt
+          : 0
+      const monotonicBackgroundDuration =
+        backgroundMonotonicAt !== null
+          ? Math.max(0, nowMonotonic - backgroundMonotonicAt)
+          : 0
+      backgroundedWallClockAt = null
+      backgroundedMonotonicAt = null
 
       if (isClosed() || !networkOnline) {
         return
@@ -544,26 +556,29 @@ export const orderRealtime = {
       clearReconnectTimer()
 
       const staleAfterBackground = backgroundDuration >= BACKGROUND_STALE_MS
+      const invalidBackgroundDuration = backgroundDuration < 0
 
       if (state === 'online') {
         // A long background session is presumed to have torn down the socket;
         // rebuild it. This check intentionally precedes activity timeout: the
-        // foreground recovery reason is more accurate for a long suspension.
-        if (staleAfterBackground) {
+        // foreground recovery reason is more accurate for a long suspension
+        // or a wall-clock rollback whose duration cannot be trusted.
+        if (staleAfterBackground || invalidBackgroundDuration) {
           invalidateActiveSocket(1000, 'foreground_recovery')
           void connect()
           return
         }
 
         // Pause the watchdog's budget while the app is hidden. Shifting the
-        // activity timestamp by the hidden duration preserves the remaining
-        // foreground budget. Clamp to now because a heartbeat dispatched while
-        // backgrounded may already have refreshed the timestamp; without the
-        // clamp this timestamp would incorrectly move into the future.
+        // activity timestamp by the monotonic hidden duration preserves the
+        // remaining foreground budget. Clamp to now because a heartbeat
+        // dispatched while backgrounded may already have refreshed the
+        // timestamp; without the clamp this timestamp would incorrectly move
+        // into the future.
         if (lastServerActivityAt !== null) {
           lastServerActivityAt = Math.min(
-            now,
-            lastServerActivityAt + backgroundDuration,
+            nowMonotonic,
+            lastServerActivityAt + monotonicBackgroundDuration,
           )
         }
 
@@ -583,7 +598,7 @@ export const orderRealtime = {
         // stale: its auth refresh / session request / handshake may be hung
         // on a frozen network. Abandon it (generation bump + abort) and start
         // a fresh flow instead of trusting it to finish.
-        if (staleAfterBackground) {
+        if (staleAfterBackground || invalidBackgroundDuration) {
           invalidateActiveSocket(1000, 'foreground_recovery')
           void connect()
         }
