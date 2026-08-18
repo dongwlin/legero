@@ -26,13 +26,33 @@ type WorkspaceRefreshOutcome =
   | { kind: 'authenticated'; result: BootstrapResponse }
   | { kind: 'unauthorized' }
   | { kind: 'no_access' }
+  | { kind: 'cancelled' }
   | { kind: 'error'; message: string }
 
-const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Failed to resolve workspace access.'
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  // DOMException (including browser fetch AbortError) is not guaranteed to
+  // inherit from Error, but still carries the useful network failure message.
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message
+  }
+
+  return 'Failed to resolve workspace access.'
+}
 
 const isMissingWorkspaceError = (error: unknown): boolean =>
   error instanceof ApiError && error.code === 'workspace_not_found'
+
+const isAbortError = (error: unknown): boolean =>
+  error instanceof Error && error.name === 'AbortError'
 
 const waitForRetry = (durationMs: number) =>
   new Promise<void>((resolve) => {
@@ -40,19 +60,35 @@ const waitForRetry = (durationMs: number) =>
   })
 
 // Single-flight: concurrent workspace refresh requests share one in-flight API
-// call, so automatic retries and manual re-checks never issue duplicates.
-let inFlightRefresh: Promise<WorkspaceRefreshOutcome> | null = null
+// call, so automatic retries and manual re-checks never issue duplicates. The
+// controller belongs to the flight rather than to a caller: cancelling the
+// current bootstrap must invalidate the whole shared request for every caller.
+type InFlightWorkspaceRefresh = {
+  controller: AbortController
+  promise: Promise<WorkspaceRefreshOutcome>
+}
+
+let inFlightRefresh: InFlightWorkspaceRefresh | null = null
 
 const runWorkspaceRefresh = async (): Promise<WorkspaceRefreshOutcome> => {
   if (inFlightRefresh) {
-    return inFlightRefresh
+    return inFlightRefresh.promise
   }
 
+  const controller = new AbortController()
   const run: Promise<WorkspaceRefreshOutcome> = (async () => {
     try {
-      const result = await authService.bootstrap()
+      const result = await authService.bootstrap(controller.signal)
       return { kind: 'authenticated', result }
     } catch (error) {
+      // Only an abort raised by this workspace request is a user cancellation.
+      // The auth client has its own refresh timeout/controller; that timeout
+      // also surfaces as AbortError but should remain a retryable network
+      // failure with its original message.
+      if (controller.signal.aborted && isAbortError(error)) {
+        return { kind: 'cancelled' }
+      }
+
       // Only credential-invalid 401s (same rule as apiClient's token
       // clearing) mean the session is definitively dead; any other 401 is a
       // transient error that must not downgrade the user to anonymous.
@@ -68,15 +104,26 @@ const runWorkspaceRefresh = async (): Promise<WorkspaceRefreshOutcome> => {
     }
   })()
 
-  inFlightRefresh = run
+  const flight: InFlightWorkspaceRefresh = { controller, promise: run }
+  inFlightRefresh = flight
 
-  try {
-    return await run
-  } finally {
-    if (inFlightRefresh === run) {
-      inFlightRefresh = null
-    }
-  }
+  // Do not await this cleanup promise: `run` converts request failures into a
+  // typed outcome, and keeping the identity check here ensures an old
+  // aborted flight can never clear a newer flight's single-flight slot.
+  void run.then(
+    () => {
+      if (inFlightRefresh === flight) {
+        inFlightRefresh = null
+      }
+    },
+    () => {
+      if (inFlightRefresh === flight) {
+        inFlightRefresh = null
+      }
+    },
+  )
+
+  return run
 }
 
 // Bumped whenever a manual re-check should supersede pending automatic
@@ -85,8 +132,28 @@ const runWorkspaceRefresh = async (): Promise<WorkspaceRefreshOutcome> => {
 // a newer, successful manual re-check already restored.
 let workspaceRefreshGeneration = 0
 
-export const cancelPendingWorkspaceRefresh = () => {
+export const AUTHENTICATION_INITIALIZATION_CANCELLED_ERROR =
+  '已取消认证初始化，请检查服务器配置，或填写手机号和密码登录。'
+
+const invalidatePendingWorkspaceRefresh = () => {
   workspaceRefreshGeneration += 1
+
+  const flight = inFlightRefresh
+  // Release the slot before aborting. Some fetch implementations reject the
+  // old promise synchronously, and the next refresh must never observe it.
+  inFlightRefresh = null
+  flight?.controller.abort()
+}
+
+export const cancelPendingWorkspaceRefresh = () => {
+  invalidatePendingWorkspaceRefresh()
+}
+
+export const cancelAuthenticationInitialization = () => {
+  invalidatePendingWorkspaceRefresh()
+  useAuthStore
+    .getState()
+    .setWorkspaceError(AUTHENTICATION_INITIALIZATION_CANCELLED_ERROR)
 }
 
 export const useRefreshWorkspaceAccess = () => {
@@ -125,6 +192,9 @@ export const useRefreshWorkspaceAccess = () => {
       case 'no_access':
         setNoWorkspaceAccess('当前账号尚未加入任何工作区。')
         return 'no_access'
+      case 'cancelled':
+        setWorkspaceError(AUTHENTICATION_INITIALIZATION_CANCELLED_ERROR)
+        return 'error'
       case 'error':
         setWorkspaceError(outcome.message)
         return 'error'
@@ -206,7 +276,7 @@ export const useAuthSessionBootstrap = () => {
       // the previous server: bump the generation so a stale outcome cannot
       // restore user/workspace/order state from a server that is no longer
       // current (e.g. after probing, selecting, or deleting another server).
-      workspaceRefreshGeneration += 1
+      invalidatePendingWorkspaceRefresh()
     }
   }, [
     apiBaseUrl,

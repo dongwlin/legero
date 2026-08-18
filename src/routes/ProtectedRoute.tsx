@@ -2,12 +2,14 @@ import { Button, Card, Spinner } from '@heroui/react'
 import React from 'react'
 import { Link, Navigate, Outlet, useMatch } from 'react-router'
 import { RealtimeDiagnosticsProvider } from '@/hooks/RealtimeDiagnosticsProvider'
+import { cancelAuthenticationInitialization } from '@/hooks/useAuthSessionBootstrap'
 import { useOrderWorkspaceSync } from '@/hooks/useOrderWorkspaceSync'
 import { useAuthStore } from '@/store/auth'
 
 type ProtectedRouteStateProps = {
   description: string
   isLoading?: boolean
+  onCancel?: () => void
   onRetry?: () => void
   showDiagnosticsLink?: boolean
   title: string
@@ -16,6 +18,7 @@ type ProtectedRouteStateProps = {
 const ProtectedRouteState: React.FC<ProtectedRouteStateProps> = ({
   description,
   isLoading = false,
+  onCancel,
   onRetry,
   showDiagnosticsLink = false,
   title,
@@ -39,8 +42,17 @@ const ProtectedRouteState: React.FC<ProtectedRouteStateProps> = ({
             <Spinner size="lg" />
           </div>
         ) : null}
-        {showDiagnosticsLink || onRetry ? (
+        {showDiagnosticsLink || onCancel || onRetry ? (
           <div className='flex flex-col items-center justify-center gap-3 sm:flex-row'>
+            {onCancel ? (
+              <Button.Root
+                className='min-h-11 w-full sm:w-auto'
+                variant='outline'
+                onPress={onCancel}
+              >
+                取消
+              </Button.Root>
+            ) : null}
             {onRetry ? (
               <Button.Root
                 className='min-h-11 w-full sm:w-auto'
@@ -78,6 +90,7 @@ const ProtectedRoute: React.FC = () => {
         isLoading
         title='正在恢复登录状态'
         description='正在检查当前会话，请稍候。'
+        onCancel={cancelAuthenticationInitialization}
       />
     )
   }
@@ -89,8 +102,10 @@ const ProtectedRoute: React.FC = () => {
   if (workspaceStatus === 'loading' || workspaceStatus === 'idle') {
     return (
       <ProtectedRouteState
+        isLoading
         title='正在解析工作区'
         description='正在确认当前账号可访问的工作区，请稍候。'
+        onCancel={cancelAuthenticationInitialization}
       />
     )
   }

@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
@@ -8,24 +8,41 @@ import { useRealtimeDiagnostics } from '@/hooks/useRealtimeDiagnostics'
 import type { RealtimeDiagnosticsSnapshot } from '@/services/realtimeDiagnostics'
 
 const mocks = vi.hoisted(() => ({
+  authStatus: 'authenticated' as 'loading' | 'authenticated' | 'anonymous',
+  cancelAuthenticationInitialization: vi.fn(),
   getDiagnostics: vi.fn<() => RealtimeDiagnosticsSnapshot | null>(() => null),
   useOrderWorkspaceSync: vi.fn(),
+  workspaceStatus: 'ready' as
+    | 'idle'
+    | 'loading'
+    | 'ready'
+    | 'no_access'
+    | 'error',
 }))
 
 vi.mock('@/hooks/useOrderWorkspaceSync', () => ({
   useOrderWorkspaceSync: mocks.useOrderWorkspaceSync,
 }))
 
+vi.mock('@/hooks/useAuthSessionBootstrap', () => ({
+  cancelAuthenticationInitialization: mocks.cancelAuthenticationInitialization,
+}))
+
 vi.mock('@/store/auth', () => ({
   useAuthStore: (
     selector: (state: {
-      status: 'authenticated'
-      workspaceStatus: 'ready'
+      status: 'loading' | 'authenticated' | 'anonymous'
+      workspaceStatus:
+        | 'idle'
+        | 'loading'
+        | 'ready'
+        | 'no_access'
+        | 'error'
     }) => unknown,
   ) =>
     selector({
-      status: 'authenticated',
-      workspaceStatus: 'ready',
+      status: mocks.authStatus,
+      workspaceStatus: mocks.workspaceStatus,
     }),
 }))
 
@@ -96,6 +113,9 @@ const renderProtectedRoute = (
 
 describe('ProtectedRoute realtime diagnostics access', () => {
   beforeEach(() => {
+    mocks.authStatus = 'authenticated'
+    mocks.workspaceStatus = 'ready'
+    mocks.cancelAuthenticationInitialization.mockReset()
     mocks.getDiagnostics.mockReset().mockReturnValue(null)
     mocks.useOrderWorkspaceSync.mockReset().mockReturnValue({
       status: 'ready',
@@ -216,6 +236,30 @@ describe('ProtectedRoute realtime diagnostics access', () => {
     expect(retryButton.parentElement?.lastElementChild).toBe(diagnosticsLink)
     expect(retryButton.className).toContain('w-full')
     expect(diagnosticsLink.className).toContain('w-full')
+    expect(screen.queryByText('business route')).toBeNull()
+  })
+
+  it('exposes a cancellation action while restoring the session', () => {
+    mocks.authStatus = 'loading'
+    mocks.workspaceStatus = 'loading'
+
+    renderProtectedRoute('/order', <output>business route</output>)
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+
+    expect(mocks.cancelAuthenticationInitialization).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('business route')).toBeNull()
+  })
+
+  it('exposes a cancellation action while resolving workspace access', () => {
+    mocks.authStatus = 'authenticated'
+    mocks.workspaceStatus = 'idle'
+
+    renderProtectedRoute('/order', <output>business route</output>)
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+
+    expect(mocks.cancelAuthenticationInitialization).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('business route')).toBeNull()
   })
 })

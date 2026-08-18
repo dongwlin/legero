@@ -63,10 +63,11 @@ export const authService = {
     return response
   },
 
-  async bootstrap(): Promise<BootstrapResponse> {
+  async bootstrap(signal?: AbortSignal): Promise<BootstrapResponse> {
     return apiRequest<BootstrapResponse>({
       path: '/api/bootstrap',
       auth: true,
+      signal,
     })
   },
 

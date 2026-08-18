@@ -6,6 +6,7 @@ import ApiBaseUrlForm, {
 } from '@/components/ApiBaseUrlForm'
 import { useApiBaseUrl } from '@/hooks/useApiBaseUrl'
 import {
+  cancelAuthenticationInitialization,
   cancelPendingWorkspaceRefresh,
   useRefreshWorkspaceAccess,
 } from '@/hooks/useAuthSessionBootstrap'
@@ -66,6 +67,78 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
 const inputClassName =
   'w-full rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors duration-200 placeholder:text-muted focus:border-accent/50'
 
+type CredentialFieldsProps = {
+  onPasswordChange: (value: string) => void
+  onPhoneChange: (value: string) => void
+  password: string
+  phone: string
+}
+
+const CredentialFields: React.FC<CredentialFieldsProps> = ({
+  onPasswordChange,
+  onPhoneChange,
+  password,
+  phone,
+}) => (
+  <div className='space-y-4'>
+    <label className='block space-y-2'>
+      <span className='block text-sm font-medium text-foreground'>手机号</span>
+      <input
+        autoComplete='tel'
+        className={inputClassName}
+        inputMode='tel'
+        placeholder='请输入手机号'
+        type='tel'
+        value={phone}
+        onChange={(event) => onPhoneChange(event.target.value)}
+      />
+    </label>
+
+    <label className='block space-y-2'>
+      <span className='block text-sm font-medium text-foreground'>密码</span>
+      <input
+        autoComplete='current-password'
+        className={inputClassName}
+        placeholder='请输入密码'
+        type='password'
+        value={password}
+        onChange={(event) => onPasswordChange(event.target.value)}
+      />
+    </label>
+  </div>
+)
+
+type LoginActionProps = {
+  canSubmit: boolean
+  isApiConfigured: boolean
+  isSubmitting: boolean
+  label?: string
+  onPress: () => void
+  serverHealthStatus: ServerHealthStatus
+}
+
+const LoginAction: React.FC<LoginActionProps> = ({
+  canSubmit,
+  isApiConfigured,
+  isSubmitting,
+  label,
+  onPress,
+  serverHealthStatus,
+}) => (
+  <Button.Root
+    className='w-full'
+    isDisabled={!canSubmit || isSubmitting}
+    variant='primary'
+    onPress={onPress}
+  >
+    {isSubmitting
+      ? '登录中...'
+      : serverHealthStatus === 'reachable' && isApiConfigured
+        ? (label ?? '登录')
+        : '请先验证服务器'}
+  </Button.Root>
+)
+
 const Auth: React.FC = () => {
   const authStatus = useAuthStore((state) => state.status)
   const workspaceStatus = useAuthStore((state) => state.workspaceStatus)
@@ -125,6 +198,10 @@ const Auth: React.FC = () => {
   }
 
   const handleSubmit = async () => {
+    // A password login is a new authentication attempt. Invalidate any
+    // automatic bootstrap retry first so its late result cannot overwrite the
+    // session established by this login.
+    cancelPendingWorkspaceRefresh()
     setIsSubmitting(true)
 
     try {
@@ -161,6 +238,15 @@ const Auth: React.FC = () => {
           isLoading
           title='正在恢复登录状态'
           description='正在检查当前会话并解析可访问的工作区，请稍候。'
+          actions={
+            <Button.Root
+              className='w-full'
+              variant='outline'
+              onPress={cancelAuthenticationInitialization}
+            >
+              取消
+            </Button.Root>
+          }
         />
       </AuthSurface>
     )
@@ -223,7 +309,26 @@ const Auth: React.FC = () => {
           description={errorMessage ?? '请检查后端 API 配置或网络状态。'}
           actions={
             <div className='space-y-4'>
-              <ApiBaseUrlForm />
+              <ApiBaseUrlForm
+                onHealthStatusChange={setServerHealthStatus}
+                onResolvedServerChange={handleResolvedServerChange}
+              />
+              <CredentialFields
+                onPasswordChange={setPassword}
+                onPhoneChange={setPhone}
+                password={password}
+                phone={phone}
+              />
+              <LoginAction
+                canSubmit={canSubmit}
+                isApiConfigured={isApiConfigured}
+                isSubmitting={isSubmitting}
+                label='使用手机号和密码登录'
+                onPress={() => {
+                  void handleSubmit()
+                }}
+                serverHealthStatus={serverHealthStatus}
+              />
               <Button.Root
                 variant='secondary'
                 onPress={() => {
@@ -233,7 +338,7 @@ const Auth: React.FC = () => {
                   void refreshWorkspaceAccess()
                 }}
               >
-                重新检查
+                重新检查当前会话
               </Button.Root>
             </div>
           }
@@ -259,45 +364,22 @@ const Auth: React.FC = () => {
           </div>
         </div>
 
-        <div className='space-y-4'>
-          <label className='block space-y-2'>
-            <input
-              autoComplete='tel'
-              className={inputClassName}
-              inputMode='tel'
-              placeholder='请输入手机号'
-              type='tel'
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-          </label>
+        <CredentialFields
+          onPasswordChange={setPassword}
+          onPhoneChange={setPhone}
+          password={password}
+          phone={phone}
+        />
 
-          <label className='block space-y-2'>
-            <input
-              autoComplete='current-password'
-              className={inputClassName}
-              placeholder='请输入密码'
-              type='password'
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-        </div>
-
-        <Button.Root
-          className='w-full'
-          isDisabled={!canSubmit || isSubmitting}
-          variant='primary'
+        <LoginAction
+          canSubmit={canSubmit}
+          isApiConfigured={isApiConfigured}
+          isSubmitting={isSubmitting}
           onPress={() => {
             void handleSubmit()
           }}
-        >
-          {isSubmitting
-            ? '登录中...'
-            : serverHealthStatus === 'reachable' && isApiConfigured
-              ? '登录'
-              : '请先验证服务器'}
-        </Button.Root>
+          serverHealthStatus={serverHealthStatus}
+        />
       </div>
     </div>
   )

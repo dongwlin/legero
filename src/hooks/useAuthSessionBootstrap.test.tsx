@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/services/apiClient'
 import { useAuthStore } from '@/store/auth'
 import {
+  AUTHENTICATION_INITIALIZATION_CANCELLED_ERROR,
+  cancelAuthenticationInitialization,
   cancelPendingWorkspaceRefresh,
   useAuthSessionBootstrap,
   useRefreshWorkspaceAccess,
@@ -168,7 +170,7 @@ describe('useAuthSessionBootstrap', () => {
     expect(mocks.bootstrap).toHaveBeenCalledTimes(2)
   })
 
-  it('reuses an in-flight automatic attempt for a manual re-check and discards stale outcomes', async () => {
+  it('starts an independent manual re-check after cancelling an in-flight attempt', async () => {
     let resolveAuto: ((result: typeof bootstrapResult) => void) | undefined
     mocks.bootstrap.mockImplementationOnce(
       () =>
@@ -176,7 +178,7 @@ describe('useAuthSessionBootstrap', () => {
           resolveAuto = resolve
         }),
     )
-    // The shared in-flight request succeeds.
+    // The fresh manual request succeeds independently after cancellation.
     mocks.bootstrap.mockResolvedValueOnce(bootstrapResult)
 
     renderHook(() => useAuthSessionBootstrap())
@@ -202,7 +204,7 @@ describe('useAuthSessionBootstrap', () => {
     // The automatic loop stops on the superseded generation: no further
     // attempts run and the restored session stays intact.
     await new Promise((resolve) => setTimeout(resolve, 1_200))
-    expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(2)
     expect(useAuthStore.getState().status).toBe('authenticated')
     expect(useAuthStore.getState().workspaceStatus).toBe('ready')
   })
@@ -243,5 +245,81 @@ describe('useAuthSessionBootstrap', () => {
     expect(useAuthStore.getState().status).toBe('anonymous')
     expect(useAuthStore.getState().activeWorkspace).toBeNull()
     expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts the current bootstrap and exposes an immediate recovery state', async () => {
+    let bootstrapSignal: AbortSignal | undefined
+    mocks.bootstrap.mockImplementationOnce((signal: AbortSignal) => {
+      bootstrapSignal = signal
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        })
+      })
+    })
+
+    renderHook(() => useAuthSessionBootstrap())
+
+    await waitFor(() => {
+      expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
+    })
+
+    cancelAuthenticationInitialization()
+
+    expect(bootstrapSignal?.aborted).toBe(true)
+    expect(useAuthStore.getState().workspaceStatus).toBe('error')
+    expect(useAuthStore.getState().errorMessage).toBe(
+      AUTHENTICATION_INITIALIZATION_CANCELLED_ERROR,
+    )
+  })
+
+  it('does not treat an unrelated AbortError as a user cancellation', async () => {
+    const abortError = new DOMException('refresh timed out', 'AbortError')
+    mocks.bootstrap.mockRejectedValueOnce(abortError)
+
+    const { result } = renderHook(() => useRefreshWorkspaceAccess())
+
+    await act(async () => {
+      await expect(result.current()).resolves.toBe('error')
+    })
+
+    expect(useAuthStore.getState().workspaceStatus).toBe('error')
+    expect(useAuthStore.getState().errorMessage).toBe('refresh timed out')
+    expect(useAuthStore.getState().errorMessage).not.toBe(
+      AUTHENTICATION_INITIALIZATION_CANCELLED_ERROR,
+    )
+  })
+
+  it('does not let a cancelled result overwrite a newer password-independent refresh', async () => {
+    let resolveOld: ((result: typeof bootstrapResult) => void) | undefined
+    mocks.bootstrap.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve
+        }),
+    )
+    mocks.bootstrap.mockResolvedValueOnce(bootstrapResult)
+
+    renderHook(() => useAuthSessionBootstrap())
+
+    await waitFor(() => {
+      expect(mocks.bootstrap).toHaveBeenCalledTimes(1)
+    })
+
+    cancelAuthenticationInitialization()
+    const { result: refreshResult } = renderHook(() => useRefreshWorkspaceAccess())
+
+    await act(async () => {
+      await expect(refreshResult.current()).resolves.toBe('authenticated')
+    })
+
+    resolveOld?.(bootstrapResult)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(2)
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(useAuthStore.getState().workspaceStatus).toBe('ready')
   })
 })
