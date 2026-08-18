@@ -117,6 +117,7 @@ const DEFAULT_MAX_STATE_CHANGES = 32
 const SAFE_RECONNECT_REASONS = new Set([
   'timer',
   'close',
+  'ws_timeout',
   'ready_timeout',
   'stale',
   'network_recovery',
@@ -198,6 +199,7 @@ const SAFE_CLOSE_REASONS = new Set([
   'network_recovery',
   'foreground_recovery',
   'server_activity_timeout',
+  'ws_timeout',
   'ready_timeout',
   'server_restart',
   'server_shutdown',

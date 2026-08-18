@@ -58,6 +58,7 @@ type ReconnectReason =
   | 'initial'
   | 'timer'
   | 'close'
+  | 'ws_timeout'
   | 'ready_timeout'
   | 'stale'
   | 'network_recovery'
@@ -602,6 +603,8 @@ export const orderRealtime = {
         // fall through to the next reconnect ourselves, since onclose will
         // now be rejected by the generation guard.
         const failureStage = getActiveAttemptFailureStage()
+        const timeoutReason =
+          failureStage === 'ws' ? 'ws_timeout' : 'ready_timeout'
         if (failureStage !== null) {
           diagnostics.recordFailure(failureStage)
         }
@@ -609,8 +612,8 @@ export const orderRealtime = {
         const timedOutGeneration = generation
         generation += 1
         clearActiveAttempt(timedOutGeneration)
-        closeSocket(1000, 'ready_timeout')
-        scheduleReconnect('ready_timeout')
+        closeSocket(1000, timeoutReason)
+        scheduleReconnect(timeoutReason)
       }, READY_TIMEOUT_MS)
     }
 

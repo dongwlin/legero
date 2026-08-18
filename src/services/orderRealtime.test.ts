@@ -961,7 +961,10 @@ describe('orderRealtime connection lifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'ready_timeout' }])
-    expect(subscription.getDiagnostics().failureStage).toBe('ready')
+    expect(subscription.getDiagnostics()).toMatchObject({
+      failureStage: 'ready',
+      lastCloseReason: 'ready_timeout',
+    })
 
     // A late 'ready' or message from the timed-out socket must not move the
     // state machine (in a real browser close() -> onclose is asynchronous,
@@ -975,6 +978,9 @@ describe('orderRealtime connection lifecycle', () => {
     await vi.advanceTimersByTimeAsync(500)
     await flushAsync()
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+    expect(subscription.getDiagnostics().lastReconnectReason).toBe(
+      'ready_timeout',
+    )
 
     subscription.close()
   })
@@ -993,15 +999,17 @@ describe('orderRealtime connection lifecycle', () => {
     await vi.advanceTimersByTimeAsync(1)
     await flushAsync()
 
-    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'ready_timeout' }])
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'ws_timeout' }])
     expect(subscription.getDiagnostics()).toMatchObject({
       state: 'reconnecting',
       failureStage: 'ws',
+      lastCloseReason: 'ws_timeout',
     })
 
     await vi.advanceTimersByTimeAsync(500)
     await flushAsync()
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+    expect(subscription.getDiagnostics().lastReconnectReason).toBe('ws_timeout')
 
     subscription.close()
   })

@@ -36,6 +36,8 @@ describe('realtime diagnostics formatters', () => {
     expect(failureStageLabel('ready')).toBe('握手确认')
     expect(failureStageLabel(null)).toBe('—')
     expect(reconnectReasonLabel('network_recovery')).toBe('网络恢复')
+    expect(reconnectReasonLabel('ws_timeout')).toBe('WebSocket 连接超时')
+    expect(reconnectReasonLabel('ready_timeout')).toBe('握手确认超时')
     expect(reconnectReasonLabel('redacted')).toBe('详细原因已隐藏')
     expect(reconnectReasonLabel('unexpected')).toBe('其他原因')
     expect(stateChangeReasonLabel('ready_received')).toBe('收到握手确认')
@@ -43,6 +45,8 @@ describe('realtime diagnostics formatters', () => {
     expect(networkOnlineLabel(false)).toBe('离线')
     expect(appBackgroundedLabel(false)).toBe('前台')
     expect(closeCodeLabel(1006)).toBe('1006')
+    expect(closeReasonLabel('ws_timeout')).toBe('WebSocket 连接超时')
+    expect(closeReasonLabel('ready_timeout')).toBe('握手确认超时')
     expect(closeReasonLabel('network_offline')).toBe('网络断开')
   })
 

@@ -57,6 +57,19 @@ describe('realtime diagnostics', () => {
     expect(JSON.stringify(safe)).not.toContain('secret-order-123')
   })
 
+  it('keeps the websocket timeout reason in the low-cardinality allowlists', () => {
+    const diagnostics = createRealtimeDiagnostics()
+
+    diagnostics.recordConnectionAttempt('initial')
+    diagnostics.recordClose(1000, 'ws_timeout')
+    diagnostics.recordConnectionAttempt('ws_timeout')
+
+    expect(diagnostics.getSnapshot()).toMatchObject({
+      lastCloseReason: 'ws_timeout',
+      lastReconnectReason: 'ws_timeout',
+    })
+  })
+
   it('aggregates heartbeat/server activity and tracks environment state', () => {
     let monotonicNow = 1
     let wallClockNow = 1000
