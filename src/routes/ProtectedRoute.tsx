@@ -1,6 +1,6 @@
 import { Button, Card, Spinner } from '@heroui/react'
 import React from 'react'
-import { Navigate, Outlet } from 'react-router'
+import { Navigate, Outlet, useMatch } from 'react-router'
 import { RealtimeDiagnosticsProvider } from '@/hooks/RealtimeDiagnosticsProvider'
 import { useOrderWorkspaceSync } from '@/hooks/useOrderWorkspaceSync'
 import { useAuthStore } from '@/store/auth'
@@ -54,6 +54,7 @@ const ProtectedRoute: React.FC = () => {
   const workspaceStatus = useAuthStore((state) => state.workspaceStatus)
   const { status, errorMessage, retrySync, getDiagnostics } =
     useOrderWorkspaceSync()
+  const isDiagnosticsRoute = useMatch('/settings/diagnostics') !== null
 
   if (authStatus === 'loading' && workspaceStatus !== 'error') {
     return (
@@ -82,7 +83,10 @@ const ProtectedRoute: React.FC = () => {
     return <Navigate to='/auth' replace />
   }
 
-  if (status === 'loading' || status === 'idle') {
+  // Diagnostics is intentionally available while the single workspace sync
+  // owner is still connecting or has reached a terminal error. The provider
+  // only exposes that owner's getter; it never creates another subscription.
+  if (!isDiagnosticsRoute && (status === 'loading' || status === 'idle')) {
     return (
       <ProtectedRouteState
         title='正在同步订单'
@@ -91,7 +95,7 @@ const ProtectedRoute: React.FC = () => {
     )
   }
 
-  if (status === 'error') {
+  if (!isDiagnosticsRoute && status === 'error') {
     return (
       <ProtectedRouteState
         title='订单同步失败'
