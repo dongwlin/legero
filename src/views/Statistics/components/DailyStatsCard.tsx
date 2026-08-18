@@ -1,13 +1,21 @@
 import { DailyStats } from '@/services/statistics'
 import { formatPriceCents } from '@/services/orderPricing'
-import { Card, EmptyState, Table } from '@heroui/react'
+import { Button, Card, EmptyState, Table } from '@heroui/react'
 import React from 'react'
 
 interface DailyStatsCardProps {
   stats: Map<string, DailyStats>
+  isReportLoading: boolean
+  onDateSelect: (date: string) => void
+  selectedDate: string | null
 }
 
-const DailyStatsCard: React.FC<DailyStatsCardProps> = ({ stats }) => {
+const DailyStatsCard: React.FC<DailyStatsCardProps> = ({
+  isReportLoading,
+  onDateSelect,
+  selectedDate,
+  stats,
+}) => {
   const rows = Array.from(stats.entries()).map(([date, summary]) => ({
     date,
     ...summary,
@@ -49,9 +57,29 @@ const DailyStatsCard: React.FC<DailyStatsCardProps> = ({ stats }) => {
                 </Table.Header>
                 <Table.Body>
                   {rows.map((row) => (
-                    <Table.Row key={row.date} id={row.date}>
+                    <Table.Row
+                      key={row.date}
+                      id={row.date}
+                      className={
+                        row.date === selectedDate
+                          ? 'bg-accent/10'
+                          : undefined
+                      }
+                    >
                       <Table.Cell className='text-sm font-medium md:text-base'>
-                        {row.date}
+                        <Button.Root
+                          className='h-auto min-h-10 max-w-full justify-start px-2 py-2 text-left font-medium whitespace-normal'
+                          variant='ghost'
+                          aria-pressed={row.date === selectedDate}
+                          onPress={() => onDateSelect(row.date)}
+                        >
+                          <span>{row.date}</span>
+                          {row.date === selectedDate && isReportLoading ? (
+                            <span className='text-xs font-normal text-foreground-secondary'>
+                              加载中...
+                            </span>
+                          ) : null}
+                        </Button.Root>
                       </Table.Cell>
                       <Table.Cell className='text-right font-mono tabular-nums md:text-base'>
                         {formatPriceCents(row.totalPriceCents, {

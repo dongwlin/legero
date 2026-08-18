@@ -88,6 +88,31 @@ export type DailyStatsResponse = {
   items: DailyStatsItemDTO[]
 }
 
+/**
+ * A report period is deliberately shared by every report consumer. The M1
+ * endpoint currently implements only `day`; week/month remain part of the
+ * wire contract so the client does not have to grow a parallel model later.
+ */
+export type ReportPeriod = 'day' | 'week' | 'month'
+
+export type ReportMetadata = {
+  period: ReportPeriod
+  startDate: string
+  endDate: string
+}
+
+/**
+ * Metric fields are intentionally kept open until the backend Report DTO is
+ * shared. The metadata and request semantics are stable; M1's concrete
+ * metric adapter will narrow this record to the final backend contract.
+ */
+export type ReportMetrics = Record<string, unknown>
+
+/** A complete report for one business period. */
+export type ReportResponse = ReportMetadata & {
+  metrics: ReportMetrics
+}
+
 export type OrderDeletedEvent = {
   id: string
 }

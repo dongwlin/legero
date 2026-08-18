@@ -1,12 +1,15 @@
 import { fetchDailyStats, DailyStats } from '@/services/statistics'
+import type { ReportResponse } from '@/services/apiTypes'
 import PasswordLockScreen from '@/components/PasswordLockScreen'
 import { usePasswordAuthStore } from '@/store/passwordAuth'
 import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import DailyStatsCard from './components/DailyStatsCard'
+import ReportDetailsCard from './components/ReportDetailsCard'
 import Header from '@/components/Header'
 import StatisticsControls from './components/StatisticsControls'
+import { useStatisticsReports } from './hooks/useStatisticsReports'
 
 interface StatisticsViewProps {
   errorMessage: string | null
@@ -15,6 +18,12 @@ interface StatisticsViewProps {
   onCalculate: () => void
   onFromDateChange: (value: string) => void
   onToDateChange: (value: string) => void
+  onDateSelect: (date: string) => void
+  onReportRefresh: () => void
+  report: ReportResponse | null
+  reportErrorMessage: string | null
+  isReportLoading: boolean
+  selectedDate: string | null
   stats: Map<string, DailyStats>
   toDate: string
 }
@@ -26,6 +35,12 @@ const StatisticsView: React.FC<StatisticsViewProps> = ({
   onCalculate,
   onFromDateChange,
   onToDateChange,
+  onDateSelect,
+  onReportRefresh,
+  report,
+  reportErrorMessage,
+  isReportLoading,
+  selectedDate,
   stats,
   toDate,
 }) => {
@@ -46,7 +61,19 @@ const StatisticsView: React.FC<StatisticsViewProps> = ({
           {errorMessage ? (
             <p className='text-sm text-danger'>{errorMessage}</p>
           ) : null}
-          <DailyStatsCard stats={stats} />
+          <DailyStatsCard
+            isReportLoading={isReportLoading}
+            onDateSelect={onDateSelect}
+            selectedDate={selectedDate}
+            stats={stats}
+          />
+          <ReportDetailsCard
+            errorMessage={reportErrorMessage}
+            isLoading={isReportLoading}
+            onRefresh={onReportRefresh}
+            report={report}
+            selectedDate={selectedDate}
+          />
         </div>
       </main>
     </div>
@@ -73,6 +100,15 @@ const Statistic: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const hasAutoLoadedRef = useRef(false)
+  const {
+    errorMessage: reportErrorMessage,
+    isLoading: isReportLoading,
+    onDateSelect,
+    onRefresh: onReportRefresh,
+    report,
+    reset: resetReports,
+    selectedDate,
+  } = useStatisticsReports()
 
   useEffect(() => {
     resetPasswordAuth()
@@ -80,6 +116,7 @@ const Statistic: React.FC = () => {
 
   const handleStatistics = useCallback(async () => {
     hasAutoLoadedRef.current = true
+    resetReports()
     setIsLoading(true)
     setErrorMessage(null)
 
@@ -91,7 +128,7 @@ const Statistic: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [fromDate, toDate])
+  }, [fromDate, resetReports, toDate])
 
   const handleUnlock = () => {
     authenticate()
@@ -151,6 +188,12 @@ const Statistic: React.FC = () => {
       }}
       onFromDateChange={setFromDate}
       onToDateChange={setToDate}
+      onDateSelect={onDateSelect}
+      onReportRefresh={onReportRefresh}
+      report={report}
+      reportErrorMessage={reportErrorMessage}
+      isReportLoading={isReportLoading}
+      selectedDate={selectedDate}
       stats={stats}
       toDate={toDate}
     />
