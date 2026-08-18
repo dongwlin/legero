@@ -2,6 +2,7 @@ import { DailyStats } from '@/services/statistics'
 import { formatPriceCents } from '@/services/orderPricing'
 import { Card, EmptyState, Table } from '@heroui/react'
 import React from 'react'
+import { Link } from 'react-router'
 
 interface DailyStatsCardProps {
   stats: Map<string, DailyStats>
@@ -22,7 +23,7 @@ const DailyStatsCard: React.FC<DailyStatsCardProps> = ({ stats }) => {
         <Card.Title className='text-lg md:text-xl'>每日统计详情</Card.Title>
         <Card.Description className='leading-6'>
           {rows.length > 0
-            ? `已生成 ${rows.length} 天的订单汇总数据。`
+            ? `已生成 ${rows.length} 天的订单汇总数据，点击“查看日报”按需加载完整指标。`
             : '点击上方按钮后，这里会展示每日订单汇总结果。'}
         </Card.Description>
       </Card.Header>
@@ -49,9 +50,21 @@ const DailyStatsCard: React.FC<DailyStatsCardProps> = ({ stats }) => {
                 </Table.Header>
                 <Table.Body>
                   {rows.map((row) => (
-                    <Table.Row key={row.date} id={row.date}>
+                    <Table.Row
+                      key={row.date}
+                      id={row.date}
+                    >
                       <Table.Cell className='text-sm font-medium md:text-base'>
-                        {row.date}
+                        <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
+                          <span>{row.date}</span>
+                          <Link
+                            className='inline-flex min-h-10 items-center justify-center rounded-lg px-2 text-sm font-medium text-accent transition-colors hover:bg-accent/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+                            to={`/statistics/report/${encodeURIComponent(row.date)}`}
+                            aria-label={`查看日报 ${row.date}`}
+                          >
+                            查看日报
+                          </Link>
+                        </div>
                       </Table.Cell>
                       <Table.Cell className='text-right font-mono tabular-nums md:text-base'>
                         {formatPriceCents(row.totalPriceCents, {

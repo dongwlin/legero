@@ -5,7 +5,9 @@ import NotFound from '@/views/NotFound'
 import Order from '@/views/Order'
 import Settings from '@/views/Settings'
 import RealtimeDiagnostics from '@/views/Settings/Diagnostics'
+import StatisticsLayout from '@/views/Statistics/Layout'
 import Statistic from '@/views/Statistics'
+import DailyReport from '@/views/Statistics/Report'
 import { createBrowserRouter } from 'react-router'
 
 const router = createBrowserRouter([
@@ -26,7 +28,17 @@ const router = createBrowserRouter([
       },
       {
         path: '/statistics',
-        element: <Statistic />,
+        element: <StatisticsLayout />,
+        children: [
+          {
+            index: true,
+            element: <Statistic />,
+          },
+          {
+            path: 'report/:date',
+            element: <DailyReport />,
+          },
+        ],
       },
       {
         path: '/settings',

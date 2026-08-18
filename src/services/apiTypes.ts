@@ -88,6 +88,70 @@ export type DailyStatsResponse = {
   items: DailyStatsItemDTO[]
 }
 
+/**
+ * A report period is deliberately shared by every report consumer. The M1
+ * endpoint currently implements only `day`; week/month remain part of the
+ * wire contract so the client does not have to grow a parallel model later.
+ */
+export type ReportPeriod = 'day' | 'week' | 'month'
+
+export type ReportMetadata = {
+  period: ReportPeriod
+  startDate: string
+  endDate: string
+}
+
+export type ReportRatioMetric = {
+  count: number
+  denominator: number
+  ratio: number
+}
+
+export type ReportPeak30Minute = {
+  start: string
+  end: string
+  orderCount: number
+}
+
+export type ReportStapleSale = {
+  stapleTypeCode: number
+  orderCount: number
+}
+
+export type ReportStandardSize = {
+  standardCount: number
+  customSizeOrderCount: number
+  small: ReportRatioMetric
+  medium: ReportRatioMetric
+  large: ReportRatioMetric
+}
+
+export type ReportCustomizationMetrics = {
+  leanMeatOnly: ReportRatioMetric
+  noIntestine: ReportRatioMetric
+  union: ReportRatioMetric
+}
+
+export type ReportMetrics = {
+  revenueCents: number
+  completedOrderCount: number
+  averageOrderValueCents: number
+  averagePreparationSeconds: number
+  peak30MinuteBuckets: ReportPeak30Minute[]
+  stapleSales: ReportStapleSale[]
+  noStapleOrderCount: number
+  unknownStapleOrderCount: number
+  standardSize: ReportStandardSize
+  totalFriedEggCount: number
+  takeout: ReportRatioMetric
+  customizations: ReportCustomizationMetrics
+}
+
+/** A complete report for one business period. */
+export type ReportResponse = ReportMetadata & {
+  metrics: ReportMetrics
+}
+
 export type OrderDeletedEvent = {
   id: string
 }

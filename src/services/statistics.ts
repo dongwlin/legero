@@ -1,5 +1,9 @@
 import { apiRequest } from './apiClient'
-import type { DailyStatsResponse } from './apiTypes'
+import type {
+  DailyStatsResponse,
+  ReportPeriod,
+  ReportResponse,
+} from './apiTypes'
 
 export interface DailyStats {
   totalPriceCents: number
@@ -29,4 +33,25 @@ export const fetchDailyStats = async (
       },
     ]),
   )
+}
+
+/**
+ * Fetch one complete report for an explicit business period.
+ *
+ * Keep this separate from `fetchDailyStats`: the range endpoint is a cheap
+ * trend query and must never fan out into one report request per date.
+ */
+export const fetchReport = async (
+  period: ReportPeriod,
+  date: string,
+): Promise<ReportResponse> => {
+  const params = new URLSearchParams({
+    period,
+    date,
+  })
+
+  return apiRequest<ReportResponse>({
+    path: `/api/stats/report?${params.toString()}`,
+    auth: true,
+  })
 }
