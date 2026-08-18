@@ -44,7 +44,6 @@ vi.mock('@heroui/react', () => {
       Description: passthrough,
       Content: passthrough,
     },
-    Chip: { Root: passthrough, Label: passthrough },
     Disclosure: {
       Root: passthrough,
       Heading: passthrough,
@@ -134,7 +133,9 @@ describe('RealtimeDiagnostics viewer', () => {
 
     render(<RealtimeDiagnostics />)
 
-    expect(screen.getAllByText('在线')).not.toHaveLength(0)
+    expect(
+      screen.getAllByRole('heading', { level: 2, name: '在线' }),
+    ).toHaveLength(1)
     expect(screen.getByText('Wi-Fi')).not.toBeNull()
     expect(screen.getByText('前台')).not.toBeNull()
     expect(screen.getByText('WebSocket')).not.toBeNull()
@@ -174,7 +175,9 @@ describe('RealtimeDiagnostics viewer', () => {
 
     render(<RealtimeDiagnostics />)
 
-    expect(screen.getAllByText('连接失败')).not.toHaveLength(0)
+    expect(
+      screen.getByRole('heading', { level: 2, name: '连接失败' }),
+    ).not.toBeNull()
     expect(screen.getByText('身份认证')).not.toBeNull()
     expect(screen.getByText('离线')).not.toBeNull()
   })
@@ -188,14 +191,18 @@ describe('RealtimeDiagnostics viewer', () => {
     mocks.getDiagnostics.mockReturnValue(onlineSnapshot)
 
     const view = render(<RealtimeDiagnostics />)
-    expect(screen.getAllByText('在线')).not.toHaveLength(0)
+    expect(
+      screen.getByRole('heading', { level: 2, name: '在线' }),
+    ).not.toBeNull()
 
     mocks.getDiagnostics.mockReturnValue(reconnectingSnapshot)
     act(() => {
       vi.advanceTimersByTime(1000)
     })
 
-    expect(screen.getAllByText('正在重连')).not.toHaveLength(0)
+    expect(
+      screen.getByRole('heading', { level: 2, name: '正在重连' }),
+    ).not.toBeNull()
     expect(screen.getByLabelText('连接状态更新中')).not.toBeNull()
     view.unmount()
     const callsAfterUnmount = mocks.getDiagnostics.mock.calls.length

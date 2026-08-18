@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Disclosure, Separator, Spinner } from '@heroui/react'
+import { Button, Card, Disclosure, Separator, Spinner } from '@heroui/react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Header from '@/components/Header'
@@ -25,20 +25,17 @@ import {
 
 const EMPTY_GET_DIAGNOSTICS = (): RealtimeDiagnosticsSnapshot | null => null
 
-type StatusChipColor = 'accent' | 'danger' | 'default' | 'success' | 'warning'
-
 type StatusMeta = {
-  chipColor: StatusChipColor
   dotClassName: string
 }
 
 const STATUS_META: Record<RealtimeConnectionState, StatusMeta> = {
-  idle: { chipColor: 'default', dotClassName: 'bg-muted' },
-  connecting: { chipColor: 'accent', dotClassName: 'bg-accent' },
-  online: { chipColor: 'success', dotClassName: 'bg-success' },
-  reconnecting: { chipColor: 'warning', dotClassName: 'bg-warning' },
-  failed: { chipColor: 'danger', dotClassName: 'bg-danger' },
-  closed: { chipColor: 'default', dotClassName: 'bg-muted' },
+  idle: { dotClassName: 'bg-muted' },
+  connecting: { dotClassName: 'bg-accent' },
+  online: { dotClassName: 'bg-success' },
+  reconnecting: { dotClassName: 'bg-warning' },
+  failed: { dotClassName: 'bg-danger' },
+  closed: { dotClassName: 'bg-muted' },
 }
 
 const isTransientState = (state: RealtimeConnectionState): boolean =>
@@ -242,38 +239,29 @@ const RealtimeDiagnostics: React.FC = () => {
                 className='border border-border/70 p-0 shadow-surface'
               >
                 <Card.Content className='px-5 py-5 md:px-6 md:py-6'>
-                  <div className='flex items-start justify-between gap-4'>
-                    <div className='min-w-0'>
-                      <p className='text-sm text-muted'>当前连接状态</p>
-                      <div className='mt-2 flex items-center gap-2.5'>
-                        {isTransientState(snapshot.state) ? (
-                          <Spinner
-                            aria-label='连接状态更新中'
-                            size='sm'
-                            color={
-                              snapshot.state === 'reconnecting'
-                                ? 'warning'
-                                : 'accent'
-                            }
-                          />
-                        ) : (
-                          <span
-                            aria-hidden='true'
-                            className={`size-2.5 rounded-full ${STATUS_META[snapshot.state].dotClassName}`}
-                          />
-                        )}
-                        <h2 className='truncate text-2xl font-semibold tracking-tight md:text-3xl'>
-                          {connectionStateLabel(snapshot.state)}
-                        </h2>
-                      </div>
+                  <div className='min-w-0'>
+                    <p className='text-sm text-muted'>当前连接状态</p>
+                    <div className='mt-2 flex items-center gap-2.5'>
+                      {isTransientState(snapshot.state) ? (
+                        <Spinner
+                          aria-label='连接状态更新中'
+                          size='sm'
+                          color={
+                            snapshot.state === 'reconnecting'
+                              ? 'warning'
+                              : 'accent'
+                          }
+                        />
+                      ) : (
+                        <span
+                          aria-hidden='true'
+                          className={`size-2.5 rounded-full ${STATUS_META[snapshot.state].dotClassName}`}
+                        />
+                      )}
+                      <h2 className='truncate text-2xl font-semibold tracking-tight md:text-3xl'>
+                        {connectionStateLabel(snapshot.state)}
+                      </h2>
                     </div>
-                    <Chip.Root
-                      color={STATUS_META[snapshot.state].chipColor}
-                      size='sm'
-                      variant='soft'
-                    >
-                      <Chip.Label>{connectionStateLabel(snapshot.state)}</Chip.Label>
-                    </Chip.Root>
                   </div>
 
                   <Separator className='my-5' />
