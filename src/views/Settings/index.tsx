@@ -5,6 +5,7 @@ import ThemeSettings from './components/ThemeSettings'
 import OrderSettings from './components/OrderSettings'
 import DataManagement from './components/DataManagement'
 import AuthSettings from './components/AuthSettings'
+import RealtimeDiagnosticsSettings from './components/RealtimeDiagnosticsSettings'
 
 const Settings: React.FC = () => {
   return (
@@ -14,6 +15,7 @@ const Settings: React.FC = () => {
       <main className='mx-auto max-w-4xl px-4 pt-[calc(5.25rem+env(safe-area-inset-top))] md:px-8'>
         <div className='space-y-6'>
           <ApiConnectionSettings />
+          <RealtimeDiagnosticsSettings />
           <AuthSettings />
           <ThemeSettings />
           <OrderSettings />

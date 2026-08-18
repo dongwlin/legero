@@ -10,6 +10,7 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 import { requestOrdersResync } from '@/services/orderResync'
 import type { LocalMutationEffect } from '@/services/orderOptimistic'
+import type { RealtimeDiagnostics } from '@/services/realtimeDiagnostics'
 import { orderTombstones } from '@/services/orderTombstones'
 import { useAuthStore } from '@/store/auth'
 import { useOrderStore } from '@/store/order'
@@ -162,7 +163,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     cleanup()
   })
 
-  it('records reconciliation success, failure, and disposed cancellation outcomes', async () => {
+  it('records reconciliation outcomes and hides diagnostics after disposal', async () => {
     const successSnapshot = deferred<OrderRecord[]>()
     mocks.listOrders.mockReturnValueOnce(successSnapshot.promise)
 
@@ -209,11 +210,7 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
       cancelledSnapshot.resolve([])
       await flushAsync()
     })
-    expect(cancelled.result.current.getDiagnostics()?.snapshotReconciliation).toMatchObject({
-      count: 0,
-      failureCount: 0,
-      cancelledCount: 1,
-    })
+    expect(cancelled.result.current.getDiagnostics()).toBeNull()
   })
 
   it('does not clobber realtime updates received while the snapshot is in flight', async () => {
@@ -1874,8 +1871,13 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
   })
 
   it('resets the session-wide registries when the active workspace changes', async () => {
-    renderHook(() => useOrderWorkspaceSync())
+    const view = renderHook(() => useOrderWorkspaceSync())
     expect(mocks.resetJournal).toHaveBeenCalledTimes(1)
+
+    const firstDiagnostics = mocks.subscribeToWorkspaceOrders.mock.calls[0]?.[0]
+      .diagnostics as RealtimeDiagnostics
+    firstDiagnostics.recordConnectionAttempt('initial')
+    expect(view.result.current.getDiagnostics()?.connectionAttemptCount).toBe(1)
 
     // Switching to another workspace starts a fresh sync session: the
     // previous workspace's tombstones and mutation journal are dropped.
@@ -1886,6 +1888,18 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     })
 
     expect(mocks.resetJournal).toHaveBeenCalledTimes(2)
+    expect(mocks.subscribeToWorkspaceOrders).toHaveBeenCalledTimes(2)
+
+    const secondDiagnostics = mocks.subscribeToWorkspaceOrders.mock.calls[1]?.[0]
+      .diagnostics as RealtimeDiagnostics
+    expect(secondDiagnostics).not.toBe(firstDiagnostics)
+    expect(view.result.current.getDiagnostics()?.connectionAttemptCount).toBe(0)
+
+    firstDiagnostics.recordConnectionAttempt('timer')
+    expect(view.result.current.getDiagnostics()?.connectionAttemptCount).toBe(0)
+
+    secondDiagnostics.recordConnectionAttempt('initial')
+    expect(view.result.current.getDiagnostics()?.connectionAttemptCount).toBe(1)
   })
 })
 

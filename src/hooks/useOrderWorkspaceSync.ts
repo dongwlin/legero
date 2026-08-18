@@ -52,6 +52,12 @@ export const useOrderWorkspaceSync = () => {
     setRefreshKey((current) => current + 1)
   }, [])
 
+  const getDiagnostics = useCallback(
+    (): RealtimeDiagnosticsSnapshot | null =>
+      diagnosticsRef.current?.getSnapshot() ?? null,
+    [],
+  )
+
   useEffect(() => {
     if (authStatus !== 'authenticated' || !activeWorkspaceId) {
       diagnosticsRef.current = null
@@ -805,6 +811,10 @@ export const useOrderWorkspaceSync = () => {
       if (subscription) {
         void orderRealtime.unsubscribe(subscription)
       }
+
+      if (diagnosticsRef.current === diagnostics) {
+        diagnosticsRef.current = null
+      }
     }
   }, [
     activeWorkspaceId,
@@ -819,7 +829,6 @@ export const useOrderWorkspaceSync = () => {
     status,
     errorMessage,
     retrySync,
-    getDiagnostics: (): RealtimeDiagnosticsSnapshot | null =>
-      diagnosticsRef.current?.getSnapshot() ?? null,
+    getDiagnostics,
   }
 }

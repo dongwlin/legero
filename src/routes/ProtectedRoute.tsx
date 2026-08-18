@@ -1,6 +1,7 @@
 import { Button, Card, Spinner } from '@heroui/react'
 import React from 'react'
 import { Navigate, Outlet } from 'react-router'
+import { RealtimeDiagnosticsProvider } from '@/hooks/RealtimeDiagnosticsProvider'
 import { useOrderWorkspaceSync } from '@/hooks/useOrderWorkspaceSync'
 import { useAuthStore } from '@/store/auth'
 
@@ -51,7 +52,8 @@ const ProtectedRouteState: React.FC<ProtectedRouteStateProps> = ({
 const ProtectedRoute: React.FC = () => {
   const authStatus = useAuthStore((state) => state.status)
   const workspaceStatus = useAuthStore((state) => state.workspaceStatus)
-  const { status, errorMessage, retrySync } = useOrderWorkspaceSync()
+  const { status, errorMessage, retrySync, getDiagnostics } =
+    useOrderWorkspaceSync()
 
   if (authStatus === 'loading' && workspaceStatus !== 'error') {
     return (
@@ -99,7 +101,11 @@ const ProtectedRoute: React.FC = () => {
     )
   }
 
-  return <Outlet />
+  return (
+    <RealtimeDiagnosticsProvider getDiagnostics={getDiagnostics}>
+      <Outlet />
+    </RealtimeDiagnosticsProvider>
+  )
 }
 
 export default ProtectedRoute
