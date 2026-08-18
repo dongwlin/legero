@@ -3,6 +3,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchReport } from '@/services/statistics'
+import type { ReportResponse } from '@/services/apiTypes'
 import { useStatisticsReports } from './useStatisticsReports'
 
 vi.mock('@/services/statistics', () => ({
@@ -11,11 +12,39 @@ vi.mock('@/services/statistics', () => ({
 
 const mockedFetchReport = vi.mocked(fetchReport)
 
-const reportFor = (date: string) => ({
-  period: 'day' as const,
+const emptyRatio = () => ({ count: 0, denominator: 0, ratio: 0 })
+
+const reportFor = (date: string): ReportResponse => ({
+  period: 'day',
   startDate: date,
   endDate: date,
-  metrics: {},
+  metrics: {
+    revenueCents: 0,
+    completedOrderCount: 0,
+    averageOrderValueCents: 0,
+    averagePreparationSeconds: 0,
+    peak30MinuteBuckets: [],
+    stapleSales: [1, 2, 3, 4].map((stapleTypeCode) => ({
+      stapleTypeCode,
+      orderCount: 0,
+    })),
+    noStapleOrderCount: 0,
+    unknownStapleOrderCount: 0,
+    standardSize: {
+      standardCount: 0,
+      customSizeOrderCount: 0,
+      small: emptyRatio(),
+      medium: emptyRatio(),
+      large: emptyRatio(),
+    },
+    totalFriedEggCount: 0,
+    takeout: emptyRatio(),
+    customizations: {
+      leanMeatOnly: emptyRatio(),
+      noIntestine: emptyRatio(),
+      union: emptyRatio(),
+    },
+  },
 })
 
 describe('useStatisticsReports', () => {

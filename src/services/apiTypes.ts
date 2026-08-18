@@ -101,12 +101,51 @@ export type ReportMetadata = {
   endDate: string
 }
 
-/**
- * Metric fields are intentionally kept open until the backend Report DTO is
- * shared. The metadata and request semantics are stable; M1's concrete
- * metric adapter will narrow this record to the final backend contract.
- */
-export type ReportMetrics = Record<string, unknown>
+export type ReportRatioMetric = {
+  count: number
+  denominator: number
+  ratio: number
+}
+
+export type ReportPeak30Minute = {
+  start: string
+  end: string
+  orderCount: number
+}
+
+export type ReportStapleSale = {
+  stapleTypeCode: number
+  orderCount: number
+}
+
+export type ReportStandardSize = {
+  standardCount: number
+  customSizeOrderCount: number
+  small: ReportRatioMetric
+  medium: ReportRatioMetric
+  large: ReportRatioMetric
+}
+
+export type ReportCustomizationMetrics = {
+  leanMeatOnly: ReportRatioMetric
+  noIntestine: ReportRatioMetric
+  union: ReportRatioMetric
+}
+
+export type ReportMetrics = {
+  revenueCents: number
+  completedOrderCount: number
+  averageOrderValueCents: number
+  averagePreparationSeconds: number
+  peak30MinuteBuckets: ReportPeak30Minute[]
+  stapleSales: ReportStapleSale[]
+  noStapleOrderCount: number
+  unknownStapleOrderCount: number
+  standardSize: ReportStandardSize
+  totalFriedEggCount: number
+  takeout: ReportRatioMetric
+  customizations: ReportCustomizationMetrics
+}
 
 /** A complete report for one business period. */
 export type ReportResponse = ReportMetadata & {
