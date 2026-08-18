@@ -68,8 +68,8 @@ const OrderControls: React.FC = () => {
               }
             }}
           >
-            <Select.Trigger className='h-full rounded-2xl border border-border/60 bg-background px-4 text-sm md:text-base'>
-              <Select.Value />
+            <Select.Trigger className='h-full items-center rounded-2xl border border-border/60 bg-background px-4 text-sm md:text-base'>
+              <Select.Value className='font-medium text-base sm:text-base' />
               <Select.Indicator />
             </Select.Trigger>
             <Select.Popover className='rounded-2xl border border-border/70 bg-background shadow-xl'>
