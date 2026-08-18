@@ -30,6 +30,7 @@ vi.mock('@capacitor/app', () => ({
 const makeHandlers = (): RealtimeRecoveryHandlers => ({
   onNetworkOffline: vi.fn(),
   onNetworkOnline: vi.fn(),
+  onNetworkType: vi.fn(),
   onAppBackground: vi.fn(),
   onAppForeground: vi.fn(),
 })
@@ -193,8 +194,10 @@ describe('realtimeRecovery (native)', () => {
     ) => void
     networkCallback({ connected: false, connectionType: 'none' })
     expect(handlers.onNetworkOffline).toHaveBeenCalledTimes(1)
+    expect(handlers.onNetworkType).toHaveBeenNthCalledWith(2, 'none')
     networkCallback({ connected: true, connectionType: 'cellular' })
     expect(handlers.onNetworkOnline).toHaveBeenCalledTimes(1)
+    expect(handlers.onNetworkType).toHaveBeenNthCalledWith(3, 'cellular')
 
     const appCallback = mocks.appAddListener.mock.calls[0]?.[1] as (
       state: { isActive: boolean },
@@ -205,6 +208,31 @@ describe('realtimeRecovery (native)', () => {
     expect(handlers.onAppForeground).toHaveBeenCalledTimes(1)
 
     controller.stop()
+  })
+
+  it('reports the initial connection type without emitting an extra online signal', async () => {
+    const handlers = makeHandlers()
+    const controller = startRealtimeRecoverySignals(handlers)
+
+    await flushAsync()
+
+    expect(handlers.onNetworkType).toHaveBeenCalledWith('wifi')
+    expect(handlers.onNetworkOnline).not.toHaveBeenCalled()
+
+    mocks.networkGetStatus.mockResolvedValue({
+      connected: true,
+      connectionType: 'vpn',
+    })
+
+    // A fresh controller proves an unknown plugin value is normalized instead
+    // of being retained as arbitrary text.
+    controller.stop()
+    const nextHandlers = makeHandlers()
+    const nextController = startRealtimeRecoverySignals(nextHandlers)
+    await flushAsync()
+    expect(nextHandlers.onNetworkType).toHaveBeenCalledWith('unknown')
+    expect(nextHandlers.onNetworkOnline).not.toHaveBeenCalled()
+    nextController.stop()
   })
 
   it('reports offline when the native app starts without connectivity', async () => {

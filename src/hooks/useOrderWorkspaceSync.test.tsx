@@ -162,6 +162,60 @@ describe('useOrderWorkspaceSync snapshot reconciliation', () => {
     cleanup()
   })
 
+  it('records reconciliation success, failure, and disposed cancellation outcomes', async () => {
+    const successSnapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValueOnce(successSnapshot.promise)
+
+    const success = renderHook(() => useOrderWorkspaceSync())
+    act(() => {
+      subscriptionCallbacks?.onSubscriptionStatus('SUBSCRIBED')
+    })
+    await act(async () => {
+      successSnapshot.resolve([])
+      await flushAsync()
+    })
+    expect(success.result.current.getDiagnostics()?.snapshotReconciliation).toMatchObject({
+      count: 1,
+      failureCount: 0,
+      cancelledCount: 0,
+    })
+    success.unmount()
+
+    const failedSnapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValueOnce(failedSnapshot.promise)
+    const failure = renderHook(() => useOrderWorkspaceSync())
+    act(() => {
+      subscriptionCallbacks?.onSubscriptionStatus('SUBSCRIBED')
+    })
+    await act(async () => {
+      failedSnapshot.reject(new Error('snapshot failed'))
+      await flushAsync()
+    })
+    expect(failure.result.current.getDiagnostics()?.snapshotReconciliation).toMatchObject({
+      count: 0,
+      failureCount: 1,
+      cancelledCount: 0,
+    })
+    failure.unmount()
+
+    const cancelledSnapshot = deferred<OrderRecord[]>()
+    mocks.listOrders.mockReturnValueOnce(cancelledSnapshot.promise)
+    const cancelled = renderHook(() => useOrderWorkspaceSync())
+    act(() => {
+      subscriptionCallbacks?.onSubscriptionStatus('SUBSCRIBED')
+    })
+    cancelled.unmount()
+    await act(async () => {
+      cancelledSnapshot.resolve([])
+      await flushAsync()
+    })
+    expect(cancelled.result.current.getDiagnostics()?.snapshotReconciliation).toMatchObject({
+      count: 0,
+      failureCount: 0,
+      cancelledCount: 1,
+    })
+  })
+
   it('does not clobber realtime updates received while the snapshot is in flight', async () => {
     const snapshot = deferred<OrderRecord[]>()
     mocks.listOrders.mockReturnValue(snapshot.promise)

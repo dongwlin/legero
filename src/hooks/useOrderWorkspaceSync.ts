@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { orderRepository } from '@/services/orderRepository'
 import {
+  createRealtimeDiagnostics,
+  type RealtimeDiagnostics,
+  type RealtimeDiagnosticsSnapshot,
+  type SnapshotReconciliationOutcome,
+} from '@/services/realtimeDiagnostics'
+import {
   orderRealtime,
   type OrderRealtimeSubscription,
 } from '@/services/orderRealtime'
@@ -37,6 +43,7 @@ export const useOrderWorkspaceSync = () => {
   const resetSyncState = useOrderStore((state) => state.resetSyncState)
   const setHydrationState = useOrderStore((state) => state.setHydrationState)
   const [refreshKey, setRefreshKey] = useState(0)
+  const diagnosticsRef = useRef<RealtimeDiagnostics | null>(null)
   // Workspace the last sync session was opened for, so a switch to another
   // workspace is detected and the session-wide registries are reset.
   const lastActiveWorkspaceIdRef = useRef<string | null>(null)
@@ -47,6 +54,7 @@ export const useOrderWorkspaceSync = () => {
 
   useEffect(() => {
     if (authStatus !== 'authenticated' || !activeWorkspaceId) {
+      diagnosticsRef.current = null
       resetSyncState()
       // The sync session is over: drop the session-wide registries so a
       // later session starts clean (ids are never reused, so this only
@@ -68,6 +76,8 @@ export const useOrderWorkspaceSync = () => {
 
     let isDisposed = false
     let subscription: OrderRealtimeSubscription | null = null
+    const diagnostics = createRealtimeDiagnostics()
+    diagnosticsRef.current = diagnostics
 
     const pendingUpserts = new Map<string, OrderRecord>()
     const pendingRemoves = new Set<string>()
@@ -384,6 +394,7 @@ export const useOrderWorkspaceSync = () => {
       }
 
       syncInFlight = true
+      diagnostics.beginSnapshotReconciliation()
 
       if (shouldBlock) {
         setHydrationState({
@@ -413,6 +424,7 @@ export const useOrderWorkspaceSync = () => {
       windowPreClearUpserts.clear()
       windowSawClear = false
       const clearEpochAtStart = orderTombstones.clearEpochValue()
+      let snapshotOutcome: SnapshotReconciliationOutcome = 'cancelled'
 
       try {
         const nextOrders = await orderRepository.list('all')
@@ -509,10 +521,13 @@ export const useOrderWorkspaceSync = () => {
         setOrders(
           protectedOrders.filter((order) => !orderTombstones.rejectsUpsert(order)),
         )
+        snapshotOutcome = 'success'
       } catch (error) {
         if (isDisposed) {
           return
         }
+
+        snapshotOutcome = 'failure'
 
         applyBufferedEvents(eventBuffer.endReconciliation())
 
@@ -536,6 +551,10 @@ export const useOrderWorkspaceSync = () => {
           })
         }
       } finally {
+        if (isDisposed) {
+          snapshotOutcome = 'cancelled'
+        }
+        diagnostics.finishSnapshotReconciliation(snapshotOutcome)
         syncInFlight = false
         // The snapshot settled: effects and protection stamps older than
         // its marker can never overlap a future snapshot (every later
@@ -546,11 +565,14 @@ export const useOrderWorkspaceSync = () => {
         orderOptimistic.prune(snapshotMarker)
       }
 
-      if (pendingReconcile) {
+      if (pendingReconcile && !isDisposed) {
         pendingReconcile = false
         const nextShouldBlock = pendingReconcileShouldBlock
         pendingReconcileShouldBlock = false
         void syncSnapshot(nextShouldBlock)
+      } else if (isDisposed) {
+        pendingReconcile = false
+        pendingReconcileShouldBlock = false
       }
     }
 
@@ -642,6 +664,7 @@ export const useOrderWorkspaceSync = () => {
         }
 
         subscription = orderRealtime.subscribeToWorkspaceOrders({
+          diagnostics,
           onUpsert: (order) => handleUpserts([order]),
           onUpsertMany: handleUpserts,
           onRemove: (id) => {
@@ -796,5 +819,7 @@ export const useOrderWorkspaceSync = () => {
     status,
     errorMessage,
     retrySync,
+    getDiagnostics: (): RealtimeDiagnosticsSnapshot | null =>
+      diagnosticsRef.current?.getSnapshot() ?? null,
   }
 }
