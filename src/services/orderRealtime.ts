@@ -14,6 +14,13 @@ import type {
 import { orderDtoToOrderRecord } from './orderRecordMapper'
 import { startRealtimeRecoverySignals } from './realtimeRecovery'
 import type { RealtimeRecoveryHandlers } from './realtimeRecovery'
+import {
+  createRealtimeDiagnostics,
+  type RealtimeConnectionState,
+  type RealtimeDiagnostics,
+  type RealtimeDiagnosticsSnapshot,
+  type RealtimeFailureStage,
+} from './realtimeDiagnostics'
 import { realtimeSession } from './realtimeSession'
 
 type SubscriptionStatus =
@@ -32,6 +39,7 @@ type RealtimeEnvelope = {
 }
 
 type WorkspaceOrderRealtimeOptions = {
+  diagnostics?: RealtimeDiagnostics
   onClear?: (event: OrdersClearedEvent) => void
   onRemove: (id: string) => void
   onSubscriptionStatus?: (status: SubscriptionStatus) => void
@@ -42,8 +50,26 @@ type WorkspaceOrderRealtimeOptions = {
 // Connection lifecycle. The realtime channel is meant to run for as long as
 // the user is signed in: transient failures (network loss, server restart,
 // weak signal) move the machine back to reconnecting and keep retrying, and
-// only an explicit close() reaches the terminal 'closed' state.
-type RealtimeState = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'closed'
+// explicit close() reaches 'closed', while definitive auth/authorization
+// failures reach the terminal 'failed' state and wait for the caller to close.
+export type RealtimeState = RealtimeConnectionState
+
+type ReconnectReason =
+  | 'initial'
+  | 'timer'
+  | 'close'
+  | 'ws_timeout'
+  | 'ready_timeout'
+  | 'stale'
+  | 'network_recovery'
+  | 'foreground_recovery'
+
+type RealtimeAttemptPhase =
+  | 'auth'
+  | 'session'
+  | 'ws'
+  | 'ready'
+  | 'online'
 
 const normalizeClearMode = (mode: unknown): ClearWorkspaceMode =>
   mode === 'before_today' ? 'before_today' : 'all'
@@ -144,6 +170,7 @@ const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
 
 export type OrderRealtimeSubscription = {
   close: () => void
+  getDiagnostics: () => RealtimeDiagnosticsSnapshot
 }
 
 // The session ticket request and the WS 'ready' handshake must complete
@@ -356,10 +383,16 @@ export const orderRealtime = {
   subscribeToWorkspaceOrders(
     options: WorkspaceOrderRealtimeOptions,
   ): OrderRealtimeSubscription {
+    const diagnostics = options.diagnostics ?? createRealtimeDiagnostics()
     let socket: WebSocket | null = null
     let reconnectTimer: number | null = null
+    let pendingReconnectReason: ReconnectReason | null = null
     let reconnectAttempts = 0
     let generation = 0
+    let activeAttempt: {
+      generation: number
+      phase: RealtimeAttemptPhase
+    } | null = null
     let state: RealtimeState = 'idle'
     let stableConnectionTimer: number | null = null
     let sessionAbortController: AbortController | null = null
@@ -373,7 +406,64 @@ export const orderRealtime = {
     let backgroundedWallClockAt: number | null = null
     let backgroundedMonotonicAt: number | null = null
 
+    // The recovery signal source reports deviations (offline/background) on
+    // startup; seed the diagnostics with the optimistic initial state so a
+    // debug snapshot is never needlessly "unknown" while the source settles.
+    diagnostics.recordNetworkStatus(networkOnline)
+    diagnostics.recordAppState(isBackgrounded)
+
     const isClosed = (): boolean => state === 'closed'
+    const isTerminalState = (): boolean =>
+      state === 'closed' || state === 'failed'
+
+    const transitionState = (nextState: RealtimeState, reason: string) => {
+      if (state === nextState) {
+        return
+      }
+
+      state = nextState
+      diagnostics.transition(nextState, reason)
+    }
+
+    const setActiveAttemptPhase = (
+      attemptGeneration: number,
+      phase: RealtimeAttemptPhase,
+    ) => {
+      if (activeAttempt?.generation === attemptGeneration) {
+        activeAttempt.phase = phase
+      }
+    }
+
+    const clearActiveAttempt = (attemptGeneration?: number) => {
+      if (
+        attemptGeneration === undefined ||
+        activeAttempt?.generation === attemptGeneration
+      ) {
+        activeAttempt = null
+      }
+    }
+
+    const getActiveAttemptFailureStage = (): RealtimeFailureStage | null => {
+      if (
+        activeAttempt === null ||
+        activeAttempt.generation !== generation
+      ) {
+        return null
+      }
+
+      switch (activeAttempt.phase) {
+        case 'auth':
+          return 'auth'
+        case 'session':
+          return 'session'
+        case 'ready':
+          return 'ready'
+        case 'ws':
+        case 'online':
+        default:
+          return 'ws'
+      }
+    }
 
     const clearReconnectTimer = () => {
       if (reconnectTimer !== null) {
@@ -437,7 +527,7 @@ export const orderRealtime = {
         serverActivityTimer = null
 
         if (
-          isClosed() ||
+          isTerminalState() ||
           attemptGeneration !== generation ||
           socket !== attemptSocket ||
           state !== 'online' ||
@@ -459,8 +549,9 @@ export const orderRealtime = {
         // Invalidate before connecting so late onclose/onmessage callbacks
         // from this socket cannot affect the fresh generation. connect() then
         // supplies the existing single-flight state-machine gate.
+        diagnostics.recordFailure('stale')
         invalidateActiveSocket(1000, 'server_activity_timeout')
-        void connect()
+        void connect('stale')
       }, remaining)
     }
 
@@ -495,32 +586,45 @@ export const orderRealtime = {
         readyTimer = null
 
         if (
-          isClosed() ||
+          isTerminalState() ||
           attemptGeneration !== generation ||
           socket !== attemptSocket
         ) {
           return
         }
 
-        // The socket opened but never sent 'ready' within the window.
+        // The socket never opened or opened but never sent 'ready' within the
+        // total handshake window. Derive the diagnostic stage from the
+        // current attempt phase so a CONNECTING socket is reported as a
+        // WebSocket transport failure rather than a ready-handshake failure.
         // Invalidate this attempt first: a late 'ready' or message from the
         // closing socket must not move the state machine (in a real browser
         // close() -> onclose is asynchronous). Then close the socket and
         // fall through to the next reconnect ourselves, since onclose will
         // now be rejected by the generation guard.
+        const failureStage = getActiveAttemptFailureStage()
+        const timeoutReason =
+          failureStage === 'ws' ? 'ws_timeout' : 'ready_timeout'
+        if (failureStage !== null) {
+          diagnostics.recordFailure(failureStage)
+        }
+        diagnostics.finishConnectSession(false)
+        const timedOutGeneration = generation
         generation += 1
-        closeSocket(1000, 'ready_timeout')
-        scheduleReconnect()
+        clearActiveAttempt(timedOutGeneration)
+        closeSocket(1000, timeoutReason)
+        scheduleReconnect(timeoutReason)
       }, READY_TIMEOUT_MS)
     }
 
-    const scheduleReconnect = () => {
-      if (isClosed()) {
+    const scheduleReconnect = (reason: ReconnectReason) => {
+      if (isTerminalState()) {
         return
       }
 
-      state = 'reconnecting'
+      transitionState('reconnecting', 'reconnect_scheduled')
       reconnectAttempts += 1
+      pendingReconnectReason = reason
       clearStableConnectionTimer()
       clearReconnectTimer()
       resetServerActivity()
@@ -534,7 +638,9 @@ export const orderRealtime = {
 
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null
-        void connect()
+        const reconnectReason = pendingReconnectReason ?? 'timer'
+        pendingReconnectReason = null
+        void connect(reconnectReason)
       }, getReconnectDelayMs(reconnectAttempts))
     }
 
@@ -550,6 +656,7 @@ export const orderRealtime = {
         activeSocket.readyState === WebSocket.OPEN ||
         activeSocket.readyState === WebSocket.CONNECTING
       ) {
+        diagnostics.recordClose(code, reason)
         activeSocket.close(code, reason)
       }
     }
@@ -559,9 +666,12 @@ export const orderRealtime = {
     // whatever is live. Used when the environment changes underneath the
     // channel (network drop, network change, stale background socket).
     const invalidateActiveSocket = (code: number, reason: string) => {
+      const invalidatedGeneration = generation
       generation += 1
+      clearActiveAttempt(invalidatedGeneration)
       clearReadyTimer()
       resetServerActivity()
+      diagnostics.finishConnectSession(false)
       closeSocket(code, reason)
       sessionAbortController?.abort()
       sessionAbortController = null
@@ -569,8 +679,9 @@ export const orderRealtime = {
 
     const handleNetworkOffline = () => {
       networkOnline = false
+      diagnostics.recordNetworkStatus(false)
 
-      if (isClosed()) {
+      if (isTerminalState()) {
         return
       }
 
@@ -580,15 +691,22 @@ export const orderRealtime = {
       if (state === 'online' || state === 'connecting') {
         // A possibly half-open socket or an in-flight attempt: tear it down
         // now instead of waiting for the OS to notice the dead interface.
+        const failureStage =
+          state === 'connecting' ? getActiveAttemptFailureStage() : 'ws'
+
+        if (failureStage !== null) {
+          diagnostics.recordFailure(failureStage)
+        }
         invalidateActiveSocket(1000, 'network_offline')
-        state = 'reconnecting'
+        transitionState('reconnecting', 'network_offline')
       }
     }
 
     const handleNetworkOnline = () => {
       networkOnline = true
+      diagnostics.recordNetworkStatus(true)
 
-      if (isClosed() || isBackgrounded) {
+      if (isTerminalState() || isBackgrounded) {
         return
       }
 
@@ -599,7 +717,7 @@ export const orderRealtime = {
         // offline event; the socket may be bound to a dead interface, so
         // rebuild it for a guaranteed-fresh server state.
         invalidateActiveSocket(1000, 'network_recovery')
-        void connect()
+        void connect('network_recovery')
         return
       }
 
@@ -611,15 +729,17 @@ export const orderRealtime = {
       // Break the backoff: a recovered network is a strong signal that the
       // previous failures were environmental, not server-side.
       reconnectAttempts = 0
-      void connect()
+      pendingReconnectReason = null
+      void connect('network_recovery')
     }
 
     const handleAppBackground = () => {
       isBackgrounded = true
+      diagnostics.recordAppState(true)
       backgroundedWallClockAt = Date.now()
       backgroundedMonotonicAt = performance.now()
 
-      if (isClosed()) {
+      if (isTerminalState()) {
         return
       }
 
@@ -633,6 +753,7 @@ export const orderRealtime = {
 
     const handleAppForeground = () => {
       isBackgrounded = false
+      diagnostics.recordAppState(false)
 
       // Consume the background duration immediately: a later duplicate or
       // spurious foreground signal must not re-judge the socket against this
@@ -652,7 +773,7 @@ export const orderRealtime = {
       backgroundedWallClockAt = null
       backgroundedMonotonicAt = null
 
-      if (isClosed() || !networkOnline) {
+      if (isTerminalState() || !networkOnline) {
         return
       }
 
@@ -667,8 +788,9 @@ export const orderRealtime = {
         // foreground recovery reason is more accurate for a long suspension
         // or a wall-clock rollback whose duration cannot be trusted.
         if (staleAfterBackground || invalidBackgroundDuration) {
+          diagnostics.recordFailure('stale')
           invalidateActiveSocket(1000, 'foreground_recovery')
-          void connect()
+          void connect('foreground_recovery')
           return
         }
 
@@ -686,8 +808,9 @@ export const orderRealtime = {
         }
 
         if (isServerActivityStale()) {
+          diagnostics.recordFailure('stale')
           invalidateActiveSocket(1000, 'server_activity_timeout')
-          void connect()
+          void connect('stale')
         } else if (socket) {
           // The watchdog was paused while hidden. Resume it from the adjusted
           // server activity timestamp when the socket is retained.
@@ -702,18 +825,20 @@ export const orderRealtime = {
         // on a frozen network. Abandon it (generation bump + abort) and start
         // a fresh flow instead of trusting it to finish.
         if (staleAfterBackground || invalidBackgroundDuration) {
+          diagnostics.recordFailure('stale')
           invalidateActiveSocket(1000, 'foreground_recovery')
-          void connect()
+          void connect('foreground_recovery')
         }
         return
       }
 
       reconnectAttempts = 0
-      void connect()
+      pendingReconnectReason = null
+      void connect('foreground_recovery')
     }
 
-    const connect = async () => {
-      if (isClosed()) {
+    const connect = async (requestedReason: ReconnectReason) => {
+      if (isTerminalState()) {
         return
       }
 
@@ -721,16 +846,27 @@ export const orderRealtime = {
       // an auth/session request on a dead environment; the recovery signals
       // drive the attempt once it is usable again.
       if (isBackgrounded || !networkOnline) {
-        state = 'reconnecting'
+        transitionState('reconnecting', 'environment_unavailable')
         return
       }
 
-      state = 'connecting'
+      transitionState('connecting', 'connect_started')
       clearReconnectTimer()
       clearReadyTimer()
       resetServerActivity()
 
+      const connectReason = requestedReason
+      diagnostics.recordConnectionAttempt(connectReason)
+
       const currentGeneration = ++generation
+
+      let attemptPhase: RealtimeAttemptPhase = 'auth'
+      activeAttempt = { generation: currentGeneration, phase: attemptPhase }
+
+      const updateAttemptPhase = (phase: RealtimeAttemptPhase) => {
+        attemptPhase = phase
+        setActiveAttemptPhase(currentGeneration, phase)
+      }
 
       try {
         const tokens = await withTimeout(
@@ -741,7 +877,7 @@ export const orderRealtime = {
         // close() can land while the auth refresh is in flight: every await
         // boundary must re-check the generation before starting the next
         // async stage, or a closed subscription would still create a session.
-        if (isClosed() || currentGeneration !== generation) {
+        if (isTerminalState() || currentGeneration !== generation) {
           return
         }
 
@@ -749,6 +885,7 @@ export const orderRealtime = {
           throw new ApiError(401, 'unauthorized', 'Not authenticated.')
         }
 
+        updateAttemptPhase('session')
         const abortController = new AbortController()
         sessionAbortController = abortController
         const sessionTimeout = window.setTimeout(() => {
@@ -758,23 +895,42 @@ export const orderRealtime = {
         let session: RealtimeSessionResponse
 
         try {
+          // The connection duration deliberately starts at the session
+          // request, and ends at the first ready envelope. It excludes auth
+          // refresh time while still covering the session and WS handshake.
+          diagnostics.beginConnectSession()
           session = await realtimeSession.create(abortController.signal)
         } finally {
           window.clearTimeout(sessionTimeout)
           sessionAbortController = null
         }
 
-        if (isClosed() || currentGeneration !== generation) {
+        if (isTerminalState() || currentGeneration !== generation) {
           return
         }
 
+        updateAttemptPhase('ws')
         const nextSocket = new WebSocket(buildWebSocketUrl(session.ticket))
         socket = nextSocket
         resetServerActivity()
         startReadyTimer(nextSocket, currentGeneration)
 
+        nextSocket.onopen = () => {
+          if (
+            !isTerminalState() &&
+            currentGeneration === generation &&
+            socket === nextSocket
+          ) {
+            updateAttemptPhase('ready')
+          }
+        }
+
         nextSocket.onmessage = (event) => {
-          if (isClosed() || currentGeneration !== generation) {
+          if (
+            isTerminalState() ||
+            currentGeneration !== generation ||
+            socket !== nextSocket
+          ) {
             return
           }
 
@@ -786,6 +942,9 @@ export const orderRealtime = {
           // Every valid server envelope is evidence that this socket can
           // still receive server data. This includes ready, heartbeat, known
           // business events, and future event types we do not dispatch yet.
+          diagnostics.recordServerActivity(
+            parsed.eventType === 'heartbeat' ? 'heartbeat' : 'envelope',
+          )
           if (parsed.eventType === 'ready') {
             const heartbeatIntervalMs = parseHeartbeatIntervalMs(parsed.payload)
             serverActivityTimeoutMs =
@@ -797,10 +956,12 @@ export const orderRealtime = {
           recordServerActivity(nextSocket, currentGeneration)
 
           if (parsed.eventType === 'ready') {
+            updateAttemptPhase('online')
+            diagnostics.finishConnectSession(true)
             clearReadyTimer()
 
             if (state !== 'online') {
-              state = 'online'
+              transitionState('online', 'ready_received')
               options.onSubscriptionStatus?.('SUBSCRIBED')
               startStableConnectionTimer()
             }
@@ -816,50 +977,77 @@ export const orderRealtime = {
         }
 
         nextSocket.onerror = () => {
-          // The browser will follow with an onclose event.
+          if (
+            isTerminalState() ||
+            currentGeneration !== generation ||
+            socket !== nextSocket
+          ) {
+            return
+          }
+
+          // The browser normally follows this with an onclose event, but
+          // record the transport stage here as well so a shim or a delayed
+          // close cannot hide the WebSocket failure.
+          diagnostics.recordFailure(
+            attemptPhase === 'ready' ? 'ready' : 'ws',
+          )
         }
 
-        nextSocket.onclose = () => {
+        nextSocket.onclose = (event) => {
           // Only the active socket may clear the ready timer: a stale onclose
           // from a previous attempt (close() -> onclose is asynchronous in a
           // real browser) must not cancel the new attempt's timer, or a
           // failing handshake would stall forever.
-          if (socket === nextSocket) {
-            socket = null
-            clearReadyTimer()
-            resetServerActivity()
-          }
-
-          if (isClosed() || currentGeneration !== generation) {
+          if (
+            isTerminalState() ||
+            currentGeneration !== generation ||
+            socket !== nextSocket
+          ) {
             return
           }
 
-          scheduleReconnect()
+          diagnostics.recordClose(event.code, event.reason)
+          socket = null
+          clearReadyTimer()
+          resetServerActivity()
+          diagnostics.finishConnectSession(false)
+          clearActiveAttempt(currentGeneration)
+          diagnostics.recordFailure(
+            attemptPhase === 'ready' ? 'ready' : 'ws',
+          )
+          scheduleReconnect('close')
         }
       } catch (error) {
-        if (isClosed() || currentGeneration !== generation) {
+        if (isTerminalState() || currentGeneration !== generation) {
           return
         }
 
+        diagnostics.finishConnectSession(false)
+        diagnostics.recordFailure(attemptPhase)
+        clearActiveAttempt(currentGeneration)
+
         if (error instanceof ApiError && error.status === 401) {
+          transitionState('failed', 'auth_failed')
           options.onSubscriptionStatus?.('TIMED_OUT')
           return
         }
 
         if (error instanceof ApiError && error.status < 500) {
+          transitionState('failed', 'channel_error')
           options.onSubscriptionStatus?.('CHANNEL_ERROR')
           return
         }
 
         // Network errors, aborts (session timeout), and 5xx are transient:
         // back off and retry instead of giving up.
-        scheduleReconnect()
+        scheduleReconnect('timer')
       }
     }
 
     const recoveryHandlers: RealtimeRecoveryHandlers = {
       onNetworkOffline: handleNetworkOffline,
       onNetworkOnline: handleNetworkOnline,
+      onNetworkType: diagnostics.recordNetworkType,
       onAppBackground: handleAppBackground,
       onAppForeground: handleAppForeground,
     }
@@ -872,7 +1060,7 @@ export const orderRealtime = {
     // created while offline or backgrounded would still burn an auth/session
     // request before the gate is known. On web the snapshot is synchronous
     // and the ready promise is already resolved.
-    void recovery.ready.then(() => void connect())
+    void recovery.ready.then(() => void connect('initial'))
 
     return {
       close: () => {
@@ -880,12 +1068,16 @@ export const orderRealtime = {
           return
         }
 
-        state = 'closed'
+        transitionState('closed', 'client_closed')
+        const closedGeneration = generation
         generation += 1
+        clearActiveAttempt(closedGeneration)
         clearReconnectTimer()
+        pendingReconnectReason = null
         clearStableConnectionTimer()
         clearReadyTimer()
         resetServerActivity()
+        diagnostics.finishConnectSession(false)
         sessionAbortController?.abort()
         sessionAbortController = null
         closeSocket(1000, 'client_closed')
@@ -893,6 +1085,7 @@ export const orderRealtime = {
         stopRecoverySignals = null
         options.onSubscriptionStatus?.('CLOSED')
       },
+      getDiagnostics: () => diagnostics.getSnapshot(),
     }
   },
 

@@ -1,6 +1,10 @@
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { Network } from '@capacitor/network'
+import {
+  normalizeRealtimeNetworkType,
+  type RealtimeNetworkType,
+} from './realtimeDiagnostics'
 
 // Recovery signals for the realtime channel. On native platforms (Capacitor)
 // the OS-level Network plugin and App lifecycle events are the source of
@@ -10,6 +14,8 @@ import { Network } from '@capacitor/network'
 export type RealtimeRecoveryHandlers = {
   onNetworkOffline: () => void
   onNetworkOnline: () => void
+  /** Optional low-cardinality native connection type; never drives recovery. */
+  onNetworkType?: (networkType: RealtimeNetworkType) => void
   onAppBackground: () => void
   onAppForeground: () => void
 }
@@ -94,6 +100,14 @@ const startNativeRecoverySignals = (
       const networkListener = await Network.addListener(
         'networkStatusChange',
         (status) => {
+          if (!isActive) {
+            return
+          }
+
+          handlers.onNetworkType?.(
+            normalizeRealtimeNetworkType(status.connectionType),
+          )
+
           if (status.connected) {
             handlers.onNetworkOnline()
           } else {
@@ -112,6 +126,10 @@ const startNativeRecoverySignals = (
       const appListener = await CapacitorApp.addListener(
         'appStateChange',
         ({ isActive: appIsActive }) => {
+          if (!isActive) {
+            return
+          }
+
           if (appIsActive) {
             handlers.onAppForeground()
           } else {
@@ -135,6 +153,12 @@ const startNativeRecoverySignals = (
       const appSnapshot = CapacitorApp.getState()
 
       const applyNetworkSnapshot = networkSnapshot.then((status) => {
+        if (isActive) {
+          handlers.onNetworkType?.(
+            normalizeRealtimeNetworkType(status.connectionType),
+          )
+        }
+
         if (isActive && !status.connected) {
           handlers.onNetworkOffline()
         }

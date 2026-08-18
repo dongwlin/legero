@@ -4,6 +4,7 @@ import Home from '@/views/Home'
 import NotFound from '@/views/NotFound'
 import Order from '@/views/Order'
 import Settings from '@/views/Settings'
+import RealtimeDiagnostics from '@/views/Settings/Diagnostics'
 import Statistic from '@/views/Statistics'
 import { createBrowserRouter } from 'react-router'
 
@@ -30,6 +31,10 @@ const router = createBrowserRouter([
       {
         path: '/settings',
         element: <Settings />,
+      },
+      {
+        path: '/settings/diagnostics',
+        element: <RealtimeDiagnostics />,
       },
     ],
   },

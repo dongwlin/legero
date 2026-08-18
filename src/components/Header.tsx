@@ -4,14 +4,20 @@ import React from 'react'
 import { useNavigate } from 'react-router'
 
 interface HeaderProps {
+  backLabel?: string
+  backPath?: string
   title?: string
 }
 
-const Header: React.FC<HeaderProps> = ({ title = '' }) => {
+const Header: React.FC<HeaderProps> = ({
+  backLabel = '返回首页',
+  backPath = '/',
+  title = '',
+}) => {
   const navigate = useNavigate()
 
-  const navigateToHomeView = () => {
-    navigate('/', {
+  const navigateBack = () => {
+    navigate(backPath, {
       replace: true,
     })
   }
@@ -29,8 +35,8 @@ const Header: React.FC<HeaderProps> = ({ title = '' }) => {
           isIconOnly
           variant='ghost'
           className='absolute left-0 top-1/2 shrink-0 -translate-y-1/2'
-          onPress={navigateToHomeView}
-          aria-label='返回首页'
+          onPress={navigateBack}
+          aria-label={backLabel}
         >
           <CarbonArrowLeft className='size-5 md:size-6' />
         </Button.Root>

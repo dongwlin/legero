@@ -22,6 +22,10 @@ import {
   getReconnectDelayMs,
   orderRealtime,
 } from './orderRealtime'
+import {
+  createRealtimeDiagnostics,
+  type RealtimeDiagnostics,
+} from './realtimeDiagnostics'
 
 const mocks = vi.hoisted(() => ({
   realtimeSessionCreate: vi.fn(),
@@ -139,9 +143,14 @@ class FakeWebSocket {
     )
   }
 
-  serverClose() {
+  serverClose(code = 1006, reason = '') {
     this.readyState = FakeWebSocket.CLOSED
-    this.onclose?.(new Event('close'))
+    const event = new Event('close') as CloseEvent
+    Object.defineProperties(event, {
+      code: { value: code },
+      reason: { value: reason },
+    })
+    this.onclose?.(event)
   }
 }
 
@@ -162,6 +171,7 @@ const latestSocket = () =>
   FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
 
 const subscribe = (extra: {
+  diagnostics?: RealtimeDiagnostics
   onSubscriptionStatus?: (status: string) => void
   onUpsert?: () => void
   onUpsertMany?: (orders: OrderRecord[]) => void
@@ -169,6 +179,7 @@ const subscribe = (extra: {
   onClear?: () => void
 } = {}) =>
   orderRealtime.subscribeToWorkspaceOrders({
+    diagnostics: extra.diagnostics,
     onSubscriptionStatus: extra.onSubscriptionStatus ?? vi.fn(),
     onUpsert: extra.onUpsert ?? vi.fn(),
     onUpsertMany: extra.onUpsertMany ?? vi.fn(),
@@ -265,6 +276,56 @@ describe('orderRealtime connection lifecycle', () => {
     expect(onClear).toHaveBeenCalledWith({ clearedCount: 3, mode: 'all' })
 
     subscription.close()
+  })
+
+  it('exposes failure stage, reconnect, close, activity, and recovery diagnostics', async () => {
+    mocks.realtimeSessionCreate
+      .mockRejectedValueOnce(networkError())
+      .mockResolvedValue(SESSION)
+
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
+
+    await flushAsync()
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'reconnecting',
+      failureStage: 'session',
+      connectionAttemptCount: 1,
+      reconnectCount: 0,
+    })
+
+    await vi.advanceTimersByTimeAsync(500)
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.emit('ready')
+    socket.emit('heartbeat')
+
+    const snapshot = subscription.getDiagnostics()
+    expect(snapshot.state).toBe('online')
+    expect(snapshot.connectionAttemptCount).toBe(2)
+    expect(snapshot.reconnectCount).toBe(1)
+    expect(snapshot.lastReconnectReason).toBe('timer')
+    expect(snapshot.lastConnectDurationMs).not.toBeNull()
+    expect(snapshot.lastRecoveryDurationMs).not.toBeNull()
+    expect(snapshot.recoveryCount).toBe(1)
+    expect(snapshot.heartbeatCount).toBe(1)
+    expect(snapshot.serverActivityCount).toBe(2)
+    expect(snapshot.networkOnline).toBe(true)
+    expect(snapshot.appBackgrounded).toBe(false)
+    expect(snapshot.stateChanges.map((change) => change.state)).toEqual([
+      'connecting',
+      'reconnecting',
+      'connecting',
+      'online',
+    ])
+
+    subscription.close()
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'closed',
+      lastCloseCode: 1000,
+      lastCloseReason: 'client_closed',
+    })
   })
 
   it('dispatches a legacy order.upsert on an active socket', async () => {
@@ -404,7 +465,8 @@ describe('orderRealtime connection lifecycle', () => {
   })
 
   it('enables the 45s watchdog from the current backend ready contract', async () => {
-    const subscription = subscribe()
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
 
     await flushAsync()
     const socket = latestSocket()
@@ -417,6 +479,7 @@ describe('orderRealtime connection lifecycle', () => {
     expect(socket.closeCalls).toEqual([
       { code: 1000, reason: 'server_activity_timeout' },
     ])
+    expect(subscription.getDiagnostics().failureStage).toBe('stale')
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
 
     // The stale callback invalidates its generation before connecting, so it
@@ -879,7 +942,12 @@ describe('orderRealtime connection lifecycle', () => {
   it('closes the socket and retries when the ready handshake never arrives', async () => {
     const onSubscriptionStatus = vi.fn()
     const onRemove = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus, onRemove })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({
+      onSubscriptionStatus,
+      onRemove,
+      diagnostics,
+    })
 
     await flushAsync()
     const socket = latestSocket()
@@ -893,6 +961,10 @@ describe('orderRealtime connection lifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'ready_timeout' }])
+    expect(subscription.getDiagnostics()).toMatchObject({
+      failureStage: 'ready',
+      lastCloseReason: 'ready_timeout',
+    })
 
     // A late 'ready' or message from the timed-out socket must not move the
     // state machine (in a real browser close() -> onclose is asynchronous,
@@ -906,6 +978,57 @@ describe('orderRealtime connection lifecycle', () => {
     await vi.advanceTimersByTimeAsync(500)
     await flushAsync()
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+    expect(subscription.getDiagnostics().lastReconnectReason).toBe(
+      'ready_timeout',
+    )
+
+    subscription.close()
+  })
+
+  it('classifies a socket that never opens as a ws-stage failure and retries', async () => {
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
+
+    await flushAsync()
+    const socket = latestSocket()
+    expect(socket.readyState).toBe(FakeWebSocket.CONNECTING)
+
+    await vi.advanceTimersByTimeAsync(READY_TIMEOUT_MS - 1)
+    expect(socket.closeCalls).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flushAsync()
+
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'ws_timeout' }])
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'reconnecting',
+      failureStage: 'ws',
+      lastCloseReason: 'ws_timeout',
+    })
+
+    await vi.advanceTimersByTimeAsync(500)
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+    expect(subscription.getDiagnostics().lastReconnectReason).toBe('ws_timeout')
+
+    subscription.close()
+  })
+
+  it('classifies a server close before ready as a ready-stage failure', async () => {
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    socket.serverClose(1001, 'server_shutdown')
+
+    expect(subscription.getDiagnostics()).toMatchObject({
+      failureStage: 'ready',
+      lastCloseCode: 1001,
+      lastCloseReason: 'server_shutdown',
+      reconnectCount: 0,
+    })
 
     subscription.close()
   })
@@ -931,9 +1054,12 @@ describe('orderRealtime connection lifecycle', () => {
     expect(socket2).not.toBe(socket1)
     socket2.open()
 
+    expect(subscription.getDiagnostics().lastCloseReason).toBe('ready_timeout')
+
     // The browser delivers socket1's onclose only now (close() -> onclose is
     // asynchronous). It must not cancel socket2's ready timer.
     socket1.onclose?.(new Event('close'))
+    expect(subscription.getDiagnostics().lastCloseReason).toBe('ready_timeout')
 
     const attemptsAfterStaleClose = mocks.realtimeSessionCreate.mock.calls.length
 
@@ -959,18 +1085,33 @@ describe('orderRealtime connection lifecycle', () => {
     )
 
     const onSubscriptionStatus = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
 
     await flushAsync()
 
     expect(onSubscriptionStatus).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).toHaveBeenCalledWith('TIMED_OUT')
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'failed',
+      failureStage: 'session',
+    })
+    expect(subscription.getDiagnostics().stateChanges.at(-1)).toMatchObject({
+      state: 'failed',
+      reason: 'auth_failed',
+    })
 
+    recoveryHandlers().onNetworkOffline()
+    recoveryHandlers().onNetworkOnline()
+    recoveryHandlers().onAppBackground()
+    recoveryHandlers().onAppForeground()
     await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 5)
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).not.toHaveBeenCalledWith('SUBSCRIBED')
 
     subscription.close()
+    expect(subscription.getDiagnostics().state).toBe('closed')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('CLOSED')
   })
 
   it('reports CHANNEL_ERROR on an explicit business error and never retries', async () => {
@@ -979,31 +1120,93 @@ describe('orderRealtime connection lifecycle', () => {
     )
 
     const onSubscriptionStatus = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
 
     await flushAsync()
 
     expect(onSubscriptionStatus).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).toHaveBeenCalledWith('CHANNEL_ERROR')
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'failed',
+      failureStage: 'session',
+    })
+    expect(subscription.getDiagnostics().stateChanges.at(-1)).toMatchObject({
+      state: 'failed',
+      reason: 'channel_error',
+    })
 
+    recoveryHandlers().onNetworkOffline()
+    recoveryHandlers().onNetworkOnline()
+    recoveryHandlers().onAppBackground()
+    recoveryHandlers().onAppForeground()
     await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 5)
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).not.toHaveBeenCalledWith('SUBSCRIBED')
 
     subscription.close()
+    expect(subscription.getDiagnostics().state).toBe('closed')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('CLOSED')
+  })
+
+  it('fails terminally when auth refresh returns 401', async () => {
+    persistAuthTokens(EXPIRED_TOKENS)
+    mockFetch.mockResolvedValue(
+      jsonResponse(401, {
+        error: { code: 'unauthorized', message: 'refresh rejected' },
+      }),
+    )
+
+    const onSubscriptionStatus = vi.fn()
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
+
+    await flushAsync()
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+    expect(onSubscriptionStatus).toHaveBeenCalledWith('TIMED_OUT')
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'failed',
+      failureStage: 'auth',
+    })
+    expect(subscription.getDiagnostics().stateChanges.at(-1)).toMatchObject({
+      state: 'failed',
+      reason: 'auth_failed',
+    })
+
+    recoveryHandlers().onNetworkOffline()
+    recoveryHandlers().onNetworkOnline()
+    recoveryHandlers().onAppBackground()
+    recoveryHandlers().onAppForeground()
+    await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 2)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    subscription.close()
+    expect(subscription.getDiagnostics().state).toBe('closed')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('CLOSED')
   })
 
   it('reports TIMED_OUT when no auth tokens are available and never retries', async () => {
     clearStoredAuthTokens()
 
     const onSubscriptionStatus = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
 
     await flushAsync()
 
     expect(onSubscriptionStatus).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).toHaveBeenCalledWith('TIMED_OUT')
     expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+    expect(subscription.getDiagnostics().failureStage).toBe('auth')
+
+    // The terminal attempt has already settled. A later environment signal
+    // must not overwrite the accurately captured auth stage with a synthetic
+    // transport failure.
+    recoveryHandlers().onNetworkOffline()
+    expect(subscription.getDiagnostics().failureStage).toBe('auth')
 
     await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 5)
     expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
@@ -1063,6 +1266,33 @@ describe('orderRealtime connection lifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 10)
     expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+  })
+
+  it('records auth when the network drops during auth refresh', async () => {
+    persistAuthTokens(EXPIRED_TOKENS)
+
+    const refreshState: {
+      resolve: ((response: Response) => void) | null
+    } = { resolve: null }
+    mockFetch.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          refreshState.resolve = resolve
+        }),
+    )
+
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
+
+    await flushAsync()
+    expect(refreshState.resolve).not.toBeNull()
+
+    recoveryHandlers().onNetworkOffline()
+    expect(subscription.getDiagnostics().failureStage).toBe('auth')
+
+    refreshState.resolve?.(jsonResponse(200, { ...TOKENS, accessToken: 'access-2' }))
+    await flushAsync()
+    subscription.close()
   })
 
   it('aborts an in-flight session request on close and stays closed', async () => {
@@ -1188,7 +1418,8 @@ describe('orderRealtime connection lifecycle', () => {
       })
     })
 
-    const subscription = subscribe()
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
     await flushAsync()
 
     const signal = mocks.realtimeSessionCreate.mock.calls[0]?.[0] as
@@ -1199,6 +1430,7 @@ describe('orderRealtime connection lifecycle', () => {
 
     recoveryHandlers().onNetworkOffline()
     expect(signal?.aborted).toBe(true)
+    expect(subscription.getDiagnostics().failureStage).toBe('session')
 
     // Offline: no timer retries. Network recovery reconnects immediately.
     await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 10)
@@ -1212,9 +1444,39 @@ describe('orderRealtime connection lifecycle', () => {
     subscription.close()
   })
 
+  it('records ws when the network drops before the socket opens', async () => {
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
+
+    await flushAsync()
+    const socket = latestSocket()
+    recoveryHandlers().onNetworkOffline()
+
+    expect(subscription.getDiagnostics().failureStage).toBe('ws')
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'network_offline' }])
+
+    subscription.close()
+  })
+
+  it('records ready when the network drops after the socket opens', async () => {
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
+
+    await flushAsync()
+    const socket = latestSocket()
+    socket.open()
+    recoveryHandlers().onNetworkOffline()
+
+    expect(subscription.getDiagnostics().failureStage).toBe('ready')
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'network_offline' }])
+
+    subscription.close()
+  })
+
   it('rebuilds an online socket after a network identity change', async () => {
     const onSubscriptionStatus = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
 
     await flushAsync()
     const socket = latestSocket()
@@ -1234,6 +1496,13 @@ describe('orderRealtime connection lifecycle', () => {
     nextSocket.open()
     nextSocket.emit('ready')
     expect(onSubscriptionStatus).toHaveBeenCalledTimes(2)
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'online',
+      reconnectCount: 1,
+      lastReconnectReason: 'network_recovery',
+      recoveryCount: 0,
+      failureStage: null,
+    })
 
     subscription.close()
   })
