@@ -191,6 +191,8 @@ describe('ProtectedRoute realtime diagnostics access', () => {
     renderProtectedRoute('/order', <output>business route</output>)
 
     expect(screen.getByText('正在同步订单')).not.toBeNull()
+    const diagnosticsLink = screen.getByRole('link', { name: '查看连接诊断' })
+    expect(diagnosticsLink.getAttribute('href')).toBe('/settings/diagnostics')
     expect(screen.queryByText('business route')).toBeNull()
   })
 
@@ -206,6 +208,14 @@ describe('ProtectedRoute realtime diagnostics access', () => {
 
     expect(screen.getByText('订单同步失败')).not.toBeNull()
     expect(screen.getByText('Realtime subscription failed.')).not.toBeNull()
+    const diagnosticsLink = screen.getByRole('link', { name: '查看连接诊断' })
+    expect(diagnosticsLink.getAttribute('href')).toBe('/settings/diagnostics')
+    const retryButton = screen.getByRole('button', { name: '重试' })
+    expect(retryButton).not.toBeNull()
+    expect(retryButton.parentElement?.firstElementChild).toBe(retryButton)
+    expect(retryButton.parentElement?.lastElementChild).toBe(diagnosticsLink)
+    expect(retryButton.className).toContain('w-full')
+    expect(diagnosticsLink.className).toContain('w-full')
     expect(screen.queryByText('business route')).toBeNull()
   })
 })
