@@ -263,6 +263,34 @@ describe('realtimeRecovery (native)', () => {
     expect(removeApp).toHaveBeenCalledTimes(1)
   })
 
+  it('ignores captured native callbacks after stop', async () => {
+    const handlers = makeHandlers()
+    const controller = startRealtimeRecoverySignals(handlers)
+
+    await flushAsync()
+
+    const networkCallback = mocks.networkAddListener.mock.calls[0]?.[1] as (
+      status: { connected: boolean; connectionType?: string }
+    ) => void
+    const appCallback = mocks.appAddListener.mock.calls[0]?.[1] as (
+      state: { isActive: boolean }
+    ) => void
+
+    expect(handlers.onNetworkType).toHaveBeenCalledTimes(1)
+    controller.stop()
+
+    networkCallback({ connected: false, connectionType: 'none' })
+    networkCallback({ connected: true, connectionType: 'cellular' })
+    appCallback({ isActive: false })
+    appCallback({ isActive: true })
+
+    expect(handlers.onNetworkOffline).not.toHaveBeenCalled()
+    expect(handlers.onNetworkOnline).not.toHaveBeenCalled()
+    expect(handlers.onAppBackground).not.toHaveBeenCalled()
+    expect(handlers.onAppForeground).not.toHaveBeenCalled()
+    expect(handlers.onNetworkType).toHaveBeenCalledTimes(1)
+  })
+
   it('reports background when the app starts backgrounded', async () => {
     mocks.appGetState.mockResolvedValue({ isActive: false })
 

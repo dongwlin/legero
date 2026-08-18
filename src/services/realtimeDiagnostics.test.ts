@@ -3,9 +3,13 @@ import { createRealtimeDiagnostics } from './realtimeDiagnostics'
 
 describe('realtime diagnostics', () => {
   it('keeps lifecycle facts, close data, and recovery duration without payloads', () => {
-    let now = 100
+    let monotonicNow = 100
+    let wallClockNow = 1000
     const diagnostics = createRealtimeDiagnostics({
-      clock: { now: () => now },
+      clock: {
+        monotonicNow: () => monotonicNow,
+        wallClockNow: () => wallClockNow,
+      },
       debug: true,
       maxStateChanges: 4,
     })
@@ -13,14 +17,17 @@ describe('realtime diagnostics', () => {
     diagnostics.transition('connecting', 'connect_started')
     diagnostics.recordConnectionAttempt('initial')
     diagnostics.recordFailure('session')
-    now = 250
+    monotonicNow = 250
+    wallClockNow = 1250
     diagnostics.transition('reconnecting', 'reconnect_scheduled')
     diagnostics.recordClose(1006, 'server_restart')
-    now = 450
+    monotonicNow = 450
+    wallClockNow = 1450
     diagnostics.transition('connecting', 'connect_started')
     diagnostics.recordConnectionAttempt('timer')
     diagnostics.beginConnectSession()
-    now = 700
+    monotonicNow = 700
+    wallClockNow = 1700
     diagnostics.finishConnectSession(true)
     diagnostics.transition('online', 'ready_received')
 
@@ -33,13 +40,16 @@ describe('realtime diagnostics', () => {
     expect(snapshot.lastConnectDurationMs).toBe(250)
     expect(snapshot.lastCloseCode).toBe(1006)
     expect(snapshot.lastCloseReason).toBe('server_restart')
+    expect(snapshot.lastClose?.at).toBe(1250)
     expect(snapshot.lastRecoveryDurationMs).toBe(600)
     expect(snapshot.recoveryCount).toBe(1)
     expect(snapshot.stateChanges).toHaveLength(4)
-    expect(snapshot.stateChanges.at(-1)).toMatchObject({
-      state: 'online',
-      reason: 'ready_received',
-    })
+    expect(snapshot.stateChanges).toEqual([
+      { at: 1000, state: 'connecting', reason: 'connect_started' },
+      { at: 1250, state: 'reconnecting', reason: 'reconnect_scheduled' },
+      { at: 1450, state: 'connecting', reason: 'connect_started' },
+      { at: 1700, state: 'online', reason: 'ready_received' },
+    ])
 
     diagnostics.recordClose(1000, 'ticket=secret-order-123')
     const safe = diagnostics.getSnapshot()
@@ -48,13 +58,21 @@ describe('realtime diagnostics', () => {
   })
 
   it('aggregates heartbeat/server activity and tracks environment state', () => {
-    let now = 1
-    const diagnostics = createRealtimeDiagnostics({ clock: { now: () => now } })
+    let monotonicNow = 1
+    let wallClockNow = 1000
+    const diagnostics = createRealtimeDiagnostics({
+      clock: {
+        monotonicNow: () => monotonicNow,
+        wallClockNow: () => wallClockNow,
+      },
+    })
 
     diagnostics.recordServerActivity('heartbeat')
-    now = 20
+    monotonicNow = 20
+    wallClockNow = 2000
     diagnostics.recordServerActivity('envelope')
-    now = 30
+    monotonicNow = 30
+    wallClockNow = 3000
     diagnostics.recordServerActivity('heartbeat')
     diagnostics.recordNetworkStatus(false)
     diagnostics.recordAppState(true)
@@ -62,7 +80,7 @@ describe('realtime diagnostics', () => {
     expect(diagnostics.getSnapshot()).toMatchObject({
       heartbeatCount: 2,
       serverActivityCount: 3,
-      lastServerActivityAt: 30,
+      lastServerActivityAt: 3000,
       currentServerActivityGapMs: 0,
       lastServerActivityGapMs: 10,
       serverActivityGapMs: 0,
@@ -72,19 +90,30 @@ describe('realtime diagnostics', () => {
   })
 
   it('records reconciliation duration and failures', () => {
-    let now = 1000
-    const diagnostics = createRealtimeDiagnostics({ clock: { now: () => now } })
+    let monotonicNow = 1000
+    let wallClockNow = 10_000
+    const diagnostics = createRealtimeDiagnostics({
+      clock: {
+        monotonicNow: () => monotonicNow,
+        wallClockNow: () => wallClockNow,
+      },
+    })
 
     diagnostics.beginSnapshotReconciliation()
-    now = 1050
+    monotonicNow = 1050
+    wallClockNow = 10_050
     diagnostics.finishSnapshotReconciliation('success')
-    now = 1100
+    monotonicNow = 1100
+    wallClockNow = 10_100
     diagnostics.beginSnapshotReconciliation()
-    now = 1175
+    monotonicNow = 1175
+    wallClockNow = 10_175
     diagnostics.finishSnapshotReconciliation('failure')
-    now = 1200
+    monotonicNow = 1200
+    wallClockNow = 10_200
     diagnostics.beginSnapshotReconciliation()
-    now = 1220
+    monotonicNow = 1220
+    wallClockNow = 10_220
     diagnostics.finishSnapshotReconciliation('cancelled')
 
     expect(diagnostics.getSnapshot().snapshotReconciliation).toEqual({
@@ -92,7 +121,7 @@ describe('realtime diagnostics', () => {
       failureCount: 1,
       cancelledCount: 1,
       lastDurationMs: 20,
-      lastFailureAt: 1175,
+      lastFailureAt: 10_175,
     })
   })
 
@@ -112,6 +141,21 @@ describe('realtime diagnostics', () => {
 
     diagnostics.recordNetworkType('private-network' as never)
     expect(diagnostics.getSnapshot().networkType).toBe('unknown')
+  })
+
+  it('keeps a bounded default ring and redacts arbitrary short reasons', () => {
+    const diagnostics = createRealtimeDiagnostics()
+    const states = ['connecting', 'online'] as const
+
+    for (let index = 0; index < 40; index += 1) {
+      diagnostics.transition(states[index % states.length], `x${index}`)
+    }
+
+    const stateChanges = diagnostics.getSnapshot().stateChanges
+    expect(stateChanges).toHaveLength(32)
+    expect(stateChanges.every((change) => change.reason === 'redacted')).toBe(
+      true,
+    )
   })
 
   it('does not retain a state ring in production mode', () => {

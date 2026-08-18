@@ -50,7 +50,8 @@ type WorkspaceOrderRealtimeOptions = {
 // Connection lifecycle. The realtime channel is meant to run for as long as
 // the user is signed in: transient failures (network loss, server restart,
 // weak signal) move the machine back to reconnecting and keep retrying, and
-// only an explicit close() reaches the terminal 'closed' state.
+// explicit close() reaches 'closed', while definitive auth/authorization
+// failures reach the terminal 'failed' state and wait for the caller to close.
 export type RealtimeState = RealtimeConnectionState
 
 type ReconnectReason =
@@ -411,6 +412,8 @@ export const orderRealtime = {
     diagnostics.recordAppState(isBackgrounded)
 
     const isClosed = (): boolean => state === 'closed'
+    const isTerminalState = (): boolean =>
+      state === 'closed' || state === 'failed'
 
     const transitionState = (nextState: RealtimeState, reason: string) => {
       if (state === nextState) {
@@ -523,7 +526,7 @@ export const orderRealtime = {
         serverActivityTimer = null
 
         if (
-          isClosed() ||
+          isTerminalState() ||
           attemptGeneration !== generation ||
           socket !== attemptSocket ||
           state !== 'online' ||
@@ -582,7 +585,7 @@ export const orderRealtime = {
         readyTimer = null
 
         if (
-          isClosed() ||
+          isTerminalState() ||
           attemptGeneration !== generation ||
           socket !== attemptSocket
         ) {
@@ -606,7 +609,7 @@ export const orderRealtime = {
     }
 
     const scheduleReconnect = (reason: ReconnectReason) => {
-      if (isClosed()) {
+      if (isTerminalState()) {
         return
       }
 
@@ -669,7 +672,7 @@ export const orderRealtime = {
       networkOnline = false
       diagnostics.recordNetworkStatus(false)
 
-      if (isClosed()) {
+      if (isTerminalState()) {
         return
       }
 
@@ -694,7 +697,7 @@ export const orderRealtime = {
       networkOnline = true
       diagnostics.recordNetworkStatus(true)
 
-      if (isClosed() || isBackgrounded) {
+      if (isTerminalState() || isBackgrounded) {
         return
       }
 
@@ -704,7 +707,6 @@ export const orderRealtime = {
         // The network identity changed (e.g. Wi-Fi -> cellular) without an
         // offline event; the socket may be bound to a dead interface, so
         // rebuild it for a guaranteed-fresh server state.
-        diagnostics.recordFailure('ws')
         invalidateActiveSocket(1000, 'network_recovery')
         void connect('network_recovery')
         return
@@ -728,7 +730,7 @@ export const orderRealtime = {
       backgroundedWallClockAt = Date.now()
       backgroundedMonotonicAt = performance.now()
 
-      if (isClosed()) {
+      if (isTerminalState()) {
         return
       }
 
@@ -762,7 +764,7 @@ export const orderRealtime = {
       backgroundedWallClockAt = null
       backgroundedMonotonicAt = null
 
-      if (isClosed() || !networkOnline) {
+      if (isTerminalState() || !networkOnline) {
         return
       }
 
@@ -827,7 +829,7 @@ export const orderRealtime = {
     }
 
     const connect = async (requestedReason: ReconnectReason) => {
-      if (isClosed()) {
+      if (isTerminalState()) {
         return
       }
 
@@ -866,7 +868,7 @@ export const orderRealtime = {
         // close() can land while the auth refresh is in flight: every await
         // boundary must re-check the generation before starting the next
         // async stage, or a closed subscription would still create a session.
-        if (isClosed() || currentGeneration !== generation) {
+        if (isTerminalState() || currentGeneration !== generation) {
           return
         }
 
@@ -894,7 +896,7 @@ export const orderRealtime = {
           sessionAbortController = null
         }
 
-        if (isClosed() || currentGeneration !== generation) {
+        if (isTerminalState() || currentGeneration !== generation) {
           return
         }
 
@@ -906,7 +908,7 @@ export const orderRealtime = {
 
         nextSocket.onopen = () => {
           if (
-            !isClosed() &&
+            !isTerminalState() &&
             currentGeneration === generation &&
             socket === nextSocket
           ) {
@@ -916,7 +918,7 @@ export const orderRealtime = {
 
         nextSocket.onmessage = (event) => {
           if (
-            isClosed() ||
+            isTerminalState() ||
             currentGeneration !== generation ||
             socket !== nextSocket
           ) {
@@ -967,7 +969,7 @@ export const orderRealtime = {
 
         nextSocket.onerror = () => {
           if (
-            isClosed() ||
+            isTerminalState() ||
             currentGeneration !== generation ||
             socket !== nextSocket
           ) {
@@ -988,7 +990,7 @@ export const orderRealtime = {
           // real browser) must not cancel the new attempt's timer, or a
           // failing handshake would stall forever.
           if (
-            isClosed() ||
+            isTerminalState() ||
             currentGeneration !== generation ||
             socket !== nextSocket
           ) {
@@ -1007,7 +1009,7 @@ export const orderRealtime = {
           scheduleReconnect('close')
         }
       } catch (error) {
-        if (isClosed() || currentGeneration !== generation) {
+        if (isTerminalState() || currentGeneration !== generation) {
           return
         }
 
@@ -1016,11 +1018,13 @@ export const orderRealtime = {
         clearActiveAttempt(currentGeneration)
 
         if (error instanceof ApiError && error.status === 401) {
+          transitionState('failed', 'auth_failed')
           options.onSubscriptionStatus?.('TIMED_OUT')
           return
         }
 
         if (error instanceof ApiError && error.status < 500) {
+          transitionState('failed', 'channel_error')
           options.onSubscriptionStatus?.('CHANNEL_ERROR')
           return
         }

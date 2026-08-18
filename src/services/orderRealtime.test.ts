@@ -1044,18 +1044,33 @@ describe('orderRealtime connection lifecycle', () => {
     )
 
     const onSubscriptionStatus = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
 
     await flushAsync()
 
     expect(onSubscriptionStatus).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).toHaveBeenCalledWith('TIMED_OUT')
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'failed',
+      failureStage: 'session',
+    })
+    expect(subscription.getDiagnostics().stateChanges.at(-1)).toMatchObject({
+      state: 'failed',
+      reason: 'auth_failed',
+    })
 
+    recoveryHandlers().onNetworkOffline()
+    recoveryHandlers().onNetworkOnline()
+    recoveryHandlers().onAppBackground()
+    recoveryHandlers().onAppForeground()
     await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 5)
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).not.toHaveBeenCalledWith('SUBSCRIBED')
 
     subscription.close()
+    expect(subscription.getDiagnostics().state).toBe('closed')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('CLOSED')
   })
 
   it('reports CHANNEL_ERROR on an explicit business error and never retries', async () => {
@@ -1064,18 +1079,72 @@ describe('orderRealtime connection lifecycle', () => {
     )
 
     const onSubscriptionStatus = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
 
     await flushAsync()
 
     expect(onSubscriptionStatus).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).toHaveBeenCalledWith('CHANNEL_ERROR')
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'failed',
+      failureStage: 'session',
+    })
+    expect(subscription.getDiagnostics().stateChanges.at(-1)).toMatchObject({
+      state: 'failed',
+      reason: 'channel_error',
+    })
 
+    recoveryHandlers().onNetworkOffline()
+    recoveryHandlers().onNetworkOnline()
+    recoveryHandlers().onAppBackground()
+    recoveryHandlers().onAppForeground()
     await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 5)
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(1)
     expect(onSubscriptionStatus).not.toHaveBeenCalledWith('SUBSCRIBED')
 
     subscription.close()
+    expect(subscription.getDiagnostics().state).toBe('closed')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('CLOSED')
+  })
+
+  it('fails terminally when auth refresh returns 401', async () => {
+    persistAuthTokens(EXPIRED_TOKENS)
+    mockFetch.mockResolvedValue(
+      jsonResponse(401, {
+        error: { code: 'unauthorized', message: 'refresh rejected' },
+      }),
+    )
+
+    const onSubscriptionStatus = vi.fn()
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
+
+    await flushAsync()
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+    expect(onSubscriptionStatus).toHaveBeenCalledWith('TIMED_OUT')
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'failed',
+      failureStage: 'auth',
+    })
+    expect(subscription.getDiagnostics().stateChanges.at(-1)).toMatchObject({
+      state: 'failed',
+      reason: 'auth_failed',
+    })
+
+    recoveryHandlers().onNetworkOffline()
+    recoveryHandlers().onNetworkOnline()
+    recoveryHandlers().onAppBackground()
+    recoveryHandlers().onAppForeground()
+    await vi.advanceTimersByTimeAsync(MAX_RECONNECT_DELAY_MS * 2)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mocks.realtimeSessionCreate).not.toHaveBeenCalled()
+
+    subscription.close()
+    expect(subscription.getDiagnostics().state).toBe('closed')
+    expect(onSubscriptionStatus).toHaveBeenLastCalledWith('CLOSED')
   })
 
   it('reports TIMED_OUT when no auth tokens are available and never retries', async () => {
@@ -1365,7 +1434,8 @@ describe('orderRealtime connection lifecycle', () => {
 
   it('rebuilds an online socket after a network identity change', async () => {
     const onSubscriptionStatus = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ onSubscriptionStatus, diagnostics })
 
     await flushAsync()
     const socket = latestSocket()
@@ -1385,6 +1455,13 @@ describe('orderRealtime connection lifecycle', () => {
     nextSocket.open()
     nextSocket.emit('ready')
     expect(onSubscriptionStatus).toHaveBeenCalledTimes(2)
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'online',
+      reconnectCount: 1,
+      lastReconnectReason: 'network_recovery',
+      recoveryCount: 0,
+      failureStage: null,
+    })
 
     subscription.close()
   })

@@ -12,6 +12,7 @@ export type RealtimeConnectionState =
   | 'connecting'
   | 'online'
   | 'reconnecting'
+  | 'failed'
   | 'closed'
 
 export type RealtimeFailureStage =
@@ -29,7 +30,8 @@ export type SnapshotReconciliationOutcome =
   | 'cancelled'
 
 export type RealtimeDiagnosticsClock = {
-  now: () => number
+  monotonicNow: () => number
+  wallClockNow: () => number
 }
 
 export type RealtimeDiagnosticsOptions = {
@@ -86,7 +88,7 @@ export type RealtimeDiagnosticsSnapshot = {
   networkType: RealtimeNetworkType | null
   appBackgrounded: boolean | null
   snapshotReconciliation: RealtimeSnapshotReconciliationSnapshot
-  /** Empty in a production build; bounded to the configured N in debug. */
+  /** Empty only when debug:false; otherwise bounded to the configured N. */
   stateChanges: ReadonlyArray<RealtimeStateChange>
 }
 
@@ -122,7 +124,7 @@ const SAFE_RECONNECT_REASONS = new Set([
   'initial',
 ])
 
-const monotonicNow = (): number => {
+const defaultMonotonicNow = (): number => {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
     return performance.now()
   }
@@ -130,11 +132,10 @@ const monotonicNow = (): number => {
   return Date.now()
 }
 
-const defaultDebug = (): boolean =>
-  typeof import.meta !== 'undefined' && import.meta.env?.DEV === true
+const defaultWallClockNow = (): number => Date.now()
 
-const asNonNegativeFinite = (value: number): number =>
-  Number.isFinite(value) && value >= 0 ? value : 0
+const asFinite = (value: number): number =>
+  Number.isFinite(value) ? value : 0
 
 // Reasons are intentionally normalized to a small, non-sensitive shape. The
 // realtime layer supplies fixed reason labels; this guard is defense-in-depth
@@ -162,6 +163,26 @@ const normalizeReason = (reason: string | undefined): string => {
   }
 
   return normalized
+}
+
+// State-change reasons are intentionally stricter than the generic reason
+// normalizer. The ring is bounded but enabled by default, so even a short,
+// otherwise harmless-looking arbitrary string must never be retained.
+const SAFE_STATE_CHANGE_REASONS = new Set([
+  'unknown',
+  'connect_started',
+  'reconnect_scheduled',
+  'network_offline',
+  'environment_unavailable',
+  'ready_received',
+  'client_closed',
+  'auth_failed',
+  'channel_error',
+])
+
+const normalizeStateChangeReason = (reason: string | undefined): string => {
+  const normalized = normalizeReason(reason)
+  return SAFE_STATE_CHANGE_REASONS.has(normalized) ? normalized : 'redacted'
 }
 
 export const normalizeRealtimeNetworkType = (
@@ -214,8 +235,11 @@ const cloneSnapshot = (
 export const createRealtimeDiagnostics = (
   options: RealtimeDiagnosticsOptions = {},
 ): RealtimeDiagnostics => {
-  const clock = options.clock ?? { now: monotonicNow }
-  const debug = options.debug ?? defaultDebug()
+  const clock = options.clock ?? {
+    monotonicNow: defaultMonotonicNow,
+    wallClockNow: defaultWallClockNow,
+  }
+  const debug = options.debug ?? true
   const requestedMaxStateChanges = options.maxStateChanges
   const maxStateChanges =
     typeof requestedMaxStateChanges === 'number' &&
@@ -236,6 +260,7 @@ export const createRealtimeDiagnostics = (
   let heartbeatCount = 0
   let serverActivityCount = 0
   let lastServerActivityAt: number | null = null
+  let lastServerActivityMonotonicAt: number | null = null
   let lastServerActivityGapMs: number | null = null
   let staleCount = 0
   let networkOnline: boolean | null = null
@@ -252,7 +277,8 @@ export const createRealtimeDiagnostics = (
   }
   let stateChanges: RealtimeStateChange[] = []
 
-  const now = (): number => asNonNegativeFinite(clock.now())
+  const monotonicNow = (): number => asFinite(clock.monotonicNow())
+  const wallClockNow = (): number => asFinite(clock.wallClockNow())
 
   const transition = (
     nextState: RealtimeConnectionState,
@@ -266,9 +292,9 @@ export const createRealtimeDiagnostics = (
 
     if (debug) {
       stateChanges.push({
-        at: now(),
+        at: wallClockNow(),
         state: nextState,
-        reason: normalizeReason(reason),
+        reason: normalizeStateChangeReason(reason),
       })
 
       if (stateChanges.length > maxStateChanges) {
@@ -277,7 +303,7 @@ export const createRealtimeDiagnostics = (
     }
 
     if (nextState === 'online' && anomalyStartedAt !== null) {
-      lastRecoveryDurationMs = Math.max(0, now() - anomalyStartedAt)
+      lastRecoveryDurationMs = Math.max(0, monotonicNow() - anomalyStartedAt)
       recoveryCount += 1
       anomalyStartedAt = null
     }
@@ -290,7 +316,7 @@ export const createRealtimeDiagnostics = (
     }
 
     if (anomalyStartedAt === null) {
-      anomalyStartedAt = now()
+      anomalyStartedAt = monotonicNow()
     }
   }
 
@@ -307,7 +333,7 @@ export const createRealtimeDiagnostics = (
   }
 
   const beginConnectSession = (): void => {
-    connectStartedAt = now()
+    connectStartedAt = monotonicNow()
   }
 
   const finishConnectSession = (success: boolean): void => {
@@ -318,7 +344,7 @@ export const createRealtimeDiagnostics = (
       return
     }
 
-    lastConnectDurationMs = Math.max(0, now() - startedAt)
+    lastConnectDurationMs = Math.max(0, monotonicNow() - startedAt)
   }
 
   const recordClose = (
@@ -333,21 +359,26 @@ export const createRealtimeDiagnostics = (
     }
 
     lastClose = {
-      at: now(),
+      at: wallClockNow(),
       code: normalizeCloseCode(code),
       reason: normalizeCloseReason(reason),
     }
   }
 
   const recordServerActivity = (kind: 'heartbeat' | 'envelope'): void => {
-    const activityAt = now()
+    const activityAt = wallClockNow()
+    const activityMonotonicAt = monotonicNow()
 
-    if (lastServerActivityAt !== null) {
-      lastServerActivityGapMs = Math.max(0, activityAt - lastServerActivityAt)
+    if (lastServerActivityMonotonicAt !== null) {
+      lastServerActivityGapMs = Math.max(
+        0,
+        activityMonotonicAt - lastServerActivityMonotonicAt,
+      )
     }
 
     serverActivityCount += 1
     lastServerActivityAt = activityAt
+    lastServerActivityMonotonicAt = activityMonotonicAt
 
     if (kind === 'heartbeat') {
       heartbeatCount += 1
@@ -367,7 +398,7 @@ export const createRealtimeDiagnostics = (
   }
 
   const beginSnapshotReconciliation = (): void => {
-    snapshotReconciliationStartedAt = now()
+    snapshotReconciliationStartedAt = monotonicNow()
   }
 
   const finishSnapshotReconciliation = (
@@ -380,8 +411,8 @@ export const createRealtimeDiagnostics = (
       return
     }
 
-    const finishedAt = now()
-    const durationMs = Math.max(0, finishedAt - startedAt)
+    const finishedMonotonicAt = monotonicNow()
+    const durationMs = Math.max(0, finishedMonotonicAt - startedAt)
 
     snapshotReconciliation = {
       count:
@@ -394,7 +425,7 @@ export const createRealtimeDiagnostics = (
       lastDurationMs: durationMs,
       lastFailureAt:
         outcome === 'failure'
-          ? finishedAt
+          ? wallClockNow()
           : snapshotReconciliation.lastFailureAt,
     }
   }
@@ -404,7 +435,9 @@ export const createRealtimeDiagnostics = (
     const currentServerActivityGapMs =
       lastServerActivityAt === null
         ? null
-        : Math.max(0, now() - lastServerActivityAt)
+        : lastServerActivityMonotonicAt === null
+          ? null
+          : Math.max(0, monotonicNow() - lastServerActivityMonotonicAt)
 
     return cloneSnapshot({
       state,
@@ -447,6 +480,7 @@ export const createRealtimeDiagnostics = (
     heartbeatCount = 0
     serverActivityCount = 0
     lastServerActivityAt = null
+    lastServerActivityMonotonicAt = null
     lastServerActivityGapMs = null
     staleCount = 0
     networkOnline = null

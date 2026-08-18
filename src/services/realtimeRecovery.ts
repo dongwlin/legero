@@ -100,6 +100,10 @@ const startNativeRecoverySignals = (
       const networkListener = await Network.addListener(
         'networkStatusChange',
         (status) => {
+          if (!isActive) {
+            return
+          }
+
           handlers.onNetworkType?.(
             normalizeRealtimeNetworkType(status.connectionType),
           )
@@ -122,6 +126,10 @@ const startNativeRecoverySignals = (
       const appListener = await CapacitorApp.addListener(
         'appStateChange',
         ({ isActive: appIsActive }) => {
+          if (!isActive) {
+            return
+          }
+
           if (appIsActive) {
             handlers.onAppForeground()
           } else {
