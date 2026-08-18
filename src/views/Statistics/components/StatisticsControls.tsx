@@ -1,5 +1,6 @@
 import { Button, Card } from '@heroui/react'
 import React from 'react'
+import { MAX_STATISTICS_DAYS } from '../dateRange'
 
 const inputClassName =
   'w-full rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors duration-200 focus:border-accent/50'
@@ -29,7 +30,8 @@ const StatisticsControls: React.FC<StatisticsControlsProps> = ({
       <Card.Header className='gap-1 px-6 pt-6'>
         <Card.Title className='text-lg md:text-xl'>统计操作</Card.Title>
         <Card.Description className='leading-6'>
-          选择统计区间后，请求后端生成每日订单汇总数据。
+          选择统计区间后，请求后端生成每日订单汇总数据。单次最多查询{' '}
+          {MAX_STATISTICS_DAYS} 天。
         </Card.Description>
       </Card.Header>
       <Card.Content className='px-6 pb-6 pt-4'>
