@@ -942,7 +942,12 @@ describe('orderRealtime connection lifecycle', () => {
   it('closes the socket and retries when the ready handshake never arrives', async () => {
     const onSubscriptionStatus = vi.fn()
     const onRemove = vi.fn()
-    const subscription = subscribe({ onSubscriptionStatus, onRemove })
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({
+      onSubscriptionStatus,
+      onRemove,
+      diagnostics,
+    })
 
     await flushAsync()
     const socket = latestSocket()
@@ -956,6 +961,7 @@ describe('orderRealtime connection lifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'ready_timeout' }])
+    expect(subscription.getDiagnostics().failureStage).toBe('ready')
 
     // A late 'ready' or message from the timed-out socket must not move the
     // state machine (in a real browser close() -> onclose is asynchronous,
@@ -966,6 +972,33 @@ describe('orderRealtime connection lifecycle', () => {
     expect(onRemove).not.toHaveBeenCalled()
 
     await flushAsync()
+    await vi.advanceTimersByTimeAsync(500)
+    await flushAsync()
+    expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)
+
+    subscription.close()
+  })
+
+  it('classifies a socket that never opens as a ws-stage failure and retries', async () => {
+    const diagnostics = createRealtimeDiagnostics({ debug: true })
+    const subscription = subscribe({ diagnostics })
+
+    await flushAsync()
+    const socket = latestSocket()
+    expect(socket.readyState).toBe(FakeWebSocket.CONNECTING)
+
+    await vi.advanceTimersByTimeAsync(READY_TIMEOUT_MS - 1)
+    expect(socket.closeCalls).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flushAsync()
+
+    expect(socket.closeCalls).toEqual([{ code: 1000, reason: 'ready_timeout' }])
+    expect(subscription.getDiagnostics()).toMatchObject({
+      state: 'reconnecting',
+      failureStage: 'ws',
+    })
+
     await vi.advanceTimersByTimeAsync(500)
     await flushAsync()
     expect(mocks.realtimeSessionCreate).toHaveBeenCalledTimes(2)

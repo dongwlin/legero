@@ -592,13 +592,19 @@ export const orderRealtime = {
           return
         }
 
-        // The socket opened but never sent 'ready' within the window.
+        // The socket never opened or opened but never sent 'ready' within the
+        // total handshake window. Derive the diagnostic stage from the
+        // current attempt phase so a CONNECTING socket is reported as a
+        // WebSocket transport failure rather than a ready-handshake failure.
         // Invalidate this attempt first: a late 'ready' or message from the
         // closing socket must not move the state machine (in a real browser
         // close() -> onclose is asynchronous). Then close the socket and
         // fall through to the next reconnect ourselves, since onclose will
         // now be rejected by the generation guard.
-        diagnostics.recordFailure('ready')
+        const failureStage = getActiveAttemptFailureStage()
+        if (failureStage !== null) {
+          diagnostics.recordFailure(failureStage)
+        }
         diagnostics.finishConnectSession(false)
         const timedOutGeneration = generation
         generation += 1
