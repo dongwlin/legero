@@ -28,7 +28,7 @@ interface StatisticsViewProps {
   toDate: string
 }
 
-const StatisticsView: React.FC<StatisticsViewProps> = ({
+export const StatisticsView: React.FC<StatisticsViewProps> = ({
   errorMessage,
   fromDate,
   isLoading,
@@ -44,6 +44,24 @@ const StatisticsView: React.FC<StatisticsViewProps> = ({
   stats,
   toDate,
 }) => {
+  const reportDetailsRef = useRef<HTMLElement>(null)
+  const handleDateSelect = useCallback(
+    (date: string) => {
+      onDateSelect(date)
+
+      const reportDetails = reportDetailsRef.current
+      if (!reportDetails) {
+        return
+      }
+
+      reportDetails.focus({ preventScroll: true })
+      if (typeof reportDetails.scrollIntoView === 'function') {
+        reportDetails.scrollIntoView({ block: 'start' })
+      }
+    },
+    [onDateSelect],
+  )
+
   return (
     <div className='min-h-dvh bg-background pb-20 text-foreground'>
       <Header title='统计' />
@@ -63,17 +81,24 @@ const StatisticsView: React.FC<StatisticsViewProps> = ({
           ) : null}
           <DailyStatsCard
             isReportLoading={isReportLoading}
-            onDateSelect={onDateSelect}
+            onDateSelect={handleDateSelect}
             selectedDate={selectedDate}
             stats={stats}
           />
-          <ReportDetailsCard
-            errorMessage={reportErrorMessage}
-            isLoading={isReportLoading}
-            onRefresh={onReportRefresh}
-            report={report}
-            selectedDate={selectedDate}
-          />
+          <section
+            ref={reportDetailsRef}
+            aria-label='日报详情'
+            tabIndex={-1}
+            className='scroll-mt-[calc(5.25rem+env(safe-area-inset-top))] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+          >
+            <ReportDetailsCard
+              errorMessage={reportErrorMessage}
+              isLoading={isReportLoading}
+              onRefresh={onReportRefresh}
+              report={report}
+              selectedDate={selectedDate}
+            />
+          </section>
         </div>
       </main>
     </div>

@@ -68,7 +68,10 @@ describe('DailyStatsCard', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '2026-08-18' }))
+    expect(screen.getAllByText('查看日报')).toHaveLength(2)
+    fireEvent.click(
+      screen.getByRole('button', { name: '查看日报 2026-08-18' }),
+    )
     expect(onDateSelect).toHaveBeenCalledWith('2026-08-18')
     expect(screen.getByText('2026-08-17')).not.toBeNull()
   })

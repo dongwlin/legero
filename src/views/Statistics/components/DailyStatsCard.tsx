@@ -30,7 +30,7 @@ const DailyStatsCard: React.FC<DailyStatsCardProps> = ({
         <Card.Title className='text-lg md:text-xl'>每日统计详情</Card.Title>
         <Card.Description className='leading-6'>
           {rows.length > 0
-            ? `已生成 ${rows.length} 天的订单汇总数据。`
+            ? `已生成 ${rows.length} 天的订单汇总数据，点击“查看日报”按需加载完整指标。`
             : '点击上方按钮后，这里会展示每日订单汇总结果。'}
         </Card.Description>
       </Card.Header>
@@ -67,19 +67,25 @@ const DailyStatsCard: React.FC<DailyStatsCardProps> = ({
                       }
                     >
                       <Table.Cell className='text-sm font-medium md:text-base'>
-                        <Button.Root
-                          className='h-auto min-h-10 max-w-full justify-start px-2 py-2 text-left font-medium whitespace-normal'
-                          variant='ghost'
-                          aria-pressed={row.date === selectedDate}
-                          onPress={() => onDateSelect(row.date)}
-                        >
+                        <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
                           <span>{row.date}</span>
-                          {row.date === selectedDate && isReportLoading ? (
-                            <span className='text-xs font-normal text-foreground-secondary'>
-                              加载中...
-                            </span>
-                          ) : null}
-                        </Button.Root>
+                          <Button.Root
+                            className='min-h-10 whitespace-nowrap px-2'
+                            variant={
+                              row.date === selectedDate ? 'primary' : 'ghost'
+                            }
+                            aria-label={`查看日报 ${row.date}`}
+                            aria-pressed={row.date === selectedDate}
+                            onPress={() => onDateSelect(row.date)}
+                          >
+                            查看日报
+                          </Button.Root>
+                        </div>
+                        {row.date === selectedDate && isReportLoading ? (
+                          <span className='ml-2 text-xs font-normal text-foreground-secondary'>
+                            加载中...
+                          </span>
+                        ) : null}
                       </Table.Cell>
                       <Table.Cell className='text-right font-mono tabular-nums md:text-base'>
                         {formatPriceCents(row.totalPriceCents, {
