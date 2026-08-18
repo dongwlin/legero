@@ -1,21 +1,14 @@
 import { DailyStats } from '@/services/statistics'
 import { formatPriceCents } from '@/services/orderPricing'
-import { Button, Card, EmptyState, Table } from '@heroui/react'
+import { Card, EmptyState, Table } from '@heroui/react'
 import React from 'react'
+import { Link } from 'react-router'
 
 interface DailyStatsCardProps {
   stats: Map<string, DailyStats>
-  isReportLoading: boolean
-  onDateSelect: (date: string) => void
-  selectedDate: string | null
 }
 
-const DailyStatsCard: React.FC<DailyStatsCardProps> = ({
-  isReportLoading,
-  onDateSelect,
-  selectedDate,
-  stats,
-}) => {
+const DailyStatsCard: React.FC<DailyStatsCardProps> = ({ stats }) => {
   const rows = Array.from(stats.entries()).map(([date, summary]) => ({
     date,
     ...summary,
@@ -60,32 +53,18 @@ const DailyStatsCard: React.FC<DailyStatsCardProps> = ({
                     <Table.Row
                       key={row.date}
                       id={row.date}
-                      className={
-                        row.date === selectedDate
-                          ? 'bg-accent/10'
-                          : undefined
-                      }
                     >
                       <Table.Cell className='text-sm font-medium md:text-base'>
                         <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
                           <span>{row.date}</span>
-                          <Button.Root
-                            className='min-h-10 whitespace-nowrap px-2'
-                            variant={
-                              row.date === selectedDate ? 'primary' : 'ghost'
-                            }
+                          <Link
+                            className='inline-flex min-h-10 items-center justify-center rounded-lg px-2 text-sm font-medium text-accent transition-colors hover:bg-accent/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+                            to={`/statistics/report/${encodeURIComponent(row.date)}`}
                             aria-label={`查看日报 ${row.date}`}
-                            aria-pressed={row.date === selectedDate}
-                            onPress={() => onDateSelect(row.date)}
                           >
                             查看日报
-                          </Button.Root>
+                          </Link>
                         </div>
-                        {row.date === selectedDate && isReportLoading ? (
-                          <span className='ml-2 text-xs font-normal text-foreground-secondary'>
-                            加载中...
-                          </span>
-                        ) : null}
                       </Table.Cell>
                       <Table.Cell className='text-right font-mono tabular-nums md:text-base'>
                         {formatPriceCents(row.totalPriceCents, {

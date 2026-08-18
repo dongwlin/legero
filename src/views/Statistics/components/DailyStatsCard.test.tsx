@@ -1,8 +1,20 @@
 /* @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import DailyStatsCard from './DailyStatsCard'
+
+vi.mock('react-router', () => ({
+  Link: ({
+    children,
+    to,
+    ...props
+  }: Record<string, unknown>) => (
+    <a href={String(to)} {...props}>
+      {children as React.ReactNode}
+    </a>
+  ),
+}))
 
 vi.mock('@heroui/react', () => {
   const passthrough = ({ children, ...props }: Record<string, unknown>) => (
@@ -51,14 +63,9 @@ describe('DailyStatsCard', () => {
     cleanup()
   })
 
-  it('keeps zero-order range rows selectable without preloading reports', () => {
-    const onDateSelect = vi.fn()
-
+  it('keeps zero-order range rows linked without preloading reports', () => {
     render(
       <DailyStatsCard
-        isReportLoading={false}
-        onDateSelect={onDateSelect}
-        selectedDate={null}
         stats={
           new Map([
             ['2026-08-18', { orderCount: 0, totalPriceCents: 0 }],
@@ -68,11 +75,17 @@ describe('DailyStatsCard', () => {
       />,
     )
 
-    expect(screen.getAllByText('查看日报')).toHaveLength(2)
-    fireEvent.click(
-      screen.getByRole('button', { name: '查看日报 2026-08-18' }),
+    const zeroOrderLink = screen.getByRole('link', {
+      name: '查看日报 2026-08-18',
+    })
+    expect(zeroOrderLink.getAttribute('href')).toBe(
+      '/statistics/report/2026-08-18',
     )
-    expect(onDateSelect).toHaveBeenCalledWith('2026-08-18')
+    expect(
+      screen.getByRole('link', { name: '查看日报 2026-08-17' }).getAttribute(
+        'href',
+      ),
+    ).toBe('/statistics/report/2026-08-17')
     expect(screen.getByText('2026-08-17')).not.toBeNull()
   })
 })

@@ -6,6 +6,7 @@ import Order from '@/views/Order'
 import Settings from '@/views/Settings'
 import RealtimeDiagnostics from '@/views/Settings/Diagnostics'
 import Statistic from '@/views/Statistics'
+import DailyReport from '@/views/Statistics/Report'
 import { createBrowserRouter } from 'react-router'
 
 const router = createBrowserRouter([
@@ -27,6 +28,10 @@ const router = createBrowserRouter([
       {
         path: '/statistics',
         element: <Statistic />,
+      },
+      {
+        path: '/statistics/report/:date',
+        element: <DailyReport />,
       },
       {
         path: '/settings',
