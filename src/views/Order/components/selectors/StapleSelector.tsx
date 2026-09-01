@@ -33,9 +33,11 @@ export const StapleSelector: React.FC<StapleSelectorProps> = ({
           isSelected={includeStaple}
           onChange={onStapleEnabledChange}
         >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
+          <Switch.Content className='shrink-0'>
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch.Content>
         </Switch.Root>
       </div>
       <div className='flex flex-1 items-center'>

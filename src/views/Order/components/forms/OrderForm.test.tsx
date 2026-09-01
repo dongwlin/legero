@@ -8,7 +8,7 @@ import {
   screen,
   type RenderResult,
 } from '@testing-library/react'
-import { cloneElement, isValidElement } from 'react'
+import { Children, cloneElement, isValidElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/services/apiClient'
 import { orderTombstones } from '@/services/orderTombstones'
@@ -52,6 +52,27 @@ vi.mock('@heroui/react', () => {
 
     return children as React.ReactNode
   }
+
+  const SwitchContent = ({
+    children,
+    isSelected,
+    onToggle,
+    ...props
+  }: Record<string, unknown>) => (
+    <button
+      type='button'
+      role='switch'
+      aria-checked={Boolean(isSelected)}
+      onClick={() => {
+        if (typeof onToggle === 'function') {
+          onToggle()
+        }
+      }}
+      {...props}
+    >
+      {children as React.ReactNode}
+    </button>
+  )
 
   return {
     Button: {
@@ -145,20 +166,23 @@ vi.mock('@heroui/react', () => {
     },
     Switch: {
       Root: ({ isSelected, onChange, children, ...props }: Record<string, unknown>) => (
-        <button
-          type='button'
-          role='switch'
-          aria-checked={Boolean(isSelected)}
-          onClick={() => {
-            if (typeof onChange === 'function') {
-              onChange(!isSelected)
-            }
-          }}
-          {...props}
-        >
-          {children as React.ReactNode}
-        </button>
+        <div {...props} data-slot='switch'>
+          {Children.map(children as React.ReactNode, (child) =>
+            isValidElement(child) && child.type === SwitchContent
+              ? cloneElement(child, {
+                  isSelected,
+                  onToggle: () => {
+                    if (typeof onChange === 'function') {
+                      onChange(!isSelected)
+                    }
+                  },
+                  'aria-label': props['aria-label'],
+                } as Record<string, unknown>)
+              : child,
+          )}
+        </div>
       ),
+      Content: SwitchContent,
       Control: passthrough,
       Thumb: passthrough,
     },
@@ -296,6 +320,56 @@ describe('OrderForm edit-session optimistic concurrency', () => {
 
   afterEach(() => {
     cleanup()
+  })
+
+  it('toggles the staple switch in the create modal', () => {
+    openCreateForm()
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: '创建订单' }))
+    })
+
+    const stapleSwitch = screen.getByRole('switch', { name: '是否带主食' })
+    const stapleOption = screen.getByRole('button', { name: '河粉' }) as HTMLButtonElement
+
+    expect(stapleSwitch.getAttribute('aria-checked')).toBe('true')
+    expect(stapleOption.disabled).toBe(false)
+
+    act(() => {
+      fireEvent.click(stapleSwitch)
+    })
+
+    expect(stapleSwitch.getAttribute('aria-checked')).toBe('false')
+    expect(stapleOption.disabled).toBe(true)
+
+    act(() => {
+      fireEvent.click(stapleSwitch)
+    })
+
+    expect(stapleSwitch.getAttribute('aria-checked')).toBe('true')
+    expect(stapleOption.disabled).toBe(false)
+  })
+
+  it('toggles the staple switch in the edit modal', () => {
+    useOrderStore.getState().upsertOrder(
+      makeOrder('a', { stapleTypeCode: null }),
+    )
+    useOrderStore.getState().setUpdateTargetID('a')
+
+    openEditForm()
+
+    const stapleSwitch = screen.getByRole('switch', { name: '是否带主食' })
+    const stapleOption = screen.getByRole('button', { name: '河粉' }) as HTMLButtonElement
+
+    expect(stapleSwitch.getAttribute('aria-checked')).toBe('false')
+    expect(stapleOption.disabled).toBe(true)
+
+    act(() => {
+      fireEvent.click(stapleSwitch)
+    })
+
+    expect(stapleSwitch.getAttribute('aria-checked')).toBe('true')
+    expect(stapleOption.disabled).toBe(false)
   })
 
   it('pins expectedVersion to the version observed at session open when realtime advances the store', async () => {
