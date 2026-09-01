@@ -49,22 +49,24 @@ const ThemeSettings: React.FC = () => {
             value={value}
             className='rounded-2xl border border-border/60 bg-background-secondary/60 p-4 transition-colors duration-200 hover:bg-background-secondary data-[selected=true]:border-accent/50 data-[selected=true]:bg-accent-soft/50'
           >
-            <Radio.Control className='mt-1'>
-              <Radio.Indicator />
-            </Radio.Control>
-            <Radio.Content>
-              <div
-                data-slot='label'
-                className='text-base font-medium text-foreground'
-              >
-                {label}
+            <Radio.Content className='items-start'>
+              <Radio.Control className='mt-1'>
+                <Radio.Indicator />
+              </Radio.Control>
+              <div className='min-w-0'>
+                <div
+                  data-slot='label'
+                  className='text-base font-medium text-foreground'
+                >
+                  {label}
+                </div>
+                <p
+                  data-slot='description'
+                  className='mt-1 text-sm leading-6 text-muted'
+                >
+                  {description}
+                </p>
               </div>
-              <p
-                data-slot='description'
-                className='mt-1 text-sm leading-6 text-muted'
-              >
-                {description}
-              </p>
             </Radio.Content>
           </Radio.Root>
         ))}

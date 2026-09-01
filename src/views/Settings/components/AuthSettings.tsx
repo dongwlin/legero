@@ -94,17 +94,19 @@ const AuthSettings: React.FC = () => {
             isSelected={passwordProtectionEnabled}
             onChange={handleToggle}
           >
-            <Switch.Content className='order-1 flex-1'>
-              <div className='text-base font-medium text-foreground'>
-                统计页面密码保护
+            <Switch.Content className='flex w-full flex-1 items-start justify-between gap-4'>
+              <div className='min-w-0 flex-1'>
+                <div className='text-base font-medium text-foreground'>
+                  统计页面密码保护
+                </div>
+                <p className='mt-1 text-sm leading-6 text-muted'>
+                  开启后访问统计页面需要输入 6 位本地密码。
+                </p>
               </div>
-              <p className='mt-1 text-sm leading-6 text-muted'>
-                开启后访问统计页面需要输入 6 位本地密码。
-              </p>
+              <Switch.Control className='mt-0.5 shrink-0'>
+                <Switch.Thumb />
+              </Switch.Control>
             </Switch.Content>
-            <Switch.Control className='order-2 mt-0.5 shrink-0'>
-              <Switch.Thumb />
-            </Switch.Control>
           </Switch.Root>
 
           {signOutError ? (
