@@ -1,6 +1,15 @@
 @import 'tailwindcss';
 @import '@heroui/styles';
 
+@layer components {
+    /* Keep white button labels readable in both resting and hovered states. */
+    .button--primary {
+        --button-bg: color-mix(in oklab, var(--accent) 80%, var(--eclipse) 20%);
+        --button-bg-hover: color-mix(in oklab, var(--accent) 70%, var(--eclipse) 30%);
+        --button-bg-pressed: var(--button-bg-hover);
+    }
+}
+
 @theme {
     --breakpoint-xs: 30rem; /* 480px */
 }
