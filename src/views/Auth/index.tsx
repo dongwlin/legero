@@ -228,7 +228,9 @@ const Auth: React.FC = () => {
   }
 
   if (
-    (authStatus === 'loading' && workspaceStatus !== 'error') ||
+    (authStatus === 'loading' &&
+      workspaceStatus !== 'error' &&
+      workspaceStatus !== 'no_access') ||
     (authStatus === 'authenticated' &&
       (workspaceStatus === 'loading' || workspaceStatus === 'idle'))
   ) {
@@ -252,7 +254,7 @@ const Auth: React.FC = () => {
     )
   }
 
-  if (authStatus === 'authenticated' && workspaceStatus === 'no_access') {
+  if (workspaceStatus === 'no_access') {
     return (
       <AuthSurface>
         <StatusPanel

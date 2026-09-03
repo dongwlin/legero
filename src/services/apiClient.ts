@@ -386,13 +386,21 @@ export const apiRequest = async <T>(
     ) {
       const nextTokens = await refreshAuthTokens()
 
-      return executeRequest<T>(
-        {
-          ...requestOptions,
-          retry: false,
-        },
-        nextTokens.accessToken,
-      )
+      try {
+        return await executeRequest<T>(
+          {
+            ...requestOptions,
+            retry: false,
+          },
+          nextTokens.accessToken,
+        )
+      } catch (retryError) {
+        if (isInvalidSessionError(retryError)) {
+          clearStoredAuthTokens()
+        }
+
+        throw retryError
+      }
     }
 
     if (requestOptions.auth && isInvalidSessionError(error)) {
