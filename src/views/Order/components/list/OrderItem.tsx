@@ -247,6 +247,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
                 data-quick-calc-ignore='true'
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${stapleStepButton.className}`}
                 variant={stapleStepButton.variant}
+                aria-pressed={record.stapleStepStatusCode === STEP_STATUS.completed}
                 onPress={handleToggleStapleStep}
               >
                 主食
@@ -257,6 +258,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
                 data-quick-calc-ignore='true'
                 className={`h-14 min-w-24 rounded-2xl px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${meatStepButton.className}`}
                 variant={meatStepButton.variant}
+                aria-pressed={record.meatStepStatusCode === STEP_STATUS.completed}
                 onPress={handleToggleMeatStep}
               >
                 肉
@@ -267,6 +269,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
               className={`h-14 min-w-24 px-6 text-lg shadow-sm touch-manipulation md:h-16 md:min-w-28 xs:text-xl ${serveMealButton.className}`}
               isDisabled={isServeMealDisabled}
               variant={serveMealButton.variant}
+              aria-pressed={record.completedAt !== null}
               onPress={handleServeMeal}
             >
               出餐
