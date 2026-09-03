@@ -78,14 +78,14 @@ const ReportDetailsCard: React.FC<ReportDetailsCardProps> = ({
                   ? report.startDate
                   : `${report.startDate} 至 ${report.endDate}`}
               </p>
-              <p className='text-foreground-secondary'>
+              <p className='text-muted'>
                 报告周期：{report.period === 'day' ? '日报' : report.period}
               </p>
             </div>
 
             {report.metrics.completedOrderCount === 0 ? (
               <p
-                className='rounded-xl border border-dashed border-border/70 px-4 py-3 text-sm leading-6 text-foreground-secondary'
+                className='rounded-xl border border-dashed border-border/70 px-4 py-3 text-sm leading-6 text-muted'
                 role='status'
               >
                 当日暂无完成订单，金额、比例和时长均按 0 展示。
