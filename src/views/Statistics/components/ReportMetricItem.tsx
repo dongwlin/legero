@@ -12,12 +12,12 @@ const ReportMetricItem: React.FC<ReportMetricItemProps> = ({
   value,
 }) => (
   <div className='min-w-0 border-b border-border/50 py-3 last:border-b-0'>
-    <dt className='text-sm text-foreground-secondary'>{label}</dt>
+    <dt className='text-sm text-muted'>{label}</dt>
     <dd className='mt-1 break-words text-base font-semibold tabular-nums text-foreground'>
       {value}
     </dd>
     {description ? (
-      <dd className='mt-1 break-words text-xs leading-5 text-foreground-secondary'>
+      <dd className='mt-1 break-words text-xs leading-5 text-muted'>
         {description}
       </dd>
     ) : null}

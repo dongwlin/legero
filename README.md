@@ -24,7 +24,7 @@ Legero（Order Management System）是一个面向特定餐饮门店的订单管
 | 状态管理 | Zustand 5 |
 | 日期处理 | dayjs |
 | 移动端 | Capacitor 8（Android） |
-| 测试 | Vitest, Testing Library |
+| 测试 | Vitest, Testing Library, Storybook, MSW, Playwright Chromium |
 | 包管理 | pnpm |
 
 ## 项目结构
@@ -61,8 +61,22 @@ pnpm build
 # 本地预览生产构建
 pnpm preview
 
-# 运行单元测试
+# 单次运行全部单元与 Storybook 测试
+# 首次运行前安装浏览器（Linux 如缺少系统库可追加 --with-deps）
+pnpm exec playwright install chromium
 pnpm test
+
+# 只运行普通测试
+pnpm test:unit
+
+# 生成 V8 覆盖率报告
+pnpm test:coverage
+
+# 启动 Storybook
+pnpm storybook
+
+# 构建静态 Storybook
+pnpm storybook:build
 
 # 代码检查
 pnpm lint
@@ -96,14 +110,17 @@ pnpm gen-icon
 
 GitHub Actions（`.github/workflows/build.yaml`）在每次 push / PR 时自动执行：
 
-1. 安装依赖并构建 Web 资源
-2. 通过 Capacitor 同步到 Android 工程
-3. 使用 Gradle 构建 Release APK
-4. 用 `apksigner` 手动签名（签名密钥通过 CI Secrets 注入）
-5. 上传构建产物
+1. 使用 frozen lockfile 安装依赖并安装 Chromium
+2. 运行 lint、TypeScript 检查、全部 Vitest 测试和静态 Storybook 构建
+3. 构建 Web 资源并通过 Capacitor 同步到 Android 工程
+4. 使用 Gradle 构建 Release APK
+5. 用 `apksigner` 手动签名（签名密钥通过 CI Secrets 注入）
+6. 上传构建产物
 
 当推送 `v*` 版本标签时，还会额外调用 `gh release create` 自动创建 GitHub Release 并附带通用 APK。
 
 ## 相关项目
 
 - **[legero-backend](https://github.com/dongwlin/legero-backend)**：Go 编写的后端服务，提供认证、订单、统计等 REST API。
+
+测试约定、测试层级和 Storybook 使用方式见 [`docs/testing.md`](docs/testing.md)。

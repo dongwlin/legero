@@ -84,7 +84,11 @@ const ProtectedRoute: React.FC = () => {
     useOrderWorkspaceSync()
   const isDiagnosticsRoute = useMatch('/settings/diagnostics') !== null
 
-  if (authStatus === 'loading' && workspaceStatus !== 'error') {
+  if (
+    authStatus === 'loading' &&
+    workspaceStatus !== 'error' &&
+    workspaceStatus !== 'no_access'
+  ) {
     return (
       <ProtectedRouteState
         isLoading

@@ -86,10 +86,6 @@ src/
 
 Read and follow [`docs/agents/skills.md`](docs/agents/skills.md) for skill discovery, selection, and loading rules.
 
-## Sub-agents
-
-Read and follow [`docs/agents/subagents.md`](docs/agents/subagents.md) for sub-agent delegation, orchestration, and model-selection rules.
-
 ## Local Environment
 
 Before starting task work, after reading this file, check whether
