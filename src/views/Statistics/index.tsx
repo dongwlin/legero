@@ -1,3 +1,4 @@
+import PerformanceProfiler from '@/components/PerformanceProfiler'
 import type { DailyStats } from '@/services/statistics'
 import React from 'react'
 import DailyStatsCard from './components/DailyStatsCard'
@@ -27,26 +28,28 @@ const StatisticsView: React.FC<StatisticsViewProps> = ({
   toDate,
 }) => {
   return (
-    <div className='min-h-dvh bg-background pb-20 text-foreground'>
-      <Header title='统计' />
+    <PerformanceProfiler area='statistics'>
+      <div className='min-h-dvh bg-background pb-20 text-foreground'>
+        <Header title='统计' />
 
-      <main className='mx-auto max-w-4xl px-4 pt-[calc(5.25rem+env(safe-area-inset-top))] md:px-8'>
-        <div className='space-y-6'>
-          <StatisticsControls
-            fromDate={fromDate}
-            isLoading={isLoading}
-            onCalculate={onCalculate}
-            onFromDateChange={onFromDateChange}
-            onToDateChange={onToDateChange}
-            toDate={toDate}
-          />
-          {errorMessage ? (
-            <p className='text-sm text-danger'>{errorMessage}</p>
-          ) : null}
-          <DailyStatsCard stats={stats} />
-        </div>
-      </main>
-    </div>
+        <main className='mx-auto max-w-4xl px-4 pt-[calc(5.25rem+env(safe-area-inset-top))] md:px-8'>
+          <div className='space-y-6'>
+            <StatisticsControls
+              fromDate={fromDate}
+              isLoading={isLoading}
+              onCalculate={onCalculate}
+              onFromDateChange={onFromDateChange}
+              onToDateChange={onToDateChange}
+              toDate={toDate}
+            />
+            {errorMessage ? (
+              <p className='text-sm text-danger'>{errorMessage}</p>
+            ) : null}
+            <DailyStatsCard stats={stats} />
+          </div>
+        </main>
+      </div>
+    </PerformanceProfiler>
   )
 }
 

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "type": "diagnostic-export-integrity-fixture",
+  "capturedAt": "2026-10-15T22:57:32.085Z",
+  "status": "passed",
+  "fixtureBytes": 1470816,
+  "sha256": "6791cf3ba615e7db954553e9f89bf5d40572afefe300d2494b35014774d65578",
+  "recordedOperations": 8000,
+  "checks": [
+    "UTF-8 file byte equality",
+    "JSON semantic equality",
+    "SHA-256 equality"
+  ],
+  "adapterTests": {
+    "browser": "real Blob payload with mocked anchor click",
+    "android": "mocked native file/share adapter with write/readback"
+  },
+  "limitations": [
+    "not physical Android acceptance",
+    "not an observed clipboard size limit",
+    "not a measured business baseline"
+  ]
+}

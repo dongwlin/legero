@@ -2,6 +2,7 @@
 
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { startPerformanceRecording, stopPerformanceRecording } from '@/services/performanceRecorder'
 import { ApiError } from '@/services/apiClient'
 import { orderOptimistic } from '@/services/orderOptimistic'
 import { orderTombstones } from '@/services/orderTombstones'
@@ -86,6 +87,7 @@ describe('useOrderItemActions optimistic mutations', () => {
   })
 
   afterEach(() => {
+    stopPerformanceRecording()
     cleanup()
   })
 
@@ -500,4 +502,25 @@ describe('useOrderItemActions optimistic mutations', () => {
     expect(orderOptimistic.hasPending('a')).toBe(false)
     expect(result.current.mutationError).toBe('Failed to fetch')
   })
+
+  it('records a failed acknowledgement and rollback without recording the business record or duplicate taps', async () => {
+    const record = makeOrder('private-order-id', { note: 'private-order-note' })
+    useOrderStore.getState().upsertOrder(record)
+    mocks.toggleStep.mockRejectedValue(new Error('network unavailable'))
+    const { result } = renderHook(() => useOrderItemActions(record))
+    startPerformanceRecording()
+    act(() => {
+      result.current.handleToggleStapleStep()
+      result.current.handleToggleStapleStep()
+    })
+    await act(flushAsync)
+    const snapshot = stopPerformanceRecording()!
+    expect(snapshot.samples.filter((sample) => sample.stage === 'server_ack')).toHaveLength(1)
+    expect(snapshot.samples.find((sample) => sample.stage === 'server_ack')!.outcome).toBe('failure')
+    expect(snapshot.samples.filter((sample) => sample.stage === 'store_commit')).toHaveLength(2)
+    expect(useOrderStore.getState().ordersById[record.id]).toEqual(record)
+    expect(JSON.stringify(snapshot)).not.toContain(record.id)
+    expect(JSON.stringify(snapshot)).not.toContain(record.note)
+  })
+
 })

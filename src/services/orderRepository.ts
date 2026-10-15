@@ -1,3 +1,4 @@
+import { beginPerformanceStage, finishPerformanceStage } from '@/services/performanceRecorder'
 import type {
   Filter,
   OrderFormValue,
@@ -53,9 +54,16 @@ const listOrders = async (filter: Filter): Promise<OrderRecord[]> => {
       auth: true,
     })
 
-    response.items
-      .map(orderDtoToOrderRecord)
-      .forEach((order) => byId.set(order.id, order))
+    const conversion = beginPerformanceStage('snapshot_conversion')
+    try {
+      response.items
+        .map(orderDtoToOrderRecord)
+        .forEach((order) => byId.set(order.id, order))
+      finishPerformanceStage(conversion, 'success', { inputCount: response.items.length, pageCount: 1 })
+    } catch (error) {
+      finishPerformanceStage(conversion, 'failure')
+      throw error
+    }
 
     nextCursor = response.nextCursor ?? null
   } while (nextCursor)

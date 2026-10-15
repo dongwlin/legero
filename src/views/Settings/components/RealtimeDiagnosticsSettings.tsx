@@ -6,7 +6,7 @@ const RealtimeDiagnosticsSettings: React.FC = () => {
   return (
     <SettingsSection
       title='实时连接诊断'
-      description='查看实时连接、重连、网络状态和数据同步情况。'
+      description='查看连接与同步情况，按需记录操作并保存诊断文件。'
     >
       <Link
         to='/settings/diagnostics'

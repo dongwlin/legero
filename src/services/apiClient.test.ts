@@ -10,6 +10,7 @@ import {
   refreshAuthTokens,
 } from './apiClient'
 import { setStoredApiBaseUrl } from './apiConfig'
+import { startPerformanceRecording, stopPerformanceRecording } from '@/services/performanceRecorder'
 
 const BASE_URL = 'http://localhost:8080'
 
@@ -344,3 +345,48 @@ describe('refreshAuthTokens timeout', () => {
   })
 })
 
+
+describe('opt-in field request stages', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setStoredApiBaseUrl(BASE_URL)
+    mockFetch.mockReset()
+    vi.stubGlobal('fetch', mockFetch)
+  })
+
+  afterEach(() => {
+    stopPerformanceRecording()
+    vi.unstubAllGlobals()
+  })
+
+  it('correlates safe numeric client/server/database stages without retaining URLs, credentials or body content', async () => {
+    const body = { privateOrderNote: 'private-order-text', phone: '13800000001' }
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Server-Timing': 'app;dur=52.5, db;dur=42, secret;desc="private-order-text"' },
+    }))
+    startPerformanceRecording()
+    await expect(apiRequest({ path: '/api/orders/private-business-id' })).resolves.toEqual(body)
+    const snapshot = stopPerformanceRecording()!
+    const stages = snapshot.samples.filter((sample) => sample.stage.startsWith('api_') || sample.stage === 'request_round_trip')
+    expect(stages.map((sample) => sample.stage)).toEqual(['api_headers', 'api_body', 'request_round_trip', 'api_decode'])
+    expect(new Set(stages.map((sample) => sample.correlation)).size).toBe(1)
+    expect(stages.find((sample) => sample.stage === 'request_round_trip')!.counters).toMatchObject({ serverDurationMs: 52.5, databaseDurationMs: 42 })
+    const headers = mockFetch.mock.calls[0][1].headers as Headers
+    expect(headers.get('X-Performance-Request-ID')).toBe(stages[0].correlation)
+    const serialized = JSON.stringify(snapshot)
+    expect(serialized).not.toContain('private-business-id')
+    expect(serialized).not.toContain('private-order-text')
+    expect(serialized).not.toContain('13800000001')
+  })
+
+  it('records decode failure separately and adds no correlation header when disabled', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('{broken', { status: 200 }))
+    startPerformanceRecording()
+    await expect(apiRequest({ path: '/api/orders' })).rejects.toThrow()
+    expect(stopPerformanceRecording()!.samples.find((sample) => sample.stage === 'api_decode')!.outcome).toBe('failure')
+    mockFetch.mockResolvedValueOnce(new Response('{}', { status: 200 }))
+    await apiRequest({ path: '/api/orders' })
+    expect((mockFetch.mock.calls[1][1].headers as Headers).has('X-Performance-Request-ID')).toBe(false)
+  })
+})

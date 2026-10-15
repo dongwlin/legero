@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -58,6 +58,23 @@ describe('OrderBenchmark', () => {
     expect(screen.getByRole('button', { name: '重新测试 5 轮' })).not.toBeNull()
   })
 
+  it('matches raw rounds by total and today counts when historical size stays fixed', async () => {
+    const result = makeBenchmarkPreviewResult()
+    result.means = [130, 260, 520].map((todayOrders) => ({ ...result.means[0], totalOrders: 1820, todayOrders }))
+    result.trials = result.trials.map((trial) => ({ ...trial, scenarios: [130, 260, 520].map((todayOrders, index) => ({
+      ...trial.scenarios[0], totalOrders: 1820, todayOrders,
+      metrics: { ...trial.scenarios[0].metrics, meat: { ...trial.scenarios[0].metrics.meat, totalMs: 100 + index } },
+    })) }))
+    mocks.runBenchmark.mockResolvedValue(result)
+    render(<OrderBenchmark />)
+    await act(async () => { start() })
+    const tables = screen.getAllByRole('table', { name: '1820 单下各轮的总耗时' })
+    expect(tables).toHaveLength(3)
+    for (const [index, table] of tables.entries()) {
+      expect(within(table).getAllByText(`${100 + index}.00 ms`)).toHaveLength(5)
+    }
+  })
+
   it('ignores late progress and completion from a cancelled run after a rerun starts', async () => {
     let finish: (result: OrderBenchmarkResult) => void = () => {}
     let firstProgress: (value: OrderBenchmarkProgress) => void = () => {}
@@ -66,11 +83,11 @@ describe('OrderBenchmark', () => {
       callCount += 1
       if (callCount === 1) {
         firstProgress = onProgress
-        onProgress({ run: 2, totalRuns: 5, totalOrders: 520, action: 'meat' })
+        onProgress({ run: 2, totalRuns: 5, totalOrders: 520, todayOrders: 130, action: 'meat', caseId: 'meat', caseLabel: null })
         return new Promise<OrderBenchmarkResult>((resolve) => { finish = resolve })
       }
 
-      onProgress({ run: 1, totalRuns: 5, totalOrders: 130, action: 'staple' })
+      onProgress({ run: 1, totalRuns: 5, totalOrders: 130, todayOrders: 130, action: 'staple', caseId: 'staple', caseLabel: null })
       return new Promise<OrderBenchmarkResult>(() => {})
     })
     render(<OrderBenchmark />)
@@ -83,7 +100,7 @@ describe('OrderBenchmark', () => {
 
     start()
     expect(screen.getByText('第 1 / 5 轮 · 130 单 · 主食')).not.toBeNull()
-    act(() => { firstProgress({ run: 5, totalRuns: 5, totalOrders: 1820, action: 'served' }) })
+    act(() => { firstProgress({ run: 5, totalRuns: 5, totalOrders: 1820, todayOrders: 130, action: 'served', caseId: 'served', caseLabel: null }) })
     expect(screen.getByText('第 1 / 5 轮 · 130 单 · 主食')).not.toBeNull()
     expect(screen.queryByText('第 5 / 5 轮 · 1820 单 · 出餐')).toBeNull()
 

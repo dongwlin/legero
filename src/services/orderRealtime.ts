@@ -1,3 +1,4 @@
+import { beginPerformanceStage, finishPerformanceStage, type PerformanceStageToken } from '@/services/performanceRecorder'
 import {
   AUTH_REFRESH_TIMEOUT_MS,
   ApiError,
@@ -385,6 +386,7 @@ export const orderRealtime = {
   ): OrderRealtimeSubscription {
     const diagnostics = options.diagnostics ?? createRealtimeDiagnostics()
     let socket: WebSocket | null = null
+    let readyStage: PerformanceStageToken | null = null
     let reconnectTimer: number | null = null
     let pendingReconnectReason: ReconnectReason | null = null
     let reconnectAttempts = 0
@@ -609,6 +611,8 @@ export const orderRealtime = {
           diagnostics.recordFailure(failureStage)
         }
         diagnostics.finishConnectSession(false)
+        finishPerformanceStage(readyStage, 'failure')
+        readyStage = null
         const timedOutGeneration = generation
         generation += 1
         clearActiveAttempt(timedOutGeneration)
@@ -666,6 +670,8 @@ export const orderRealtime = {
     // whatever is live. Used when the environment changes underneath the
     // channel (network drop, network change, stale background socket).
     const invalidateActiveSocket = (code: number, reason: string) => {
+      finishPerformanceStage(readyStage, 'cancelled')
+      readyStage = null
       const invalidatedGeneration = generation
       generation += 1
       clearActiveAttempt(invalidatedGeneration)
@@ -898,6 +904,8 @@ export const orderRealtime = {
           // The connection duration deliberately starts at the session
           // request, and ends at the first ready envelope. It excludes auth
           // refresh time while still covering the session and WS handshake.
+          finishPerformanceStage(readyStage, 'cancelled')
+          readyStage = beginPerformanceStage('realtime_ready')
           diagnostics.beginConnectSession()
           session = await realtimeSession.create(abortController.signal)
         } finally {
@@ -934,7 +942,9 @@ export const orderRealtime = {
             return
           }
 
+          const decodeStage = beginPerformanceStage('realtime_decode')
           const parsed = parseRealtimeEnvelope(event.data)
+          finishPerformanceStage(decodeStage, parsed ? 'success' : 'failure')
           if (!parsed) {
             return
           }
@@ -957,6 +967,8 @@ export const orderRealtime = {
 
           if (parsed.eventType === 'ready') {
             updateAttemptPhase('online')
+            finishPerformanceStage(readyStage)
+            readyStage = null
             diagnostics.finishConnectSession(true)
             clearReadyTimer()
 
@@ -1006,6 +1018,8 @@ export const orderRealtime = {
             return
           }
 
+          finishPerformanceStage(readyStage, 'failure')
+          readyStage = null
           diagnostics.recordClose(event.code, event.reason)
           socket = null
           clearReadyTimer()
@@ -1023,6 +1037,8 @@ export const orderRealtime = {
         }
 
         diagnostics.finishConnectSession(false)
+        finishPerformanceStage(readyStage, 'failure')
+        readyStage = null
         diagnostics.recordFailure(attemptPhase)
         clearActiveAttempt(currentGeneration)
 
@@ -1068,6 +1084,8 @@ export const orderRealtime = {
           return
         }
 
+        finishPerformanceStage(readyStage, 'cancelled')
+        readyStage = null
         transitionState('closed', 'client_closed')
         const closedGeneration = generation
         generation += 1

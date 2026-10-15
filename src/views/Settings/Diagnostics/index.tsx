@@ -1,7 +1,10 @@
-import { Button, Card, Disclosure, Separator, Spinner } from '@heroui/react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Card, Disclosure, Separator, Spinner } from '@heroui/react'
+import React, { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import Header from '@/components/Header'
+import DiagnosticExport from '@/components/DiagnosticExport'
+import { getBuildMetadata } from '@/services/buildMetadata'
+import PerformanceRecordingPanel from '@/views/Settings/Diagnostics/PerformanceRecordingPanel'
 import { useRealtimeDiagnostics } from '@/hooks/useRealtimeDiagnostics'
 import type {
   RealtimeConnectionState,
@@ -121,43 +124,6 @@ const StateChangeItem: React.FC<{
   </li>
 )
 
-const copyText = async (text: string): Promise<boolean> => {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch {
-      // Continue with the legacy textarea fallback when clipboard permission
-      // is unavailable in an embedded browser or older Android WebView.
-    }
-  }
-
-  if (
-    typeof document === 'undefined' ||
-    typeof document.execCommand !== 'function'
-  ) {
-    return false
-  }
-
-  const textArea = document.createElement('textarea')
-  textArea.value = text
-  textArea.setAttribute('readonly', '')
-  textArea.style.position = 'fixed'
-  textArea.style.opacity = '0'
-  document.body.appendChild(textArea)
-
-  try {
-    textArea.focus()
-    textArea.select()
-    textArea.setSelectionRange(0, textArea.value.length)
-    return document.execCommand('copy')
-  } catch {
-    return false
-  } finally {
-    textArea.remove()
-  }
-}
-
 const UnavailableDiagnostics: React.FC = () => (
   <Card.Root
     variant='secondary'
@@ -179,9 +145,6 @@ const RealtimeDiagnostics: React.FC = () => {
   const [snapshot, setSnapshot] = useState<RealtimeDiagnosticsSnapshot | null>(
     () => getDiagnostics(),
   )
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
-  const copyResetTimeoutRef = useRef<number | null>(null)
-
   useEffect(() => {
     const updateSnapshot = () => {
       setSnapshot(getDiagnostics())
@@ -195,32 +158,6 @@ const RealtimeDiagnostics: React.FC = () => {
     }
   }, [getDiagnostics])
 
-  useEffect(
-    () => () => {
-      if (copyResetTimeoutRef.current !== null) {
-        window.clearTimeout(copyResetTimeoutRef.current)
-      }
-    },
-    [],
-  )
-
-  const handleCopy = useCallback(async () => {
-    if (!snapshot) {
-      return
-    }
-
-    const copied = await copyText(JSON.stringify(snapshot, null, 2))
-    setCopyState(copied ? 'copied' : 'error')
-
-    if (copyResetTimeoutRef.current !== null) {
-      window.clearTimeout(copyResetTimeoutRef.current)
-    }
-
-    copyResetTimeoutRef.current = window.setTimeout(() => {
-      setCopyState('idle')
-      copyResetTimeoutRef.current = null
-    }, 1800)
-  }, [snapshot])
 
   return (
     <div className='min-h-dvh bg-background pb-20 text-foreground'>
@@ -232,6 +169,7 @@ const RealtimeDiagnostics: React.FC = () => {
 
       <main className='mx-auto max-w-4xl px-4 pt-[calc(5.25rem+env(safe-area-inset-top))] md:px-8'>
         <div className='space-y-6'>
+          <PerformanceRecordingPanel />
           {snapshot ? (
             <>
               <Card.Root
@@ -404,27 +342,8 @@ const RealtimeDiagnostics: React.FC = () => {
                 )}
               </DiagnosticsSection>
 
-              <div className='space-y-3'>
-                <Button.Root
-                  className='w-full md:w-auto'
-                  variant='outline'
-                  onPress={() => {
-                    void handleCopy()
-                  }}
-                >
-                  {copyState === 'copied' ? '已复制' : '复制诊断信息'}
-                </Button.Root>
-                <p
-                  aria-live='polite'
-                  className={`min-h-5 text-sm ${copyState === 'error' ? 'text-danger' : 'text-muted'}`}
-                >
-                  {copyState === 'error'
-                    ? '复制失败，请检查浏览器剪贴板权限。'
-                    : copyState === 'copied'
-                      ? '诊断信息已复制，可粘贴给现场支持人员。'
-                      : '复制内容只包含当前诊断快照中的低基数字段。'}
-                </p>
-              </div>
+              <DiagnosticExport json={JSON.stringify({ schemaVersion: 1, kind: 'realtime-diagnostics', status: 'snapshot', capturedAt: new Date().toISOString(), environment: getBuildMetadata(), snapshot }, null, 2)} purpose='realtime-diagnostics' appVersion={getBuildMetadata().appVersion}
+                refreshable textLabel='完整实时诊断 JSON' />
 
               <Disclosure.Root className='rounded-2xl border border-border/70 bg-background-secondary/35'>
                 <Disclosure.Heading>

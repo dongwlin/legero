@@ -1,3 +1,4 @@
+import { beginPerformanceStage, finishPerformanceStage, isPerformanceRecordingActive, measurePerformanceStage, type PerformanceStageToken } from '@/services/performanceRecorder'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { orderRepository } from '@/services/orderRepository'
 import {
@@ -88,6 +89,8 @@ export const useOrderWorkspaceSync = () => {
     const pendingUpserts = new Map<string, OrderRecord>()
     const pendingRemoves = new Set<string>()
     let flushRafId: number | null = null
+    let receiveStage: PerformanceStageToken | null = null
+    let workspaceStage: PerformanceStageToken | null = null
 
     // Realtime events received while a snapshot request is in flight are
     // buffered here and replayed over the snapshot when it lands, so the
@@ -167,10 +170,22 @@ export const useOrderWorkspaceSync = () => {
       // optimistic record of a pending mutation keeps the pre-mutation server
       // version, so it is version-comparable too and cannot shield a newer
       // authoritative event from another client.
-      store.upsertOrdersIfNewer(upserts)
+      const acceptedCount = isPerformanceRecordingActive() ? upserts.filter((order) => !store.ordersById[order.id] || order.version > store.ordersById[order.id].version).length : 0
+      const commit = beginPerformanceStage('store_commit', receiveStage)
+      try {
+        store.upsertOrdersIfNewer(upserts)
 
-      for (const id of removes) {
-        store.removeOrder(id)
+        for (const id of removes) {
+          store.removeOrder(id)
+        }
+        finishPerformanceStage(commit, 'success', { uniqueCount: upserts.length + removes.length, acceptedCount })
+        finishPerformanceStage(receiveStage, 'success', { uniqueCount: upserts.length + removes.length, acceptedCount })
+      } catch (error) {
+        finishPerformanceStage(commit, 'failure')
+        finishPerformanceStage(receiveStage, 'failure')
+        throw error
+      } finally {
+        receiveStage = null
       }
     }
 
@@ -400,6 +415,9 @@ export const useOrderWorkspaceSync = () => {
       }
 
       syncInFlight = true
+      const readyState = beginPerformanceStage('workspace_ready_state')
+      workspaceStage = readyState
+      let snapshotMerge: PerformanceStageToken | null = null
       diagnostics.beginSnapshotReconciliation()
 
       if (shouldBlock) {
@@ -455,6 +473,7 @@ export const useOrderWorkspaceSync = () => {
         // re-applied last by version against the reconciled candidate, so a
         // strictly higher authoritative state still wins while a stale
         // snapshot never clobbers the local record.
+        snapshotMerge = beginPerformanceStage('snapshot_merge', readyState)
         const events = eventBuffer.endReconciliation()
         const effects = orderOptimistic.effectsAfter(snapshotMarker)
         // Only the raw guaranteed-post-clear snapshot can decide whether a
@@ -500,10 +519,10 @@ export const useOrderWorkspaceSync = () => {
         }
 
         let reconciled = applyLocalRemoveEffects(
-          reconcileSnapshotWithEvents(
+          measurePerformanceStage('buffer_replay', () => reconcileSnapshotWithEvents(
             applyLocalUpsertEffects(nextOrders, effects),
             events,
-          ),
+          ), { inputCount: events.length }),
           effects,
         )
 
@@ -527,6 +546,7 @@ export const useOrderWorkspaceSync = () => {
         setOrders(
           protectedOrders.filter((order) => !orderTombstones.rejectsUpsert(order)),
         )
+        finishPerformanceStage(snapshotMerge, 'success', { inputCount: nextOrders.length })
         snapshotOutcome = 'success'
       } catch (error) {
         if (isDisposed) {
@@ -560,6 +580,9 @@ export const useOrderWorkspaceSync = () => {
         if (isDisposed) {
           snapshotOutcome = 'cancelled'
         }
+        finishPerformanceStage(snapshotMerge, snapshotOutcome)
+        finishPerformanceStage(readyState, snapshotOutcome)
+        if (workspaceStage === readyState) workspaceStage = null
         diagnostics.finishSnapshotReconciliation(snapshotOutcome)
         syncInFlight = false
         // The snapshot settled: effects and protection stamps older than
@@ -646,6 +669,7 @@ export const useOrderWorkspaceSync = () => {
         // comparison still accepts a strictly newer event (another client's
         // commit) and rejects echoes/stale events. Batched upserts for the
         // same id consolidate on the highest version at insertion.
+        receiveStage ??= beginPerformanceStage('sync_receive_to_state')
         const queued = pendingUpserts.get(order.id)
         if (!queued || order.version > queued.version) {
           pendingUpserts.set(order.id, order)
@@ -693,6 +717,7 @@ export const useOrderWorkspaceSync = () => {
                 return
               }
 
+              receiveStage ??= beginPerformanceStage('sync_receive_to_state')
               pendingRemoves.add(id)
               scheduleBatchFlush()
             }
@@ -800,6 +825,10 @@ export const useOrderWorkspaceSync = () => {
 
     return () => {
       isDisposed = true
+      finishPerformanceStage(workspaceStage, 'cancelled')
+      workspaceStage = null
+      finishPerformanceStage(receiveStage, 'cancelled')
+      receiveStage = null
 
       stopResyncSubscription?.()
 

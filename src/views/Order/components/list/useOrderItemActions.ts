@@ -1,3 +1,4 @@
+import { beginPerformanceStage, finishPerformanceStage, measurePerformanceStage } from '@/services/performanceRecorder'
 import { useCallback, useRef, useState } from 'react'
 import { type OrderRecord } from '@/types'
 import { isOrderConflictError } from '@/services/apiClient'
@@ -60,14 +61,17 @@ export const useOrderItemActions = (
         return
       }
 
+      // Starts after the duplicate/no-op guard: accepted local operation to parsed HTTP result.
+      const acknowledgement = beginPerformanceStage('server_ack')
       const gen = orderOptimistic.beginMutation(record.id, record)
 
       // Optimistic copies keep the server's version untouched: only the
       // backend can mint the next version once the commit actually lands.
-      upsertOrder(nextRecord)
+      measurePerformanceStage('store_commit', () => upsertOrder(nextRecord))
 
       persist()
         .then((serverRecord) => {
+          finishPerformanceStage(acknowledgement)
           if (orderOptimistic.endMutation(record.id, gen)) {
             // A realtime remove of the same id (or a confirmed local DELETE)
             // that landed while this mutation was in flight registered a
@@ -94,13 +98,14 @@ export const useOrderItemActions = (
               // the raw follow-up snapshot to classify, but do not put it
               // back into the store before that decision.
               if (!isPendingClear) {
-                upsertIfNewer(serverRecord)
+                measurePerformanceStage('store_commit', () => upsertIfNewer(serverRecord))
               }
               orderOptimistic.recordUpsert(serverRecord)
             }
           }
         })
         .catch((error) => {
+          finishPerformanceStage(acknowledgement, 'failure')
           if (orderOptimistic.endMutation(record.id, gen)) {
             // Roll back to the pre-mutation record only when the store holds
             // nothing newer: an authoritative realtime state with a higher
@@ -116,7 +121,7 @@ export const useOrderItemActions = (
               !orderTombstones.rejectsUpsert(record) &&
               (!current || current.version <= record.version)
             ) {
-              upsertOrder(record)
+              measurePerformanceStage('store_commit', () => upsertOrder(record))
             }
 
             if (isOrderConflictError(error)) {
@@ -162,9 +167,11 @@ export const useOrderItemActions = (
     setIsMutating(true)
     setMutationError(null)
 
+    const acknowledgement = beginPerformanceStage('server_ack')
     try {
       await orderRepository.remove(record.id)
-      removeOrder(record.id)
+      finishPerformanceStage(acknowledgement)
+      measurePerformanceStage('store_commit', () => removeOrder(record.id))
       // Journal the confirmed delete so a snapshot that overlaps it cannot
       // resurrect the order when the WS remove event has not arrived yet.
       orderOptimistic.recordRemove(record.id)
@@ -175,6 +182,7 @@ export const useOrderItemActions = (
       orderTombstones.markRemoved(record.id)
       setIsDeleteOpen(false)
     } catch (error) {
+      finishPerformanceStage(acknowledgement, 'failure')
       setMutationError(getMutationErrorMessage(error))
     } finally {
       setIsMutating(false)

@@ -1,3 +1,4 @@
+import PerformanceProfiler from '@/components/PerformanceProfiler'
 import React, { useCallback, useEffect, useState } from 'react'
 import { CarbonAdd } from '@/components/Icon'
 import { Button, CloseButton, Modal, Separator, TextArea } from '@heroui/react'
@@ -597,17 +598,19 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, initialItem }) => {
                         </h2>
                       </div>
                     </Modal.Header>
-                    <OrderFormContent
-                      key={formSessionKey}
-                      close={close}
-                      initialItem={activeItem}
-                      isCreateMode={isCreateMode}
-                      isSubmitting={isSubmitting}
-                      mode={mode}
-                      submitError={submitError}
-                      submitButtonText={submitButtonText}
-                      onSubmit={handleSubmit}
-                    />
+                    <PerformanceProfiler area='form'>
+                      <OrderFormContent
+                        key={formSessionKey}
+                        close={close}
+                        initialItem={activeItem}
+                        isCreateMode={isCreateMode}
+                        isSubmitting={isSubmitting}
+                        mode={mode}
+                        submitError={submitError}
+                        submitButtonText={submitButtonText}
+                        onSubmit={handleSubmit}
+                      />
+                    </PerformanceProfiler>
                   </>
                 )}
               </Modal.Dialog>

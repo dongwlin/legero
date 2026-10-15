@@ -1,3 +1,4 @@
+import { beginPerformanceStage, finishPerformanceStage, type PerformanceCounters } from '@/services/performanceRecorder'
 import { getApiBaseUrl } from './apiConfig'
 import type {
   AuthTokens,
@@ -272,18 +273,70 @@ const executeRequest = async <T>(
   options: ApiRequestOptions,
   accessToken: string | null,
 ): Promise<T> => {
-  const response = await fetch(`${getApiBaseUrl()}${options.path}`, {
-    method: options.method ?? 'GET',
-    body: createRequestBody(options.body),
-    headers: createRequestHeaders(options.headers, options.body, accessToken),
-    signal: options.signal,
-  })
+  const roundTrip = beginPerformanceStage('request_round_trip')
+  const headersStage = beginPerformanceStage('api_headers', roundTrip)
+  let response: Response
 
-  if (!response.ok) {
-    throw buildApiError(response.status, await response.text())
+  try {
+    const headers = createRequestHeaders(options.headers, options.body, accessToken)
+    if (roundTrip) headers.set('X-Performance-Request-ID', roundTrip.correlation)
+    response = await fetch(`${getApiBaseUrl()}${options.path}`, {
+      method: options.method ?? 'GET',
+      body: createRequestBody(options.body),
+      headers,
+      signal: options.signal,
+    })
+    finishPerformanceStage(headersStage)
+  } catch (error) {
+    const outcome = options.signal?.aborted ? 'cancelled' : 'failure'
+    finishPerformanceStage(headersStage, outcome)
+    finishPerformanceStage(roundTrip, outcome)
+    throw error
   }
 
-  return parseSuccessfulResponse<T>(response, options.responseType ?? 'json')
+  // Keep the ordinary release path unchanged when the user has not opted in.
+  if (!roundTrip) {
+    if (!response.ok) throw buildApiError(response.status, await response.text())
+    return parseSuccessfulResponse<T>(response, options.responseType ?? 'json')
+  }
+
+  const bodyStage = beginPerformanceStage('api_body', roundTrip)
+  let payload: string
+  try {
+    payload = await response.text()
+  } catch (error) {
+    const outcome = options.signal?.aborted ? 'cancelled' : 'failure'
+    finishPerformanceStage(bodyStage, outcome)
+    finishPerformanceStage(roundTrip, outcome)
+    throw error
+  }
+  const bodyReadAt = performance.now()
+  const counters: PerformanceCounters = {}
+  // Byte length is UTF-8 payload size, not compressed network transfer size.
+  counters.byteCount = new TextEncoder().encode(payload).byteLength
+  for (const metric of (response.headers.get('Server-Timing') ?? '').split(',')) {
+    const match = /^\s*(app|db);\s*dur=([\d.]+)(?:;|\s*$)/.exec(metric)
+    if (!match) continue
+    const value = Number(match[2])
+    if (Number.isFinite(value) && value >= 0) {
+      counters[match[1] === 'db' ? 'databaseDurationMs' : 'serverDurationMs'] = value
+    }
+  }
+  const outcome = response.ok ? 'success' : 'failure'
+  finishPerformanceStage(bodyStage, outcome, counters, bodyReadAt)
+  finishPerformanceStage(roundTrip, outcome, counters, bodyReadAt)
+  if (!response.ok) throw buildApiError(response.status, payload)
+  if (options.responseType === 'none' || response.status === 204) return undefined as T
+  if (options.responseType === 'text') return payload as T
+  const decodeStage = beginPerformanceStage('api_decode', roundTrip)
+  try {
+    const value = JSON.parse(payload) as T
+    finishPerformanceStage(decodeStage)
+    return value
+  } catch (error) {
+    finishPerformanceStage(decodeStage, 'failure')
+    throw error
+  }
 }
 
 export const refreshAuthTokens = async (): Promise<AuthTokens> => {

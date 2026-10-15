@@ -16,8 +16,8 @@ const sharedTestOptions = {
   retry: 0,
 }
 
-export default mergeConfig(
-  viteConfig,
+export default defineConfig((environment) => mergeConfig(
+  viteConfig(environment),
   defineConfig({
     test: {
       ...sharedTestOptions,
@@ -71,4 +71,4 @@ export default mergeConfig(
       ],
     },
   }),
-)
+))

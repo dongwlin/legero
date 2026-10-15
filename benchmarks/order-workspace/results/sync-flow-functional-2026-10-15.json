@@ -1,0 +1,4914 @@
+{
+  "type": "legero-workspace-sync-functional-traces",
+  "schemaVersion": 1,
+  "status": "completed",
+  "expectedTrials": 5,
+  "clientCount": 1,
+  "scenarios": [
+    "S01",
+    "S02",
+    "S03"
+  ],
+  "faultSchedule": [
+    "ready while first snapshot is deferred",
+    "duplicate/higher-version batch during snapshot",
+    "offline then online before reconnect ready",
+    "remove/full clear and batch during reconnect snapshot, followed by post-clear snapshot",
+    "long background crossing Shanghai midnight then foreground",
+    "workspace switch then stale previous-socket event"
+  ],
+  "stageSummary": [
+    {
+      "stage": "resource_trend",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 1,
+          "meanMs": 0
+        },
+        {
+          "run": 2,
+          "sampleCount": 1,
+          "meanMs": 0
+        },
+        {
+          "run": 3,
+          "sampleCount": 1,
+          "meanMs": 0
+        },
+        {
+          "run": 4,
+          "sampleCount": 1,
+          "meanMs": 0
+        },
+        {
+          "run": 5,
+          "sampleCount": 1,
+          "meanMs": 0
+        }
+      ],
+      "fiveTrialMeanMs": 0
+    },
+    {
+      "stage": "api_headers",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 10,
+          "meanMs": 0.20610270000001946
+        },
+        {
+          "run": 2,
+          "sampleCount": 10,
+          "meanMs": 0.07355030000003353
+        },
+        {
+          "run": 3,
+          "sampleCount": 10,
+          "meanMs": 0.07695950000004359
+        },
+        {
+          "run": 4,
+          "sampleCount": 10,
+          "meanMs": 0.09742999999998574
+        },
+        {
+          "run": 5,
+          "sampleCount": 10,
+          "meanMs": 0.09200879999996232
+        }
+      ],
+      "fiveTrialMeanMs": 0.10921026000000893
+    },
+    {
+      "stage": "api_body",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 10,
+          "meanMs": 0.1280501000000413
+        },
+        {
+          "run": 2,
+          "sampleCount": 10,
+          "meanMs": 0.032505800000012644
+        },
+        {
+          "run": 3,
+          "sampleCount": 10,
+          "meanMs": 0.033193799999958175
+        },
+        {
+          "run": 4,
+          "sampleCount": 10,
+          "meanMs": 0.04045440000004419
+        },
+        {
+          "run": 5,
+          "sampleCount": 10,
+          "meanMs": 0.04116990000004535
+        }
+      ],
+      "fiveTrialMeanMs": 0.05507480000002033
+    },
+    {
+      "stage": "request_round_trip",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 10,
+          "meanMs": 0.40200530000004164
+        },
+        {
+          "run": 2,
+          "sampleCount": 10,
+          "meanMs": 0.13014100000000325
+        },
+        {
+          "run": 3,
+          "sampleCount": 10,
+          "meanMs": 0.13243219999997108
+        },
+        {
+          "run": 4,
+          "sampleCount": 10,
+          "meanMs": 0.16369560000005096
+        },
+        {
+          "run": 5,
+          "sampleCount": 10,
+          "meanMs": 0.15429900000003727
+        }
+      ],
+      "fiveTrialMeanMs": 0.19651462000002082
+    },
+    {
+      "stage": "api_decode",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 10,
+          "meanMs": 0.00921829999995225
+        },
+        {
+          "run": 2,
+          "sampleCount": 10,
+          "meanMs": 0.00752500000000964
+        },
+        {
+          "run": 3,
+          "sampleCount": 10,
+          "meanMs": 0.007335899999975482
+        },
+        {
+          "run": 4,
+          "sampleCount": 10,
+          "meanMs": 0.008743200000003526
+        },
+        {
+          "run": 5,
+          "sampleCount": 10,
+          "meanMs": 0.008041900000011992
+        }
+      ],
+      "fiveTrialMeanMs": 0.008172859999990578
+    },
+    {
+      "stage": "realtime_decode",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 8,
+          "meanMs": 0.035964499999977306
+        },
+        {
+          "run": 2,
+          "sampleCount": 8,
+          "meanMs": 0.02018387500001495
+        },
+        {
+          "run": 3,
+          "sampleCount": 8,
+          "meanMs": 0.015113500000040858
+        },
+        {
+          "run": 4,
+          "sampleCount": 8,
+          "meanMs": 0.018530625000011014
+        },
+        {
+          "run": 5,
+          "sampleCount": 8,
+          "meanMs": 0.016298124999991614
+        }
+      ],
+      "fiveTrialMeanMs": 0.021218125000007148
+    },
+    {
+      "stage": "realtime_ready",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 4,
+          "meanMs": 5.991615500000023
+        },
+        {
+          "run": 2,
+          "sampleCount": 4,
+          "meanMs": 6.096453499999939
+        },
+        {
+          "run": 3,
+          "sampleCount": 4,
+          "meanMs": 6.274809249999919
+        },
+        {
+          "run": 4,
+          "sampleCount": 4,
+          "meanMs": 6.210624249999967
+        },
+        {
+          "run": 5,
+          "sampleCount": 4,
+          "meanMs": 6.214676749999967
+        }
+      ],
+      "fiveTrialMeanMs": 6.157635849999963
+    },
+    {
+      "stage": "store_commit",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 5,
+          "meanMs": 0.0158575999999357
+        },
+        {
+          "run": 2,
+          "sampleCount": 5,
+          "meanMs": 0.00725959999999759
+        },
+        {
+          "run": 3,
+          "sampleCount": 5,
+          "meanMs": 0.004343999999991866
+        },
+        {
+          "run": 4,
+          "sampleCount": 5,
+          "meanMs": 0.004662800000005518
+        },
+        {
+          "run": 5,
+          "sampleCount": 5,
+          "meanMs": 0.003434400000014648
+        }
+      ],
+      "fiveTrialMeanMs": 0.007111679999989064
+    },
+    {
+      "stage": "snapshot_conversion",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 6,
+          "meanMs": 0.02065200000004097
+        },
+        {
+          "run": 2,
+          "sampleCount": 6,
+          "meanMs": 0.00842216666664323
+        },
+        {
+          "run": 3,
+          "sampleCount": 6,
+          "meanMs": 0.004189666666623755
+        },
+        {
+          "run": 4,
+          "sampleCount": 6,
+          "meanMs": 0.006944666666565051
+        },
+        {
+          "run": 5,
+          "sampleCount": 6,
+          "meanMs": 0.004381666666631645
+        }
+      ],
+      "fiveTrialMeanMs": 0.00891803333330093
+    },
+    {
+      "stage": "buffer_replay",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 5,
+          "meanMs": 0.04755280000008497
+        },
+        {
+          "run": 2,
+          "sampleCount": 5,
+          "meanMs": 0.01636279999988801
+        },
+        {
+          "run": 3,
+          "sampleCount": 5,
+          "meanMs": 0.009367599999904996
+        },
+        {
+          "run": 4,
+          "sampleCount": 5,
+          "meanMs": 0.0089966000000004
+        },
+        {
+          "run": 5,
+          "sampleCount": 5,
+          "meanMs": 0.009211199999981545
+        }
+      ],
+      "fiveTrialMeanMs": 0.018298199999971985
+    },
+    {
+      "stage": "snapshot_merge",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 5,
+          "meanMs": 0.30348420000004805
+        },
+        {
+          "run": 2,
+          "sampleCount": 5,
+          "meanMs": 0.1105663999999706
+        },
+        {
+          "run": 3,
+          "sampleCount": 5,
+          "meanMs": 0.08127380000000813
+        },
+        {
+          "run": 4,
+          "sampleCount": 5,
+          "meanMs": 0.09135480000004463
+        },
+        {
+          "run": 5,
+          "sampleCount": 5,
+          "meanMs": 0.07984879999999066
+        }
+      ],
+      "fiveTrialMeanMs": 0.1333056000000124
+    },
+    {
+      "stage": "workspace_ready_state",
+      "trialMeans": [
+        {
+          "run": 1,
+          "sampleCount": 5,
+          "meanMs": 2.9672497999999905
+        },
+        {
+          "run": 2,
+          "sampleCount": 5,
+          "meanMs": 0.7199494000000414
+        },
+        {
+          "run": 3,
+          "sampleCount": 5,
+          "meanMs": 0.6194703999999547
+        },
+        {
+          "run": 4,
+          "sampleCount": 5,
+          "meanMs": 0.746855800000094
+        },
+        {
+          "run": 5,
+          "sampleCount": 5,
+          "meanMs": 0.6632920000000467
+        }
+      ],
+      "fiveTrialMeanMs": 1.1433634800000254
+    }
+  ],
+  "boundaries": [
+    "Actual apiClient, repository, WebSocket decoder, sync hook, journal, tombstones and store execute in an isolated jsdom context.",
+    "Fetch, WebSocket transport and native recovery signals are controlled fixtures; no real server, database, Android, browser paint or network fault is measured.",
+    "Five trials preserve raw stage samples and explicitly scoped functional-stage means. This is not a device latency baseline or the computation benchmark protocol.",
+    "Only one singleton client exists per trial. Two/three concurrent clients require separate browser contexts and remain unverified.",
+    "Business/lifecycle Date is injected around Shanghai midnight; durations use the real local monotonic clock.",
+    "Build/source metadata records the dirty development checkout at collection; no clean-release provenance is claimed."
+  ],
+  "trials": [
+    {
+      "run": 1,
+      "status": "completed",
+      "correctness": "passed",
+      "recording": {
+        "type": "legero-field-performance",
+        "schemaVersion": 1,
+        "build": {
+          "appVersion": "0.0.23",
+          "mode": "test",
+          "profiling": false,
+          "commit": null,
+          "dirty": null,
+          "sourceSha256": {},
+          "unavailableReason": "source metadata unavailable at build time"
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (linux) AppleWebKit/537.36 (KHTML, like Gecko) jsdom/30.0.1",
+          "deviceModel": null,
+          "androidVersion": null,
+          "webViewVersion": null,
+          "unavailableReason": "Device model and Android/WebView versions require native device metadata or external inspection; userAgent is retained without version inference."
+        },
+        "sessionId": "14fa3930-23b6-474c-93ec-422e5172362b",
+        "status": "stopped",
+        "startedAt": "2026-10-15T15:59:58.000Z",
+        "elapsedMs": 63.95458800000006,
+        "profilingBuild": false,
+        "limits": {
+          "maxDurationMs": 10000,
+          "maxSamples": 500,
+          "maxActiveStages": 128,
+          "eventDurationThresholdMs": 40
+        },
+        "retention": "most_recent_samples",
+        "droppedSamples": 0,
+        "droppedStages": 0,
+        "incompleteStages": 0,
+        "capabilities": {
+          "eventTiming": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver event entries unavailable"
+          },
+          "longTasks": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver longtask entries unavailable"
+          },
+          "longAnimationFrames": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver long-animation-frame entries unavailable"
+          },
+          "resources": {
+            "status": "available",
+            "reason": null
+          },
+          "scrollFrames": {
+            "status": "available",
+            "reason": null
+          },
+          "heap": {
+            "status": "unavailable",
+            "reason": "Nonstandard performance.memory unavailable"
+          },
+          "reactProfiler": {
+            "status": "unavailable",
+            "reason": "Requires a dedicated React profiling build"
+          }
+        },
+        "eventTiming": {
+          "observedInputs": 0,
+          "reportedEvents": 0,
+          "ungroupedEvents": 0,
+          "reportedInteractions": 0,
+          "grouping": "not_yet_observed",
+          "retainedReportedInteractionCount": 0,
+          "retainedReportedInteractionMeanMs": null,
+          "interpretation": "reported_entries_only_not_all_interactions_or_page_inp",
+          "coverage": "unavailable"
+        },
+        "samples": [
+          {
+            "sequence": 1,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:1",
+            "stage": "resource_trend",
+            "startMs": 0.9263889999999719,
+            "durationMs": 0,
+            "outcome": "success",
+            "counters": {
+              "resourceCount": 0
+            }
+          },
+          {
+            "sequence": 2,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:2",
+            "stage": "api_headers",
+            "startMs": 18.097899000000098,
+            "durationMs": 0.7144729999999981,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 3,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:2",
+            "stage": "api_body",
+            "startMs": 19.189515999999912,
+            "durationMs": 0.620017000000189,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 4,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:2",
+            "stage": "request_round_trip",
+            "startMs": 18.07907399999999,
+            "durationMs": 1.7304590000001099,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 5,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:2",
+            "stage": "api_decode",
+            "startMs": 20.06280599999991,
+            "durationMs": 0.01484800000002906,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 6,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:6",
+            "stage": "realtime_decode",
+            "startMs": 22.817217000000028,
+            "durationMs": 0.11555599999996957,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 7,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:1",
+            "stage": "realtime_ready",
+            "startMs": 17.481148000000076,
+            "durationMs": 5.619207999999844,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 8,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:8",
+            "stage": "store_commit",
+            "startMs": 23.77780000000007,
+            "durationMs": 0.05502299999989191,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 9,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:9",
+            "stage": "realtime_decode",
+            "startMs": 24.65625,
+            "durationMs": 0.05118500000003223,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 10,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:10",
+            "stage": "api_headers",
+            "startMs": 25.49195899999995,
+            "durationMs": 0.20218799999997827,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 11,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:10",
+            "stage": "api_body",
+            "startMs": 25.760299999999916,
+            "durationMs": 0.09263299999997798,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 12,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:10",
+            "stage": "request_round_trip",
+            "startMs": 25.47547899999995,
+            "durationMs": 0.37745399999994333,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 13,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:10",
+            "stage": "api_decode",
+            "startMs": 26.02068600000007,
+            "durationMs": 0.012232999999923777,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 14,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:14",
+            "stage": "snapshot_conversion",
+            "startMs": 26.049880999999914,
+            "durationMs": 0.0420080000001235,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 15,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:15",
+            "stage": "api_headers",
+            "startMs": 26.185453999999936,
+            "durationMs": 0.0944160000001375,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 16,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:15",
+            "stage": "api_body",
+            "startMs": 26.298084000000017,
+            "durationMs": 0.06942000000003645,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 17,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:15",
+            "stage": "request_round_trip",
+            "startMs": 26.180343999999877,
+            "durationMs": 0.1871600000001763,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 18,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:15",
+            "stage": "api_decode",
+            "startMs": 26.41164600000002,
+            "durationMs": 0.008415999999897394,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 19,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:19",
+            "stage": "snapshot_conversion",
+            "startMs": 26.430951999999934,
+            "durationMs": 0.01477799999997842,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 20,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:21",
+            "stage": "buffer_replay",
+            "startMs": 33.80618699999991,
+            "durationMs": 0.1898150000001806,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 21,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:7",
+            "stage": "snapshot_merge",
+            "startMs": 33.500115999999935,
+            "durationMs": 0.948470000000043,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 22,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:7",
+            "stage": "workspace_ready_state",
+            "startMs": 23.56373099999996,
+            "durationMs": 10.916154000000006,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 23,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:23",
+            "stage": "api_headers",
+            "startMs": 37.94277800000009,
+            "durationMs": 0.3143969999998717,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 24,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:23",
+            "stage": "api_body",
+            "startMs": 38.28745099999992,
+            "durationMs": 0.08662200000003395,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 25,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:23",
+            "stage": "request_round_trip",
+            "startMs": 37.9348030000001,
+            "durationMs": 0.4392699999998513,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 26,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:23",
+            "stage": "api_decode",
+            "startMs": 38.42991699999993,
+            "durationMs": 0.006683000000066386,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 27,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:27",
+            "stage": "realtime_decode",
+            "startMs": 43.075788999999986,
+            "durationMs": 0.02088899999989735,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 28,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:22",
+            "stage": "realtime_ready",
+            "startMs": 37.8654939999999,
+            "durationMs": 5.261951000000181,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 29,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:29",
+            "stage": "store_commit",
+            "startMs": 43.24226900000008,
+            "durationMs": 0.0073039999999764404,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 30,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:30",
+            "stage": "realtime_decode",
+            "startMs": 43.70135600000003,
+            "durationMs": 0.01672099999996135,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 31,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:31",
+            "stage": "realtime_decode",
+            "startMs": 43.85955100000001,
+            "durationMs": 0.014537000000018452,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 32,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:32",
+            "stage": "realtime_decode",
+            "startMs": 44.150615000000016,
+            "durationMs": 0.026368999999931475,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 33,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:33",
+            "stage": "api_headers",
+            "startMs": 44.493443999999954,
+            "durationMs": 0.09126100000003134,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 34,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:33",
+            "stage": "api_body",
+            "startMs": 44.60188700000003,
+            "durationMs": 0.07553099999995538,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 35,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:33",
+            "stage": "request_round_trip",
+            "startMs": 44.48668199999997,
+            "durationMs": 0.19073600000001534,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 36,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:33",
+            "stage": "api_decode",
+            "startMs": 44.740215000000035,
+            "durationMs": 0.010949999999866122,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 37,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:37",
+            "stage": "snapshot_conversion",
+            "startMs": 44.763508,
+            "durationMs": 0.023124000000052547,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 38,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:39",
+            "stage": "buffer_replay",
+            "startMs": 44.866671,
+            "durationMs": 0.018454000000019732,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 39,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:28",
+            "stage": "snapshot_merge",
+            "startMs": 44.83835799999997,
+            "durationMs": 0.14945899999997891,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 40,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:28",
+            "stage": "workspace_ready_state",
+            "startMs": 43.164845000000014,
+            "durationMs": 1.838841999999886,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 41,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:41",
+            "stage": "store_commit",
+            "startMs": 45.03145900000004,
+            "durationMs": 0.004357999999911044,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 42,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:42",
+            "stage": "api_headers",
+            "startMs": 45.308275000000094,
+            "durationMs": 0.09160099999985505,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 43,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:42",
+            "stage": "api_body",
+            "startMs": 45.415976,
+            "durationMs": 0.056025000000090586,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 44,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:42",
+            "stage": "request_round_trip",
+            "startMs": 45.3022739999999,
+            "durationMs": 0.16972700000019358,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 45,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:42",
+            "stage": "api_decode",
+            "startMs": 45.510583,
+            "durationMs": 0.00832500000001346,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 46,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:46",
+            "stage": "snapshot_conversion",
+            "startMs": 45.52936799999998,
+            "durationMs": 0.021639999999933934,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 47,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:48",
+            "stage": "buffer_replay",
+            "startMs": 45.62197100000003,
+            "durationMs": 0.011872000000039407,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 48,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:40",
+            "stage": "snapshot_merge",
+            "startMs": 45.56469399999992,
+            "durationMs": 0.19979299999999967,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 49,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:40",
+            "stage": "workspace_ready_state",
+            "startMs": 45.02287299999989,
+            "durationMs": 0.7596570000000611,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 50,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:50",
+            "stage": "api_headers",
+            "startMs": 46.62171699999999,
+            "durationMs": 0.18932300000005853,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 51,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:50",
+            "stage": "api_body",
+            "startMs": 46.82874300000003,
+            "durationMs": 0.04737899999986439,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 52,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:50",
+            "stage": "request_round_trip",
+            "startMs": 46.61690799999997,
+            "durationMs": 0.259213999999929,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 53,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:50",
+            "stage": "api_decode",
+            "startMs": 46.911808000000065,
+            "durationMs": 0.005379999999831853,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 54,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:54",
+            "stage": "realtime_decode",
+            "startMs": 52.49127199999998,
+            "durationMs": 0.019866999999976542,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 55,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:49",
+            "stage": "realtime_ready",
+            "startMs": 46.565131000000065,
+            "durationMs": 5.9749819999999545,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 56,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:56",
+            "stage": "store_commit",
+            "startMs": 52.659396000000015,
+            "durationMs": 0.007413999999926091,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 57,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:57",
+            "stage": "api_headers",
+            "startMs": 52.98933199999988,
+            "durationMs": 0.07346700000016426,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 58,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:57",
+            "stage": "api_body",
+            "startMs": 53.07929899999999,
+            "durationMs": 0.06617400000004636,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 59,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:57",
+            "stage": "request_round_trip",
+            "startMs": 52.9830199999999,
+            "durationMs": 0.1624530000001414,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 60,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:57",
+            "stage": "api_decode",
+            "startMs": 53.18820299999993,
+            "durationMs": 0.00941699999998491,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 61,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:61",
+            "stage": "snapshot_conversion",
+            "startMs": 53.214111,
+            "durationMs": 0.013284999999996217,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 62,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:63",
+            "stage": "buffer_replay",
+            "startMs": 53.25665099999992,
+            "durationMs": 0.008295000000089203,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 63,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:55",
+            "stage": "snapshot_merge",
+            "startMs": 53.2425639999999,
+            "durationMs": 0.11418300000013915,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 64,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:55",
+            "stage": "workspace_ready_state",
+            "startMs": 52.575008000000025,
+            "durationMs": 0.797888999999941,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 65,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:65",
+            "stage": "api_headers",
+            "startMs": 54.82047899999998,
+            "durationMs": 0.21780699999999342,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 66,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:65",
+            "stage": "api_body",
+            "startMs": 55.057010999999875,
+            "durationMs": 0.06936900000005153,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 67,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:65",
+            "stage": "request_round_trip",
+            "startMs": 54.81610099999989,
+            "durationMs": 0.31027900000003683,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 68,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:65",
+            "stage": "api_decode",
+            "startMs": 55.17100299999993,
+            "durationMs": 0.005550999999968553,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 69,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:69",
+            "stage": "realtime_decode",
+            "startMs": 61.844419000000016,
+            "durationMs": 0.022592000000031476,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 70,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:64",
+            "stage": "realtime_ready",
+            "startMs": 54.781966999999895,
+            "durationMs": 7.110321000000113,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 71,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:71",
+            "stage": "store_commit",
+            "startMs": 61.93689199999994,
+            "durationMs": 0.005188999999973021,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 72,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:72",
+            "stage": "api_headers",
+            "startMs": 62.03061699999989,
+            "durationMs": 0.07209400000010646,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 73,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:72",
+            "stage": "api_body",
+            "startMs": 62.121746999999914,
+            "durationMs": 0.09733100000016748,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 74,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:72",
+            "stage": "request_round_trip",
+            "startMs": 62.02577700000006,
+            "durationMs": 0.19330100000001949,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 75,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:72",
+            "stage": "api_decode",
+            "startMs": 62.27591400000006,
+            "durationMs": 0.010379999999940992,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 76,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:76",
+            "stage": "snapshot_conversion",
+            "startMs": 62.2975449999999,
+            "durationMs": 0.009077000000161206,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 77,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:78",
+            "stage": "buffer_replay",
+            "startMs": 62.34597499999995,
+            "durationMs": 0.009328000000095926,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 78,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:70",
+            "stage": "snapshot_merge",
+            "startMs": 62.32851299999993,
+            "durationMs": 0.10551600000007966,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 79,
+            "correlation": "14fa3930-23b6-474c-93ec-422e5172362b:70",
+            "stage": "workspace_ready_state",
+            "startMs": 61.92474900000002,
+            "durationMs": 0.5237070000000585,
+            "outcome": "success",
+            "counters": {}
+          }
+        ],
+        "boundaries": [
+          "Durations use one local monotonic clock; overlapping stages must not be added.",
+          "State completion and React commit/render do not prove pixels have been presented.",
+          "Commit approximations use the first subsequent orders-subtree Profiler commit, which may include unrelated changes; target state presentation and businessFeedbackMs are unavailable.",
+          "react_render startMs is callback receipt time and actualDuration is React-reported work; concurrent render may not occupy a contiguous wall-clock interval.",
+          "sync_receive_to_state starts at the decoded-event hook callback; realtime_decode is separate and both exclude earlier network queueing.",
+          "Handler stages exclude input queueing before callback entry.",
+          "Interaction grouping is bounded by the retained sample window; evicted groups may be counted again if reported later.",
+          "Event Timing includes reported entries above the configured threshold only; no page INP is calculated.",
+          "Scroll intervals are rAF callback intervals during scrolling, not proof of presented frames.",
+          "Heap is optional JS heap observation, not Android process memory or proof of a leak.",
+          "Recording starts observing future activity only and never initiates business operations."
+        ]
+      }
+    },
+    {
+      "run": 2,
+      "status": "completed",
+      "correctness": "passed",
+      "recording": {
+        "type": "legero-field-performance",
+        "schemaVersion": 1,
+        "build": {
+          "appVersion": "0.0.23",
+          "mode": "test",
+          "profiling": false,
+          "commit": null,
+          "dirty": null,
+          "sourceSha256": {},
+          "unavailableReason": "source metadata unavailable at build time"
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (linux) AppleWebKit/537.36 (KHTML, like Gecko) jsdom/30.0.1",
+          "deviceModel": null,
+          "androidVersion": null,
+          "webViewVersion": null,
+          "unavailableReason": "Device model and Android/WebView versions require native device metadata or external inspection; userAgent is retained without version inference."
+        },
+        "sessionId": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03",
+        "status": "stopped",
+        "startedAt": "2026-10-15T15:59:58.000Z",
+        "elapsedMs": 33.16675400000008,
+        "profilingBuild": false,
+        "limits": {
+          "maxDurationMs": 10000,
+          "maxSamples": 500,
+          "maxActiveStages": 128,
+          "eventDurationThresholdMs": 40
+        },
+        "retention": "most_recent_samples",
+        "droppedSamples": 0,
+        "droppedStages": 0,
+        "incompleteStages": 0,
+        "capabilities": {
+          "eventTiming": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver event entries unavailable"
+          },
+          "longTasks": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver longtask entries unavailable"
+          },
+          "longAnimationFrames": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver long-animation-frame entries unavailable"
+          },
+          "resources": {
+            "status": "available",
+            "reason": null
+          },
+          "scrollFrames": {
+            "status": "available",
+            "reason": null
+          },
+          "heap": {
+            "status": "unavailable",
+            "reason": "Nonstandard performance.memory unavailable"
+          },
+          "reactProfiler": {
+            "status": "unavailable",
+            "reason": "Requires a dedicated React profiling build"
+          }
+        },
+        "eventTiming": {
+          "observedInputs": 0,
+          "reportedEvents": 0,
+          "ungroupedEvents": 0,
+          "reportedInteractions": 0,
+          "grouping": "not_yet_observed",
+          "retainedReportedInteractionCount": 0,
+          "retainedReportedInteractionMeanMs": null,
+          "interpretation": "reported_entries_only_not_all_interactions_or_page_inp",
+          "coverage": "unavailable"
+        },
+        "samples": [
+          {
+            "sequence": 1,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:1",
+            "stage": "resource_trend",
+            "startMs": 0.11674800000014329,
+            "durationMs": 0,
+            "outcome": "success",
+            "counters": {
+              "resourceCount": 0
+            }
+          },
+          {
+            "sequence": 2,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:2",
+            "stage": "api_headers",
+            "startMs": 1.5120730000001004,
+            "durationMs": 0.09828300000003765,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 3,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:2",
+            "stage": "api_body",
+            "startMs": 1.6312550000000101,
+            "durationMs": 0.039905000000089785,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 4,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:2",
+            "stage": "request_round_trip",
+            "startMs": 1.5074940000001789,
+            "durationMs": 0.16366599999992104,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 5,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:2",
+            "stage": "api_decode",
+            "startMs": 1.7306110000001809,
+            "durationMs": 0.005910999999969135,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 6,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:6",
+            "stage": "realtime_decode",
+            "startMs": 7.354758000000174,
+            "durationMs": 0.044011999999838736,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 7,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:1",
+            "stage": "realtime_ready",
+            "startMs": 1.470846000000165,
+            "durationMs": 5.96990199999982,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 8,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:8",
+            "stage": "store_commit",
+            "startMs": 7.523583000000144,
+            "durationMs": 0.007122999999864987,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 9,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:9",
+            "stage": "realtime_decode",
+            "startMs": 7.832059000000072,
+            "durationMs": 0.029995999999982814,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 10,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:10",
+            "stage": "api_headers",
+            "startMs": 8.066045000000031,
+            "durationMs": 0.05984200000011697,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 11,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:10",
+            "stage": "api_body",
+            "startMs": 8.142328000000134,
+            "durationMs": 0.03682800000001407,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 12,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:10",
+            "stage": "request_round_trip",
+            "startMs": 8.059974000000011,
+            "durationMs": 0.11918200000013712,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 13,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:10",
+            "stage": "api_decode",
+            "startMs": 8.217869000000064,
+            "durationMs": 0.012012000000140688,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 14,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:14",
+            "stage": "snapshot_conversion",
+            "startMs": 8.2467630000001,
+            "durationMs": 0.009426999999959662,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 15,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:15",
+            "stage": "api_headers",
+            "startMs": 8.31199400000014,
+            "durationMs": 0.03759999999988395,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 16,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:15",
+            "stage": "api_body",
+            "startMs": 8.362307999999985,
+            "durationMs": 0.02651000000014392,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 17,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:15",
+            "stage": "request_round_trip",
+            "startMs": 8.308027000000038,
+            "durationMs": 0.08079100000009021,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 18,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:15",
+            "stage": "api_decode",
+            "startMs": 8.428221000000121,
+            "durationMs": 0.008045000000038272,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 19,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:19",
+            "stage": "snapshot_conversion",
+            "startMs": 8.447456999999986,
+            "durationMs": 0.008055000000013024,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 20,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:21",
+            "stage": "buffer_replay",
+            "startMs": 8.536754000000201,
+            "durationMs": 0.021749999999883585,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 21,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:7",
+            "stage": "snapshot_merge",
+            "startMs": 8.495196000000078,
+            "durationMs": 0.14919899999995323,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 22,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:7",
+            "stage": "workspace_ready_state",
+            "startMs": 7.474461000000019,
+            "durationMs": 1.187025000000176,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 23,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:23",
+            "stage": "api_headers",
+            "startMs": 10.564919000000145,
+            "durationMs": 0.11890199999993456,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 24,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:23",
+            "stage": "api_body",
+            "startMs": 10.728865000000042,
+            "durationMs": 0.0330020000001241,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 25,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:23",
+            "stage": "request_round_trip",
+            "startMs": 10.55936900000006,
+            "durationMs": 0.2024980000001051,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 26,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:23",
+            "stage": "api_decode",
+            "startMs": 10.790520000000015,
+            "durationMs": 0.004439000000047599,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 27,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:27",
+            "stage": "realtime_decode",
+            "startMs": 16.226957000000084,
+            "durationMs": 0.01826400000004469,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 28,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:22",
+            "stage": "realtime_ready",
+            "startMs": 10.510057000000188,
+            "durationMs": 5.755732999999964,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 29,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:29",
+            "stage": "store_commit",
+            "startMs": 16.33310500000016,
+            "durationMs": 0.006902999999965687,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 30,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:30",
+            "stage": "realtime_decode",
+            "startMs": 16.564547000000175,
+            "durationMs": 0.010309000000006563,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 31,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:31",
+            "stage": "realtime_decode",
+            "startMs": 16.612427000000025,
+            "durationMs": 0.006462000000055923,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 32,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:32",
+            "stage": "realtime_decode",
+            "startMs": 16.664674000000105,
+            "durationMs": 0.013564999999971405,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 33,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:33",
+            "stage": "api_headers",
+            "startMs": 16.836174000000028,
+            "durationMs": 0.04531500000007327,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 34,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:33",
+            "stage": "api_body",
+            "startMs": 16.8952240000001,
+            "durationMs": 0.04124699999988479,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 35,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:33",
+            "stage": "request_round_trip",
+            "startMs": 16.83093400000007,
+            "durationMs": 0.10553699999991295,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 36,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:33",
+            "stage": "api_decode",
+            "startMs": 16.96565600000008,
+            "durationMs": 0.008986999999933687,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 37,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:37",
+            "stage": "snapshot_conversion",
+            "startMs": 16.983940000000075,
+            "durationMs": 0.010970000000043001,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 38,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:39",
+            "stage": "buffer_replay",
+            "startMs": 17.078957000000173,
+            "durationMs": 0.027501999999913096,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 39,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:28",
+            "stage": "snapshot_merge",
+            "startMs": 17.044062000000167,
+            "durationMs": 0.12566500000002634,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 40,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:28",
+            "stage": "workspace_ready_state",
+            "startMs": 16.29015500000014,
+            "durationMs": 0.8939080000000104,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 41,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:41",
+            "stage": "store_commit",
+            "startMs": 17.20923000000016,
+            "durationMs": 0.004067999999961103,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 42,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:42",
+            "stage": "api_headers",
+            "startMs": 17.35256800000002,
+            "durationMs": 0.03583700000012868,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 43,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:42",
+            "stage": "api_body",
+            "startMs": 17.40192000000002,
+            "durationMs": 0.025939000000107626,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 44,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:42",
+            "stage": "request_round_trip",
+            "startMs": 17.347098000000187,
+            "durationMs": 0.08076099999993858,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 45,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:42",
+            "stage": "api_decode",
+            "startMs": 17.45463800000016,
+            "durationMs": 0.007493999999951484,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 46,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:46",
+            "stage": "snapshot_conversion",
+            "startMs": 17.474125000000186,
+            "durationMs": 0.00984799999991992,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 47,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:48",
+            "stage": "buffer_replay",
+            "startMs": 17.513037000000168,
+            "durationMs": 0.006973999999900116,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 48,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:40",
+            "stage": "snapshot_merge",
+            "startMs": 17.497128000000203,
+            "durationMs": 0.06333799999993062,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 49,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:40",
+            "stage": "workspace_ready_state",
+            "startMs": 17.20086500000002,
+            "durationMs": 0.3711630000000241,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 50,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:50",
+            "stage": "api_headers",
+            "startMs": 18.041534000000183,
+            "durationMs": 0.09361499999999978,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 51,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:50",
+            "stage": "api_body",
+            "startMs": 18.1511280000002,
+            "durationMs": 0.021780999999919004,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 52,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:50",
+            "stage": "request_round_trip",
+            "startMs": 18.03750600000012,
+            "durationMs": 0.1354029999999966,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 53,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:50",
+            "stage": "api_decode",
+            "startMs": 18.197375000000193,
+            "durationMs": 0.005760000000009313,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 54,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:54",
+            "stage": "realtime_decode",
+            "startMs": 24.967791000000034,
+            "durationMs": 0.02337400000010348,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 55,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:49",
+            "stage": "realtime_ready",
+            "startMs": 18.004936000000043,
+            "durationMs": 7.029209000000037,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 56,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:56",
+            "stage": "store_commit",
+            "startMs": 25.12755900000002,
+            "durationMs": 0.009547999999995227,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 57,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:57",
+            "stage": "api_headers",
+            "startMs": 25.442217000000028,
+            "durationMs": 0.06661400000007234,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 58,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:57",
+            "stage": "api_body",
+            "startMs": 25.528598000000102,
+            "durationMs": 0.03967400000010457,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 59,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:57",
+            "stage": "request_round_trip",
+            "startMs": 25.434973000000127,
+            "durationMs": 0.1332990000000791,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 60,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:57",
+            "stage": "api_decode",
+            "startMs": 25.598318000000063,
+            "durationMs": 0.008735999999998967,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 61,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:61",
+            "stage": "snapshot_conversion",
+            "startMs": 25.62746200000015,
+            "durationMs": 0.007433999999875596,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 62,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:63",
+            "stage": "buffer_replay",
+            "startMs": 25.66425100000015,
+            "durationMs": 0.01411599999983082,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 63,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:55",
+            "stage": "snapshot_merge",
+            "startMs": 25.646769000000177,
+            "durationMs": 0.10934399999996458,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 64,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:55",
+            "stage": "workspace_ready_state",
+            "startMs": 25.06664599999999,
+            "durationMs": 0.7041940000001432,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 65,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:65",
+            "stage": "api_headers",
+            "startMs": 26.529115000000047,
+            "durationMs": 0.10694000000012238,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 66,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:65",
+            "stage": "api_body",
+            "startMs": 26.650923000000148,
+            "durationMs": 0.02540699999985918,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 67,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:65",
+            "stage": "request_round_trip",
+            "startMs": 26.525549000000183,
+            "durationMs": 0.15078099999982442,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 68,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:65",
+            "stage": "api_decode",
+            "startMs": 26.709672000000182,
+            "durationMs": 0.0045689999999467545,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 69,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:69",
+            "stage": "realtime_decode",
+            "startMs": 32.09083600000008,
+            "durationMs": 0.015489000000115993,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 70,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:64",
+            "stage": "realtime_ready",
+            "startMs": 26.498077000000194,
+            "durationMs": 5.630969999999934,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 71,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:71",
+            "stage": "store_commit",
+            "startMs": 32.17093599999998,
+            "durationMs": 0.008656000000200947,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 72,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:72",
+            "stage": "api_headers",
+            "startMs": 32.28080100000011,
+            "durationMs": 0.07255499999996573,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 73,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:72",
+            "stage": "api_body",
+            "startMs": 32.36904500000014,
+            "durationMs": 0.034764999999879365,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 74,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:72",
+            "stage": "request_round_trip",
+            "startMs": 32.274317999999994,
+            "durationMs": 0.12949200000002747,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 75,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:72",
+            "stage": "api_decode",
+            "startMs": 32.43366600000013,
+            "durationMs": 0.009297000000060507,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 76,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:76",
+            "stage": "snapshot_conversion",
+            "startMs": 32.45806100000004,
+            "durationMs": 0.004799000000048181,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 77,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:78",
+            "stage": "buffer_replay",
+            "startMs": 32.499198000000206,
+            "durationMs": 0.011471999999912441,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 78,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:70",
+            "stage": "snapshot_merge",
+            "startMs": 32.4753740000001,
+            "durationMs": 0.10528599999997823,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 79,
+            "correlation": "87944fe2-8b12-4e7e-8b3b-a51f8e569a03:70",
+            "stage": "workspace_ready_state",
+            "startMs": 32.15394400000014,
+            "durationMs": 0.443456999999853,
+            "outcome": "success",
+            "counters": {}
+          }
+        ],
+        "boundaries": [
+          "Durations use one local monotonic clock; overlapping stages must not be added.",
+          "State completion and React commit/render do not prove pixels have been presented.",
+          "Commit approximations use the first subsequent orders-subtree Profiler commit, which may include unrelated changes; target state presentation and businessFeedbackMs are unavailable.",
+          "react_render startMs is callback receipt time and actualDuration is React-reported work; concurrent render may not occupy a contiguous wall-clock interval.",
+          "sync_receive_to_state starts at the decoded-event hook callback; realtime_decode is separate and both exclude earlier network queueing.",
+          "Handler stages exclude input queueing before callback entry.",
+          "Interaction grouping is bounded by the retained sample window; evicted groups may be counted again if reported later.",
+          "Event Timing includes reported entries above the configured threshold only; no page INP is calculated.",
+          "Scroll intervals are rAF callback intervals during scrolling, not proof of presented frames.",
+          "Heap is optional JS heap observation, not Android process memory or proof of a leak.",
+          "Recording starts observing future activity only and never initiates business operations."
+        ]
+      }
+    },
+    {
+      "run": 3,
+      "status": "completed",
+      "correctness": "passed",
+      "recording": {
+        "type": "legero-field-performance",
+        "schemaVersion": 1,
+        "build": {
+          "appVersion": "0.0.23",
+          "mode": "test",
+          "profiling": false,
+          "commit": null,
+          "dirty": null,
+          "sourceSha256": {},
+          "unavailableReason": "source metadata unavailable at build time"
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (linux) AppleWebKit/537.36 (KHTML, like Gecko) jsdom/30.0.1",
+          "deviceModel": null,
+          "androidVersion": null,
+          "webViewVersion": null,
+          "unavailableReason": "Device model and Android/WebView versions require native device metadata or external inspection; userAgent is retained without version inference."
+        },
+        "sessionId": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9",
+        "status": "stopped",
+        "startedAt": "2026-10-15T15:59:58.000Z",
+        "elapsedMs": 33.414927000000034,
+        "profilingBuild": false,
+        "limits": {
+          "maxDurationMs": 10000,
+          "maxSamples": 500,
+          "maxActiveStages": 128,
+          "eventDurationThresholdMs": 40
+        },
+        "retention": "most_recent_samples",
+        "droppedSamples": 0,
+        "droppedStages": 0,
+        "incompleteStages": 0,
+        "capabilities": {
+          "eventTiming": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver event entries unavailable"
+          },
+          "longTasks": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver longtask entries unavailable"
+          },
+          "longAnimationFrames": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver long-animation-frame entries unavailable"
+          },
+          "resources": {
+            "status": "available",
+            "reason": null
+          },
+          "scrollFrames": {
+            "status": "available",
+            "reason": null
+          },
+          "heap": {
+            "status": "unavailable",
+            "reason": "Nonstandard performance.memory unavailable"
+          },
+          "reactProfiler": {
+            "status": "unavailable",
+            "reason": "Requires a dedicated React profiling build"
+          }
+        },
+        "eventTiming": {
+          "observedInputs": 0,
+          "reportedEvents": 0,
+          "ungroupedEvents": 0,
+          "reportedInteractions": 0,
+          "grouping": "not_yet_observed",
+          "retainedReportedInteractionCount": 0,
+          "retainedReportedInteractionMeanMs": null,
+          "interpretation": "reported_entries_only_not_all_interactions_or_page_inp",
+          "coverage": "unavailable"
+        },
+        "samples": [
+          {
+            "sequence": 1,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:1",
+            "stage": "resource_trend",
+            "startMs": 0.14651400000002468,
+            "durationMs": 0,
+            "outcome": "success",
+            "counters": {
+              "resourceCount": 0
+            }
+          },
+          {
+            "sequence": 2,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:2",
+            "stage": "api_headers",
+            "startMs": 1.8144669999999223,
+            "durationMs": 0.13154500000018743,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 3,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:2",
+            "stage": "api_body",
+            "startMs": 1.9688450000001012,
+            "durationMs": 0.03989400000000387,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 4,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:2",
+            "stage": "request_round_trip",
+            "startMs": 1.809146999999939,
+            "durationMs": 0.19959200000016608,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 5,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:2",
+            "stage": "api_decode",
+            "startMs": 2.0440349999998944,
+            "durationMs": 0.0056410000001960725,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 6,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:6",
+            "stage": "realtime_decode",
+            "startMs": 7.672941000000037,
+            "durationMs": 0.019497000000001208,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 7,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:1",
+            "stage": "realtime_ready",
+            "startMs": 1.7627899999999954,
+            "durationMs": 5.959303000000091,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 8,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:8",
+            "stage": "store_commit",
+            "startMs": 7.783237000000099,
+            "durationMs": 0.006572000000005573,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 9,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:9",
+            "stage": "realtime_decode",
+            "startMs": 7.988871000000017,
+            "durationMs": 0.016601000000036947,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 10,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:10",
+            "stage": "api_headers",
+            "startMs": 8.183643999999958,
+            "durationMs": 0.07001100000002225,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 11,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:10",
+            "stage": "api_body",
+            "startMs": 8.267831999999999,
+            "durationMs": 0.043431000000055064,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 12,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:10",
+            "stage": "request_round_trip",
+            "startMs": 8.179016000000047,
+            "durationMs": 0.13224700000000666,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 13,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:10",
+            "stage": "api_decode",
+            "startMs": 8.34115799999995,
+            "durationMs": 0.008565999999973428,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 14,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:14",
+            "stage": "snapshot_conversion",
+            "startMs": 8.358040000000074,
+            "durationMs": 0.00420799999983501,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 15,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:15",
+            "stage": "api_headers",
+            "startMs": 8.410667999999987,
+            "durationMs": 0.0350860000000921,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 16,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:15",
+            "stage": "api_body",
+            "startMs": 8.479135999999926,
+            "durationMs": 0.04069600000002538,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 17,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:15",
+            "stage": "request_round_trip",
+            "startMs": 8.407592000000022,
+            "durationMs": 0.11223999999992884,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 18,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:15",
+            "stage": "api_decode",
+            "startMs": 8.548365000000103,
+            "durationMs": 0.007533999999850494,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 19,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:19",
+            "stage": "snapshot_conversion",
+            "startMs": 8.564374999999927,
+            "durationMs": 0.004108000000087486,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 20,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:21",
+            "stage": "buffer_replay",
+            "startMs": 8.635307000000012,
+            "durationMs": 0.012473999999883745,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 21,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:7",
+            "stage": "snapshot_merge",
+            "startMs": 8.607385000000022,
+            "durationMs": 0.11789999999996326,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 22,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:7",
+            "stage": "workspace_ready_state",
+            "startMs": 7.747591000000057,
+            "durationMs": 0.9903779999999642,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 23,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:23",
+            "stage": "api_headers",
+            "startMs": 10.533149999999978,
+            "durationMs": 0.10146899999995185,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 24,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:23",
+            "stage": "api_body",
+            "startMs": 10.649556999999959,
+            "durationMs": 0.024454999999989013,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 25,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:23",
+            "stage": "request_round_trip",
+            "startMs": 10.530044000000089,
+            "durationMs": 0.14396799999985888,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 26,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:23",
+            "stage": "api_decode",
+            "startMs": 10.697296000000051,
+            "durationMs": 0.003966999999875043,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 27,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:27",
+            "stage": "realtime_decode",
+            "startMs": 17.16278299999999,
+            "durationMs": 0.017693000000008396,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 28,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:22",
+            "stage": "realtime_ready",
+            "startMs": 10.494437000000062,
+            "durationMs": 6.711937999999918,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 29,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:29",
+            "stage": "store_commit",
+            "startMs": 17.276526000000104,
+            "durationMs": 0.004547999999886088,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 30,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:30",
+            "stage": "realtime_decode",
+            "startMs": 17.530739999999923,
+            "durationMs": 0.011502000000064072,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 31,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:31",
+            "stage": "realtime_decode",
+            "startMs": 17.586563999999953,
+            "durationMs": 0.007133999999950902,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 32,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:32",
+            "stage": "realtime_decode",
+            "startMs": 17.663798999999926,
+            "durationMs": 0.016931000000113272,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 33,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:33",
+            "stage": "api_headers",
+            "startMs": 17.846770000000106,
+            "durationMs": 0.048800999999912165,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 34,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:33",
+            "stage": "api_body",
+            "startMs": 17.91064899999992,
+            "durationMs": 0.03872300000011819,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 35,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:33",
+            "stage": "request_round_trip",
+            "startMs": 17.841609999999946,
+            "durationMs": 0.1077620000000934,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 36,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:33",
+            "stage": "api_decode",
+            "startMs": 17.979867999999897,
+            "durationMs": 0.011412000000063927,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 37,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:37",
+            "stage": "snapshot_conversion",
+            "startMs": 18.000988000000007,
+            "durationMs": 0.004347999999936292,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 38,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:39",
+            "stage": "buffer_replay",
+            "startMs": 18.066600000000108,
+            "durationMs": 0.013314999999920474,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 39,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:28",
+            "stage": "snapshot_merge",
+            "startMs": 18.045360999999957,
+            "durationMs": 0.0991950000000088,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 40,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:28",
+            "stage": "workspace_ready_state",
+            "startMs": 17.23027900000011,
+            "durationMs": 0.928262999999788,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 41,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:41",
+            "stage": "store_commit",
+            "startMs": 18.17819899999995,
+            "durationMs": 0.0027250000000549335,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 42,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:42",
+            "stage": "api_headers",
+            "startMs": 18.338017000000036,
+            "durationMs": 0.0493420000000242,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 43,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:42",
+            "stage": "api_body",
+            "startMs": 18.40054400000008,
+            "durationMs": 0.026378999999906227,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 44,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:42",
+            "stage": "request_round_trip",
+            "startMs": 18.33372899999995,
+            "durationMs": 0.09319400000003952,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 45,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:42",
+            "stage": "api_decode",
+            "startMs": 18.451749000000063,
+            "durationMs": 0.006952999999839449,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 46,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:46",
+            "stage": "snapshot_conversion",
+            "startMs": 18.466136000000006,
+            "durationMs": 0.003085999999939304,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 47,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:48",
+            "stage": "buffer_replay",
+            "startMs": 18.502754000000095,
+            "durationMs": 0.007313999999951193,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 48,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:40",
+            "stage": "snapshot_merge",
+            "startMs": 18.485521999999946,
+            "durationMs": 0.057187000000112675,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 49,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:40",
+            "stage": "workspace_ready_state",
+            "startMs": 18.171295999999984,
+            "durationMs": 0.38047000000005937,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 50,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:50",
+            "stage": "api_headers",
+            "startMs": 18.945670999999948,
+            "durationMs": 0.1127200000000812,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 51,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:50",
+            "stage": "api_body",
+            "startMs": 19.07391000000007,
+            "durationMs": 0.022111999999879117,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 52,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:50",
+            "stage": "request_round_trip",
+            "startMs": 18.941383000000087,
+            "durationMs": 0.15463899999986097,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 53,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:50",
+            "stage": "api_decode",
+            "startMs": 19.139413000000104,
+            "durationMs": 0.004267999999910899,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 54,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:54",
+            "stage": "realtime_decode",
+            "startMs": 24.585256999999956,
+            "durationMs": 0.015319000000090455,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 55,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:49",
+            "stage": "realtime_ready",
+            "startMs": 18.910546000000068,
+            "durationMs": 5.716698999999835,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 56,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:56",
+            "stage": "store_commit",
+            "startMs": 24.688900999999987,
+            "durationMs": 0.0043180000000120344,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 57,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:57",
+            "stage": "api_headers",
+            "startMs": 24.86525000000006,
+            "durationMs": 0.05293800000004012,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 58,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:57",
+            "stage": "api_body",
+            "startMs": 24.935471000000007,
+            "durationMs": 0.0345239999999194,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 59,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:57",
+            "stage": "request_round_trip",
+            "startMs": 24.85897799999998,
+            "durationMs": 0.11101699999994707,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 60,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:57",
+            "stage": "api_decode",
+            "startMs": 25.00335700000005,
+            "durationMs": 0.010420000000067375,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 61,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:61",
+            "stage": "snapshot_conversion",
+            "startMs": 25.024366999999984,
+            "durationMs": 0.004357999999911044,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 62,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:63",
+            "stage": "buffer_replay",
+            "startMs": 25.05010500000003,
+            "durationMs": 0.007032999999864842,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 63,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:55",
+            "stage": "snapshot_merge",
+            "startMs": 25.040807000000086,
+            "durationMs": 0.0696100000000115,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 64,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:55",
+            "stage": "workspace_ready_state",
+            "startMs": 24.65185100000008,
+            "durationMs": 0.48879299999998693,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 65,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:65",
+            "stage": "api_headers",
+            "startMs": 25.833155999999917,
+            "durationMs": 0.12089600000012979,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 66,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:65",
+            "stage": "api_body",
+            "startMs": 25.972727000000077,
+            "durationMs": 0.027089999999816428,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 67,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:65",
+            "stage": "request_round_trip",
+            "startMs": 25.829398999999967,
+            "durationMs": 0.1704179999999269,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 68,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:65",
+            "stage": "api_decode",
+            "startMs": 26.026927999999998,
+            "durationMs": 0.004838999999947191,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 69,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:69",
+            "stage": "realtime_decode",
+            "startMs": 32.46632599999998,
+            "durationMs": 0.016231000000061613,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 70,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:64",
+            "stage": "realtime_ready",
+            "startMs": 25.7990420000001,
+            "durationMs": 6.711296999999831,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 71,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:71",
+            "stage": "store_commit",
+            "startMs": 32.53997400000003,
+            "durationMs": 0.0035570000000006985,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 72,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:72",
+            "stage": "api_headers",
+            "startMs": 32.60949400000004,
+            "durationMs": 0.046786999999994805,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 73,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:72",
+            "stage": "api_body",
+            "startMs": 32.66993700000012,
+            "durationMs": 0.03463399999986905,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 74,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:72",
+            "stage": "request_round_trip",
+            "startMs": 32.605326000000105,
+            "durationMs": 0.09924499999988257,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 75,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:72",
+            "stage": "api_decode",
+            "startMs": 32.73305400000004,
+            "durationMs": 0.009759000000030937,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 76,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:76",
+            "stage": "snapshot_conversion",
+            "startMs": 32.75127799999996,
+            "durationMs": 0.005030000000033397,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 77,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:78",
+            "stage": "buffer_replay",
+            "startMs": 32.77720700000009,
+            "durationMs": 0.006701999999904729,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 78,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:70",
+            "stage": "snapshot_merge",
+            "startMs": 32.76719800000001,
+            "durationMs": 0.06247699999994438,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 79,
+            "correlation": "a43479ee-c943-4d6f-9df4-fc0dc2ee1ed9:70",
+            "stage": "workspace_ready_state",
+            "startMs": 32.53168800000003,
+            "durationMs": 0.30944799999997485,
+            "outcome": "success",
+            "counters": {}
+          }
+        ],
+        "boundaries": [
+          "Durations use one local monotonic clock; overlapping stages must not be added.",
+          "State completion and React commit/render do not prove pixels have been presented.",
+          "Commit approximations use the first subsequent orders-subtree Profiler commit, which may include unrelated changes; target state presentation and businessFeedbackMs are unavailable.",
+          "react_render startMs is callback receipt time and actualDuration is React-reported work; concurrent render may not occupy a contiguous wall-clock interval.",
+          "sync_receive_to_state starts at the decoded-event hook callback; realtime_decode is separate and both exclude earlier network queueing.",
+          "Handler stages exclude input queueing before callback entry.",
+          "Interaction grouping is bounded by the retained sample window; evicted groups may be counted again if reported later.",
+          "Event Timing includes reported entries above the configured threshold only; no page INP is calculated.",
+          "Scroll intervals are rAF callback intervals during scrolling, not proof of presented frames.",
+          "Heap is optional JS heap observation, not Android process memory or proof of a leak.",
+          "Recording starts observing future activity only and never initiates business operations."
+        ]
+      }
+    },
+    {
+      "run": 4,
+      "status": "completed",
+      "correctness": "passed",
+      "recording": {
+        "type": "legero-field-performance",
+        "schemaVersion": 1,
+        "build": {
+          "appVersion": "0.0.23",
+          "mode": "test",
+          "profiling": false,
+          "commit": null,
+          "dirty": null,
+          "sourceSha256": {},
+          "unavailableReason": "source metadata unavailable at build time"
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (linux) AppleWebKit/537.36 (KHTML, like Gecko) jsdom/30.0.1",
+          "deviceModel": null,
+          "androidVersion": null,
+          "webViewVersion": null,
+          "unavailableReason": "Device model and Android/WebView versions require native device metadata or external inspection; userAgent is retained without version inference."
+        },
+        "sessionId": "f85bf591-973d-4a41-a116-3034c2e289cb",
+        "status": "stopped",
+        "startedAt": "2026-10-15T15:59:58.000Z",
+        "elapsedMs": 34.57893899999999,
+        "profilingBuild": false,
+        "limits": {
+          "maxDurationMs": 10000,
+          "maxSamples": 500,
+          "maxActiveStages": 128,
+          "eventDurationThresholdMs": 40
+        },
+        "retention": "most_recent_samples",
+        "droppedSamples": 0,
+        "droppedStages": 0,
+        "incompleteStages": 0,
+        "capabilities": {
+          "eventTiming": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver event entries unavailable"
+          },
+          "longTasks": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver longtask entries unavailable"
+          },
+          "longAnimationFrames": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver long-animation-frame entries unavailable"
+          },
+          "resources": {
+            "status": "available",
+            "reason": null
+          },
+          "scrollFrames": {
+            "status": "available",
+            "reason": null
+          },
+          "heap": {
+            "status": "unavailable",
+            "reason": "Nonstandard performance.memory unavailable"
+          },
+          "reactProfiler": {
+            "status": "unavailable",
+            "reason": "Requires a dedicated React profiling build"
+          }
+        },
+        "eventTiming": {
+          "observedInputs": 0,
+          "reportedEvents": 0,
+          "ungroupedEvents": 0,
+          "reportedInteractions": 0,
+          "grouping": "not_yet_observed",
+          "retainedReportedInteractionCount": 0,
+          "retainedReportedInteractionMeanMs": null,
+          "interpretation": "reported_entries_only_not_all_interactions_or_page_inp",
+          "coverage": "unavailable"
+        },
+        "samples": [
+          {
+            "sequence": 1,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:1",
+            "stage": "resource_trend",
+            "startMs": 0.13404999999988831,
+            "durationMs": 0,
+            "outcome": "success",
+            "counters": {
+              "resourceCount": 0
+            }
+          },
+          {
+            "sequence": 2,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:2",
+            "stage": "api_headers",
+            "startMs": 1.5325800000000527,
+            "durationMs": 0.10296299999981784,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 3,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:2",
+            "stage": "api_body",
+            "startMs": 1.655078999999887,
+            "durationMs": 0.03609700000015437,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 4,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:2",
+            "stage": "request_round_trip",
+            "startMs": 1.5282720000000154,
+            "durationMs": 0.16290400000002592,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 5,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:2",
+            "stage": "api_decode",
+            "startMs": 1.7204709999998613,
+            "durationMs": 0.0047790000000986765,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 6,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:6",
+            "stage": "realtime_decode",
+            "startMs": 7.3137910000000375,
+            "durationMs": 0.029264000000011947,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 7,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:1",
+            "stage": "realtime_ready",
+            "startMs": 1.494179000000031,
+            "durationMs": 5.912464999999884,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 8,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:8",
+            "stage": "store_commit",
+            "startMs": 7.490820999999869,
+            "durationMs": 0.006392000000005282,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 9,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:9",
+            "stage": "realtime_decode",
+            "startMs": 7.7461779999998726,
+            "durationMs": 0.02076800000008916,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 10,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:10",
+            "stage": "api_headers",
+            "startMs": 7.987417999999934,
+            "durationMs": 0.06622399999992012,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 11,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:10",
+            "stage": "api_body",
+            "startMs": 8.070031999999856,
+            "durationMs": 0.04588600000010956,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 12,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:10",
+            "stage": "request_round_trip",
+            "startMs": 7.98178699999994,
+            "durationMs": 0.13413100000002487,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 13,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:10",
+            "stage": "api_decode",
+            "startMs": 8.15278699999999,
+            "durationMs": 0.010068000000046595,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 14,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:14",
+            "stage": "snapshot_conversion",
+            "startMs": 8.174487,
+            "durationMs": 0.005249999999932697,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 15,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:15",
+            "stage": "api_headers",
+            "startMs": 8.234739999999874,
+            "durationMs": 0.04217800000014904,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 16,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:15",
+            "stage": "api_body",
+            "startMs": 8.289301000000023,
+            "durationMs": 0.03377299999988281,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 17,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:15",
+            "stage": "request_round_trip",
+            "startMs": 8.230701999999837,
+            "durationMs": 0.09237200000006851,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 18,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:15",
+            "stage": "api_decode",
+            "startMs": 8.352579999999989,
+            "durationMs": 0.00892599999997401,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 19,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:19",
+            "stage": "snapshot_conversion",
+            "startMs": 8.370944000000009,
+            "durationMs": 0.013985999999931664,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 20,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:21",
+            "stage": "buffer_replay",
+            "startMs": 8.459920000000011,
+            "durationMs": 0.010479000000032102,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 21,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:7",
+            "stage": "snapshot_merge",
+            "startMs": 8.438769999999977,
+            "durationMs": 0.12304999999992106,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 22,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:7",
+            "stage": "workspace_ready_state",
+            "startMs": 7.444223999999849,
+            "durationMs": 1.1347580000001471,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 23,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:23",
+            "stage": "api_headers",
+            "startMs": 10.816448000000037,
+            "durationMs": 0.1958959999999479,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 24,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:23",
+            "stage": "api_body",
+            "startMs": 11.06962099999987,
+            "durationMs": 0.04320000000006985,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 25,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:23",
+            "stage": "request_round_trip",
+            "startMs": 10.811067999999977,
+            "durationMs": 0.3017529999999624,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 26,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:23",
+            "stage": "api_decode",
+            "startMs": 11.153196999999864,
+            "durationMs": 0.0058109999999942374,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 27,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:27",
+            "stage": "realtime_decode",
+            "startMs": 16.930278999999928,
+            "durationMs": 0.02158000000008542,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 28,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:22",
+            "stage": "realtime_ready",
+            "startMs": 10.7135659999999,
+            "durationMs": 6.270023000000037,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 29,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:29",
+            "stage": "store_commit",
+            "startMs": 17.06945900000005,
+            "durationMs": 0.004908999999997832,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 30,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:30",
+            "stage": "realtime_decode",
+            "startMs": 17.336176999999907,
+            "durationMs": 0.01089999999999236,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 31,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:31",
+            "stage": "realtime_decode",
+            "startMs": 17.413301000000047,
+            "durationMs": 0.009006999999883192,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 32,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:32",
+            "stage": "realtime_decode",
+            "startMs": 17.495633999999882,
+            "durationMs": 0.01770299999998315,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 33,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:33",
+            "stage": "api_headers",
+            "startMs": 17.706016999999974,
+            "durationMs": 0.060021999999889886,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 34,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:33",
+            "stage": "api_body",
+            "startMs": 17.781467999999904,
+            "durationMs": 0.04082600000015191,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 35,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:33",
+            "stage": "request_round_trip",
+            "startMs": 17.70184900000004,
+            "durationMs": 0.1204450000000179,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 36,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:33",
+            "stage": "api_decode",
+            "startMs": 17.85946399999989,
+            "durationMs": 0.011901999999963664,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 37,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:37",
+            "stage": "snapshot_conversion",
+            "startMs": 17.887224999999944,
+            "durationMs": 0.005480999999917913,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 38,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:39",
+            "stage": "buffer_replay",
+            "startMs": 17.94979199999989,
+            "durationMs": 0.011762000000089756,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 39,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:28",
+            "stage": "snapshot_merge",
+            "startMs": 17.930134999999837,
+            "durationMs": 0.08958800000004885,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 40,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:28",
+            "stage": "workspace_ready_state",
+            "startMs": 17.01035899999988,
+            "durationMs": 1.0231290000001536,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 41,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:41",
+            "stage": "store_commit",
+            "startMs": 18.054967999999917,
+            "durationMs": 0.002555000000029395,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 42,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:42",
+            "stage": "api_headers",
+            "startMs": 18.214525999999978,
+            "durationMs": 0.04797000000007756,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 43,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:42",
+            "stage": "api_body",
+            "startMs": 18.276751999999988,
+            "durationMs": 0.0337130000000343,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 44,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:42",
+            "stage": "request_round_trip",
+            "startMs": 18.210047999999915,
+            "durationMs": 0.10041700000010678,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 45,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:42",
+            "stage": "api_decode",
+            "startMs": 18.342926000000034,
+            "durationMs": 0.009116999999832842,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 46,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:46",
+            "stage": "snapshot_conversion",
+            "startMs": 18.362802999999985,
+            "durationMs": 0.003946999999925538,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 47,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:48",
+            "stage": "buffer_replay",
+            "startMs": 18.398899999999912,
+            "durationMs": 0.006321999999954642,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 48,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:40",
+            "stage": "snapshot_merge",
+            "startMs": 18.387077999999974,
+            "durationMs": 0.05798899999990681,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 49,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:40",
+            "stage": "workspace_ready_state",
+            "startMs": 18.048616999999922,
+            "durationMs": 0.409123000000136,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 50,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:50",
+            "stage": "api_headers",
+            "startMs": 18.965477999999848,
+            "durationMs": 0.12028400000008332,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 51,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:50",
+            "stage": "api_body",
+            "startMs": 19.103174999999965,
+            "durationMs": 0.029295000000047366,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 52,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:50",
+            "stage": "request_round_trip",
+            "startMs": 18.96197099999995,
+            "durationMs": 0.17049900000006346,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 53,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:50",
+            "stage": "api_decode",
+            "startMs": 19.16479000000004,
+            "durationMs": 0.005589999999983775,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 54,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:54",
+            "stage": "realtime_decode",
+            "startMs": 25.658830999999964,
+            "durationMs": 0.01875500000005559,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 55,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:49",
+            "stage": "realtime_ready",
+            "startMs": 18.926905999999917,
+            "durationMs": 6.7804450000001,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 56,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:56",
+            "stage": "store_commit",
+            "startMs": 25.78458499999988,
+            "durationMs": 0.005020000000058644,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 57,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:57",
+            "stage": "api_headers",
+            "startMs": 26.06961699999988,
+            "durationMs": 0.08109200000012606,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 58,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:57",
+            "stage": "api_body",
+            "startMs": 26.170665999999983,
+            "durationMs": 0.053560000000061336,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 59,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:57",
+            "stage": "request_round_trip",
+            "startMs": 26.063576000000012,
+            "durationMs": 0.16065000000003238,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 60,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:57",
+            "stage": "api_decode",
+            "startMs": 26.269160000000056,
+            "durationMs": 0.012793999999985317,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 61,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:61",
+            "stage": "snapshot_conversion",
+            "startMs": 26.294828000000052,
+            "durationMs": 0.006310999999868727,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 62,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:63",
+            "stage": "buffer_replay",
+            "startMs": 26.33232799999996,
+            "durationMs": 0.007603999999901134,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 63,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:55",
+            "stage": "snapshot_merge",
+            "startMs": 26.318170999999893,
+            "durationMs": 0.10130900000012844,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 64,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:55",
+            "stage": "workspace_ready_state",
+            "startMs": 25.737356999999975,
+            "durationMs": 0.6996460000000297,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 65,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:65",
+            "stage": "api_headers",
+            "startMs": 27.570809000000054,
+            "durationMs": 0.1654689999998027,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 66,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:65",
+            "stage": "api_body",
+            "startMs": 27.757477999999992,
+            "durationMs": 0.03582600000004277,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 67,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:65",
+            "stage": "request_round_trip",
+            "startMs": 27.56673099999989,
+            "durationMs": 0.22657300000014402,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 68,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:65",
+            "stage": "api_decode",
+            "startMs": 27.830312999999933,
+            "durationMs": 0.005411000000094646,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 69,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:69",
+            "stage": "realtime_decode",
+            "startMs": 33.34342300000003,
+            "durationMs": 0.020267999999987296,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 70,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:64",
+            "stage": "realtime_ready",
+            "startMs": 27.53149600000006,
+            "durationMs": 5.879563999999846,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 71,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:71",
+            "stage": "store_commit",
+            "startMs": 33.490949,
+            "durationMs": 0.004437999999936437,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 72,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:72",
+            "stage": "api_headers",
+            "startMs": 33.58936199999994,
+            "durationMs": 0.09220200000004297,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 73,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:72",
+            "stage": "api_body",
+            "startMs": 33.699738000000025,
+            "durationMs": 0.052367999999887616,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 74,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:72",
+            "stage": "request_round_trip",
+            "startMs": 33.58489399999985,
+            "durationMs": 0.1672120000000632,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 75,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:72",
+            "stage": "api_decode",
+            "startMs": 33.796348999999964,
+            "durationMs": 0.013034000000061496,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 76,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:76",
+            "stage": "snapshot_conversion",
+            "startMs": 33.82224700000006,
+            "durationMs": 0.006692999999813765,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 77,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:78",
+            "stage": "buffer_replay",
+            "startMs": 33.85960699999987,
+            "durationMs": 0.00881600000002436,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 78,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:70",
+            "stage": "snapshot_merge",
+            "startMs": 33.84575099999984,
+            "durationMs": 0.08483800000021802,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 79,
+            "correlation": "f85bf591-973d-4a41-a116-3034c2e289cb:70",
+            "stage": "workspace_ready_state",
+            "startMs": 33.4777939999999,
+            "durationMs": 0.46762300000000323,
+            "outcome": "success",
+            "counters": {}
+          }
+        ],
+        "boundaries": [
+          "Durations use one local monotonic clock; overlapping stages must not be added.",
+          "State completion and React commit/render do not prove pixels have been presented.",
+          "Commit approximations use the first subsequent orders-subtree Profiler commit, which may include unrelated changes; target state presentation and businessFeedbackMs are unavailable.",
+          "react_render startMs is callback receipt time and actualDuration is React-reported work; concurrent render may not occupy a contiguous wall-clock interval.",
+          "sync_receive_to_state starts at the decoded-event hook callback; realtime_decode is separate and both exclude earlier network queueing.",
+          "Handler stages exclude input queueing before callback entry.",
+          "Interaction grouping is bounded by the retained sample window; evicted groups may be counted again if reported later.",
+          "Event Timing includes reported entries above the configured threshold only; no page INP is calculated.",
+          "Scroll intervals are rAF callback intervals during scrolling, not proof of presented frames.",
+          "Heap is optional JS heap observation, not Android process memory or proof of a leak.",
+          "Recording starts observing future activity only and never initiates business operations."
+        ]
+      }
+    },
+    {
+      "run": 5,
+      "status": "completed",
+      "correctness": "passed",
+      "recording": {
+        "type": "legero-field-performance",
+        "schemaVersion": 1,
+        "build": {
+          "appVersion": "0.0.23",
+          "mode": "test",
+          "profiling": false,
+          "commit": null,
+          "dirty": null,
+          "sourceSha256": {},
+          "unavailableReason": "source metadata unavailable at build time"
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (linux) AppleWebKit/537.36 (KHTML, like Gecko) jsdom/30.0.1",
+          "deviceModel": null,
+          "androidVersion": null,
+          "webViewVersion": null,
+          "unavailableReason": "Device model and Android/WebView versions require native device metadata or external inspection; userAgent is retained without version inference."
+        },
+        "sessionId": "66071e09-06b0-4231-be2d-aeaf018daa14",
+        "status": "stopped",
+        "startedAt": "2026-10-15T15:59:58.000Z",
+        "elapsedMs": 34.25533599999994,
+        "profilingBuild": false,
+        "limits": {
+          "maxDurationMs": 10000,
+          "maxSamples": 500,
+          "maxActiveStages": 128,
+          "eventDurationThresholdMs": 40
+        },
+        "retention": "most_recent_samples",
+        "droppedSamples": 0,
+        "droppedStages": 0,
+        "incompleteStages": 0,
+        "capabilities": {
+          "eventTiming": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver event entries unavailable"
+          },
+          "longTasks": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver longtask entries unavailable"
+          },
+          "longAnimationFrames": {
+            "status": "unavailable",
+            "reason": "PerformanceObserver long-animation-frame entries unavailable"
+          },
+          "resources": {
+            "status": "available",
+            "reason": null
+          },
+          "scrollFrames": {
+            "status": "available",
+            "reason": null
+          },
+          "heap": {
+            "status": "unavailable",
+            "reason": "Nonstandard performance.memory unavailable"
+          },
+          "reactProfiler": {
+            "status": "unavailable",
+            "reason": "Requires a dedicated React profiling build"
+          }
+        },
+        "eventTiming": {
+          "observedInputs": 0,
+          "reportedEvents": 0,
+          "ungroupedEvents": 0,
+          "reportedInteractions": 0,
+          "grouping": "not_yet_observed",
+          "retainedReportedInteractionCount": 0,
+          "retainedReportedInteractionMeanMs": null,
+          "interpretation": "reported_entries_only_not_all_interactions_or_page_inp",
+          "coverage": "unavailable"
+        },
+        "samples": [
+          {
+            "sequence": 1,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:1",
+            "stage": "resource_trend",
+            "startMs": 0.13988099999983206,
+            "durationMs": 0,
+            "outcome": "success",
+            "counters": {
+              "resourceCount": 0
+            }
+          },
+          {
+            "sequence": 2,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:2",
+            "stage": "api_headers",
+            "startMs": 2.3640919999998005,
+            "durationMs": 0.1764100000000326,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 3,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:2",
+            "stage": "api_body",
+            "startMs": 2.5689149999998335,
+            "durationMs": 0.053620000000137225,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 4,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:2",
+            "stage": "request_round_trip",
+            "startMs": 2.359613999999965,
+            "durationMs": 0.26292100000000573,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 5,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:2",
+            "stage": "api_decode",
+            "startMs": 2.6708849999999984,
+            "durationMs": 0.007413999999926091,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 6,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:6",
+            "stage": "realtime_decode",
+            "startMs": 8.3570679999998,
+            "durationMs": 0.019797000000153275,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 7,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:1",
+            "stage": "realtime_ready",
+            "startMs": 2.3168439999999464,
+            "durationMs": 6.092120999999906,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 8,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:8",
+            "stage": "store_commit",
+            "startMs": 8.467864999999847,
+            "durationMs": 0.003777000000127373,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 9,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:9",
+            "stage": "realtime_decode",
+            "startMs": 8.695199000000002,
+            "durationMs": 0.019385999999940395,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 10,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:10",
+            "stage": "api_headers",
+            "startMs": 8.96964099999991,
+            "durationMs": 0.08059099999991304,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 11,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:10",
+            "stage": "api_body",
+            "startMs": 9.07161199999996,
+            "durationMs": 0.05230699999992794,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 12,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:10",
+            "stage": "request_round_trip",
+            "startMs": 8.96390099999985,
+            "durationMs": 0.1600180000000364,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 560
+            }
+          },
+          {
+            "sequence": 13,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:10",
+            "stage": "api_decode",
+            "startMs": 9.159204999999929,
+            "durationMs": 0.01082999999994172,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 14,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:14",
+            "stage": "snapshot_conversion",
+            "startMs": 9.180564999999888,
+            "durationMs": 0.004558999999972002,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 15,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:15",
+            "stage": "api_headers",
+            "startMs": 9.27218599999992,
+            "durationMs": 0.048910999999861815,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 16,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:15",
+            "stage": "api_body",
+            "startMs": 9.33552399999985,
+            "durationMs": 0.034865000000081636,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 17,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:15",
+            "stage": "request_round_trip",
+            "startMs": 9.268438999999944,
+            "durationMs": 0.101949999999988,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 18,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:15",
+            "stage": "api_decode",
+            "startMs": 9.400985999999875,
+            "durationMs": 0.00920799999994415,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 19,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:19",
+            "stage": "snapshot_conversion",
+            "startMs": 9.41929099999993,
+            "durationMs": 0.003746999999975742,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 20,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:21",
+            "stage": "buffer_replay",
+            "startMs": 9.476827999999841,
+            "durationMs": 0.009637999999995372,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 21,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:7",
+            "stage": "snapshot_merge",
+            "startMs": 9.459515999999894,
+            "durationMs": 0.09867400000007365,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 22,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:7",
+            "stage": "workspace_ready_state",
+            "startMs": 8.435313999999835,
+            "durationMs": 1.1337660000001506,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 23,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:23",
+            "stage": "api_headers",
+            "startMs": 11.397702999999865,
+            "durationMs": 0.11276100000009137,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 24,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:23",
+            "stage": "api_body",
+            "startMs": 11.525340999999798,
+            "durationMs": 0.038813000000118336,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 25,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:23",
+            "stage": "request_round_trip",
+            "startMs": 11.394827999999961,
+            "durationMs": 0.16932599999995546,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 26,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:23",
+            "stage": "api_decode",
+            "startMs": 11.589751999999862,
+            "durationMs": 0.004237000000102853,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 27,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:27",
+            "stage": "realtime_decode",
+            "startMs": 17.046074999999973,
+            "durationMs": 0.012633999999934531,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 28,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:22",
+            "stage": "realtime_ready",
+            "startMs": 11.364190999999892,
+            "durationMs": 5.71202100000005,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 29,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:29",
+            "stage": "store_commit",
+            "startMs": 17.127066999999897,
+            "durationMs": 0.003676000000041313,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 30,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:30",
+            "stage": "realtime_decode",
+            "startMs": 17.345914999999877,
+            "durationMs": 0.011291000000028362,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 31,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:31",
+            "stage": "realtime_decode",
+            "startMs": 17.41617599999995,
+            "durationMs": 0.007223999999951047,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 32,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:32",
+            "stage": "realtime_decode",
+            "startMs": 17.47844199999986,
+            "durationMs": 0.01594000000000051,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 33,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:33",
+            "stage": "api_headers",
+            "startMs": 17.640384999999924,
+            "durationMs": 0.044953999999961525,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 34,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:33",
+            "stage": "api_body",
+            "startMs": 17.69946499999992,
+            "durationMs": 0.033071999999947366,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 35,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:33",
+            "stage": "request_round_trip",
+            "startMs": 17.636256999999887,
+            "durationMs": 0.09627999999997883,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 1065
+            }
+          },
+          {
+            "sequence": 36,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:33",
+            "stage": "api_decode",
+            "startMs": 17.762151999999787,
+            "durationMs": 0.01079000000004271,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 37,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:37",
+            "stage": "snapshot_conversion",
+            "startMs": 17.781136999999944,
+            "durationMs": 0.00409799999988536,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 38,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:39",
+            "stage": "buffer_replay",
+            "startMs": 17.824698999999782,
+            "durationMs": 0.01068000000009306,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 39,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:28",
+            "stage": "snapshot_merge",
+            "startMs": 17.81052199999999,
+            "durationMs": 0.07190399999990404,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 2
+            }
+          },
+          {
+            "sequence": 40,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:28",
+            "stage": "workspace_ready_state",
+            "startMs": 17.09443599999986,
+            "durationMs": 0.7983799999999519,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 41,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:41",
+            "stage": "store_commit",
+            "startMs": 17.912702999999965,
+            "durationMs": 0.0021939999999176507,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 42,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:42",
+            "stage": "api_headers",
+            "startMs": 18.040170999999873,
+            "durationMs": 0.038851999999906184,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 43,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:42",
+            "stage": "api_body",
+            "startMs": 18.091355999999905,
+            "durationMs": 0.027632000000039625,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 44,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:42",
+            "stage": "request_round_trip",
+            "startMs": 18.03576299999986,
+            "durationMs": 0.08322500000008404,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 546
+            }
+          },
+          {
+            "sequence": 45,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:42",
+            "stage": "api_decode",
+            "startMs": 18.14480599999979,
+            "durationMs": 0.0075940000001537555,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 46,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:46",
+            "stage": "snapshot_conversion",
+            "startMs": 18.16065599999979,
+            "durationMs": 0.003276000000141721,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 47,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:48",
+            "stage": "buffer_replay",
+            "startMs": 18.1858729999999,
+            "durationMs": 0.005038999999896987,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 48,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:40",
+            "stage": "snapshot_merge",
+            "startMs": 18.173328999999967,
+            "durationMs": 0.06431999999995242,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 49,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:40",
+            "stage": "workspace_ready_state",
+            "startMs": 17.906601999999793,
+            "durationMs": 0.3472980000001371,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 50,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:50",
+            "stage": "api_headers",
+            "startMs": 18.667391999999836,
+            "durationMs": 0.08693200000016077,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 51,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:50",
+            "stage": "api_body",
+            "startMs": 18.76719799999978,
+            "durationMs": 0.03307200000017474,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 52,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:50",
+            "stage": "request_round_trip",
+            "startMs": 18.66502699999978,
+            "durationMs": 0.1352430000001732,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 53,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:50",
+            "stage": "api_decode",
+            "startMs": 18.82208999999989,
+            "durationMs": 0.0037070000000767322,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 54,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:54",
+            "stage": "realtime_decode",
+            "startMs": 25.262019999999893,
+            "durationMs": 0.019776999999976397,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 55,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:49",
+            "stage": "realtime_ready",
+            "startMs": 18.64130299999988,
+            "durationMs": 6.668615999999929,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 56,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:56",
+            "stage": "store_commit",
+            "startMs": 25.380089999999882,
+            "durationMs": 0.004339000000072701,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 57,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:57",
+            "stage": "api_headers",
+            "startMs": 25.651346999999987,
+            "durationMs": 0.09107999999991989,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 58,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:57",
+            "stage": "api_body",
+            "startMs": 25.762744999999995,
+            "durationMs": 0.05794799999989664,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 59,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:57",
+            "stage": "request_round_trip",
+            "startMs": 25.64461399999982,
+            "durationMs": 0.17607900000007248,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 555
+            }
+          },
+          {
+            "sequence": 60,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:57",
+            "stage": "api_decode",
+            "startMs": 25.868912999999793,
+            "durationMs": 0.012283000000024913,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 61,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:61",
+            "stage": "snapshot_conversion",
+            "startMs": 25.89477099999999,
+            "durationMs": 0.006351999999878899,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 62,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:63",
+            "stage": "buffer_replay",
+            "startMs": 25.9320909999999,
+            "durationMs": 0.014546999999993204,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 63,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:55",
+            "stage": "snapshot_merge",
+            "startMs": 25.918586000000005,
+            "durationMs": 0.09956499999998414,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 64,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:55",
+            "stage": "workspace_ready_state",
+            "startMs": 25.33224099999984,
+            "durationMs": 0.6987440000000333,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 65,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:65",
+            "stage": "api_headers",
+            "startMs": 26.954819999999927,
+            "durationMs": 0.17424499999992804,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 66,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:65",
+            "stage": "api_body",
+            "startMs": 27.149622999999792,
+            "durationMs": 0.03876200000013341,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 67,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:65",
+            "stage": "request_round_trip",
+            "startMs": 26.95125299999995,
+            "durationMs": 0.23713199999997414,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 36
+            }
+          },
+          {
+            "sequence": 68,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:65",
+            "stage": "api_decode",
+            "startMs": 27.24043299999994,
+            "durationMs": 0.0053089999998974235,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 69,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:69",
+            "stage": "realtime_decode",
+            "startMs": 33.24859599999991,
+            "durationMs": 0.0243359999999484,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 70,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:64",
+            "stage": "realtime_ready",
+            "startMs": 26.917699999999968,
+            "durationMs": 6.385948999999982,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 71,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:71",
+            "stage": "store_commit",
+            "startMs": 33.33385599999997,
+            "durationMs": 0.003185999999914202,
+            "outcome": "success",
+            "counters": {
+              "uniqueCount": 0,
+              "acceptedCount": 0
+            }
+          },
+          {
+            "sequence": 72,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:72",
+            "stage": "api_headers",
+            "startMs": 33.412211999999954,
+            "durationMs": 0.06535199999984798,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 73,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:72",
+            "stage": "api_body",
+            "startMs": 33.48839399999997,
+            "durationMs": 0.04160799999999654,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 74,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:72",
+            "stage": "request_round_trip",
+            "startMs": 33.40918599999986,
+            "durationMs": 0.1208160000001044,
+            "outcome": "success",
+            "counters": {
+              "byteCount": 552
+            }
+          },
+          {
+            "sequence": 75,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:72",
+            "stage": "api_decode",
+            "startMs": 33.55864499999984,
+            "durationMs": 0.009047000000009575,
+            "outcome": "success",
+            "counters": {}
+          },
+          {
+            "sequence": 76,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:76",
+            "stage": "snapshot_conversion",
+            "startMs": 33.57489499999997,
+            "durationMs": 0.004257999999936146,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1,
+              "pageCount": 1
+            }
+          },
+          {
+            "sequence": 77,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:78",
+            "stage": "buffer_replay",
+            "startMs": 33.600602999999865,
+            "durationMs": 0.006151999999929103,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 0
+            }
+          },
+          {
+            "sequence": 78,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:70",
+            "stage": "snapshot_merge",
+            "startMs": 33.58989299999985,
+            "durationMs": 0.06478100000003906,
+            "outcome": "success",
+            "counters": {
+              "inputCount": 1
+            }
+          },
+          {
+            "sequence": 79,
+            "correlation": "66071e09-06b0-4231-be2d-aeaf018daa14:70",
+            "stage": "workspace_ready_state",
+            "startMs": 33.325218999999834,
+            "durationMs": 0.3382719999999608,
+            "outcome": "success",
+            "counters": {}
+          }
+        ],
+        "boundaries": [
+          "Durations use one local monotonic clock; overlapping stages must not be added.",
+          "State completion and React commit/render do not prove pixels have been presented.",
+          "Commit approximations use the first subsequent orders-subtree Profiler commit, which may include unrelated changes; target state presentation and businessFeedbackMs are unavailable.",
+          "react_render startMs is callback receipt time and actualDuration is React-reported work; concurrent render may not occupy a contiguous wall-clock interval.",
+          "sync_receive_to_state starts at the decoded-event hook callback; realtime_decode is separate and both exclude earlier network queueing.",
+          "Handler stages exclude input queueing before callback entry.",
+          "Interaction grouping is bounded by the retained sample window; evicted groups may be counted again if reported later.",
+          "Event Timing includes reported entries above the configured threshold only; no page INP is calculated.",
+          "Scroll intervals are rAF callback intervals during scrolling, not proof of presented frames.",
+          "Heap is optional JS heap observation, not Android process memory or proof of a leak.",
+          "Recording starts observing future activity only and never initiates business operations."
+        ]
+      }
+    }
+  ]
+}

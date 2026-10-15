@@ -16,7 +16,7 @@ const OrderBenchmarkSettings = () => (
             测试订单处理性能
           </span>
           <span className='mt-1 block text-sm leading-6 text-foreground/75'>
-            每次运行 5 轮取平均值，可复制结果用于门店排查。
+            每次运行 5 轮取平均值，可保存完整结果文件用于门店排查。
           </span>
         </span>
         <span className='shrink-0 text-sm font-medium text-foreground transition-transform duration-200 motion-reduce:transition-none group-hover:translate-x-0.5'>
