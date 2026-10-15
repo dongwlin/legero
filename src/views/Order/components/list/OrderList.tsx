@@ -3,7 +3,7 @@ import OrderItem from './OrderItem'
 import { useOrderStore } from '@/store/order'
 import { List, RowComponentProps, useDynamicRowHeight } from 'react-window'
 import { AutoSizer } from 'react-virtualized-auto-sizer'
-import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import { selectTodayOrderIds } from '@/services/orderWorkspaceView'
 import { formatPriceCents } from '@/services/orderPricing'
 import { CarbonArrowUp } from '@/components/Icon'
 import { Button, Card, EmptyState } from '@heroui/react'
@@ -195,26 +195,10 @@ const OrderList: React.FC = () => {
     (state) => state.pruneQuickCalcSelection,
   )
 
-  const filteredOrderIds = useMemo(() => {
-    const todayIds = orderDisplayIds.filter((id) =>
-      isOrderCreatedToday(ordersById[id]),
-    )
-
-    switch (filter) {
-      case 'uncompleted':
-        return todayIds.filter((id) => ordersById[id].completedAt === null)
-      case 'completed':
-        return todayIds
-          .filter((id) => ordersById[id].completedAt !== null)
-          .sort(
-            (a, b) =>
-              new Date(ordersById[b].completedAt ?? 0).getTime() -
-              new Date(ordersById[a].completedAt ?? 0).getTime(),
-          )
-      default:
-        return todayIds
-    }
-  }, [ordersById, orderDisplayIds, filter])
+  const filteredOrderIds = useMemo(
+    () => selectTodayOrderIds(ordersById, orderDisplayIds, filter),
+    [ordersById, orderDisplayIds, filter],
+  )
 
   const selectedOrderIdSet = useMemo(
     () => new Set(quickCalcSelectedOrderIds),

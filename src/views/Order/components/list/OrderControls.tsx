@@ -1,7 +1,7 @@
 import OrderForm from '../forms/OrderForm'
 import { useOrderStore } from '@/store/order'
 import { Filter } from '@/types'
-import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import { countTodayOrders } from '@/services/orderWorkspaceView'
 import { Card, ListBox, Select } from '@heroui/react'
 import React, { useMemo } from 'react'
 
@@ -11,29 +11,10 @@ const OrderControls: React.FC = () => {
   const filter = useOrderStore((state) => state.filter)
   const setFilter = useOrderStore((state) => state.setFilter)
 
-  const { todayCompletedCount, uncompletedCount } = useMemo(() => {
-    let todayCompleted = 0
-    let uncompleted = 0
-
-    for (const id of orderDisplayIds) {
-      const record = ordersById[id]
-
-      if (!isOrderCreatedToday(record)) {
-        continue
-      }
-
-      if (record.completedAt === null) {
-        uncompleted++
-      } else {
-        todayCompleted++
-      }
-    }
-
-    return {
-      todayCompletedCount: todayCompleted,
-      uncompletedCount: uncompleted,
-    }
-  }, [ordersById, orderDisplayIds])
+  const { todayCompletedCount, uncompletedCount } = useMemo(
+    () => countTodayOrders(ordersById, orderDisplayIds),
+    [ordersById, orderDisplayIds],
+  )
 
   return (
     <Card.Root
