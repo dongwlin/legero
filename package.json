@@ -18,6 +18,7 @@
     "benchmark:recorder-overhead": "node benchmarks/order-workspace/recorder-overhead.mjs",
     "benchmark:soak": "node benchmarks/order-workspace/soak.mjs",
     "benchmark:sync": "vitest run --project=unit tests/performance/workspaceSyncFlows.test.tsx",
+    "benchmark:clients": "node benchmarks/browser-workspace/run.mjs",
     "preview": "vite preview",
     "sync": "pnpm cap sync",
     "gen-icon": "npx @capacitor/assets generate --assetPath public --android",
