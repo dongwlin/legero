@@ -93,13 +93,13 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
         <div className='space-y-6'>
           <Card.Root variant='secondary' className='border border-border/70 p-0 shadow-surface'>
             <Card.Header className='gap-1 px-5 pt-5 md:px-6 md:pt-6'>
-              <Card.Title className='text-lg md:text-xl'>测试这台设备</Card.Title>
-              <Card.Description className='leading-6'>
+              <h2 className='text-lg font-semibold md:text-xl'>测试这台设备</h2>
+              <Card.Description className='leading-6 text-foreground/75'>
                 用模拟订单重复执行“肉、主食、出餐”的本地状态更新与列表计算，每个场景运行 5 轮取平均值。
               </Card.Description>
             </Card.Header>
             <Card.Content className='space-y-5 px-5 pb-5 md:px-6 md:pb-6'>
-              <div className='space-y-2 text-sm leading-6 text-muted'>
+              <div className='space-y-2 text-sm leading-6 text-foreground/75'>
                 <p>分别测试 130、520、1820 单，每个场景包含 130 单今日订单。</p>
                 <p>测试不会读取或修改真实订单，也不会提交订单到服务器。</p>
                 <p>结果仅反映本地模拟处理耗时，不包含网络、服务器响应或页面完整渲染耗时。请在非忙碌时测试，并保持应用在前台。</p>
@@ -132,16 +132,16 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
                       max={5}
                       value={progress ? Math.max(0, progress.run - 1) : 0}
                     />
-                    <p className='text-muted'>可随时取消；离开此页或切换到后台会停止测试。</p>
+                    <p className='text-foreground/75'>可随时取消；离开此页或切换到后台会停止测试。</p>
                   </div>
                 ) : status === 'cancelled' ? (
-                  <p className='text-muted'>测试已取消，未生成平均值。可重新开始。</p>
+                  <p className='text-foreground/75'>测试已取消，未生成平均值。可重新开始。</p>
                 ) : status === 'error' ? (
-                  <p role='alert' className='text-danger'>测试未完成，请重新运行。如仍失败，请重启应用后重试。</p>
+                  <p role='alert' className='text-foreground font-medium'>测试未完成，请重新运行。如仍失败，请重启应用后重试。</p>
                 ) : status === 'done' ? (
                   <p>已完成 5 轮，以下为每次模拟操作的平均耗时，数值越低越快。</p>
                 ) : (
-                  <p className='text-muted'>尚未测试。请在出现卡顿的实际操作设备上运行，并保留结果用于对比。</p>
+                  <p className='text-foreground/75'>尚未测试。请在出现卡顿的实际操作设备上运行，并保留结果用于对比。</p>
                 )}
               </div>
             </Card.Content>
@@ -152,18 +152,18 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
               <section aria-labelledby='benchmark-results-title' className='space-y-5'>
                 <div className='space-y-1'>
                   <h2 id='benchmark-results-title' className='text-lg font-semibold md:text-xl'>5 轮平均结果</h2>
-                  <p className='text-sm leading-6 text-muted'>
+                  <p className='text-sm leading-6 text-foreground/75'>
                     应用版本：{result.environment.appVersion ?? '当前浏览器未提供'}
                     {result.environment.appBuild ? `（构建 ${result.environment.appBuild}）` : ''}
                   </p>
-                  <p className='text-sm leading-6 text-muted'>本地阶段为立即更新，确认阶段模拟收到服务器记录后的再次更新；两个阶段均包含状态写入和列表计算。</p>
+                  <p className='text-sm leading-6 text-foreground/75'>本地阶段为立即更新，确认阶段模拟收到服务器记录后的再次更新；两个阶段均包含状态写入和列表计算。</p>
                 </div>
                 {result.means.map((scenario) => (
                   <div key={scenario.totalOrders} className='rounded-2xl border border-border/70 bg-background-secondary/35 px-4 py-4 sm:px-5'>
                     <h3 className='font-medium tabular-nums'>{scenario.totalOrders} 单，其中今日 {scenario.todayOrders} 单</h3>
                     <table className='mt-3 w-full table-fixed text-left text-xs tabular-nums sm:text-sm'>
                       <caption className='sr-only'>{scenario.totalOrders} 单下各操作的 5 轮平均耗时</caption>
-                      <thead className='text-muted'>
+                      <thead className='text-foreground/75'>
                         <tr>
                           <th scope='col' className='w-12 py-2 font-medium sm:w-16'>操作</th>
                           <th scope='col' className='py-2 text-right font-medium'>平均总耗时</th>
@@ -178,18 +178,18 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
                             <tr key={action}>
                               <th scope='row' className='py-3 font-medium'>{benchmarkActionLabel[action]}</th>
                               <td className='py-3 text-right font-semibold'>{formatBenchmarkMs(timing.totalMs)}</td>
-                              <td className='py-3 text-right text-muted'>{formatBenchmarkMs(timing.optimisticCommitMs + timing.optimisticViewsMs)}</td>
-                              <td className='py-3 text-right text-muted'>{formatBenchmarkMs(timing.authoritativeCommitMs + timing.authoritativeViewsMs)}</td>
+                              <td className='py-3 text-right text-foreground/75'>{formatBenchmarkMs(timing.optimisticCommitMs + timing.optimisticViewsMs)}</td>
+                              <td className='py-3 text-right text-foreground/75'>{formatBenchmarkMs(timing.authoritativeCommitMs + timing.authoritativeViewsMs)}</td>
                             </tr>
                           )
                         })}
                       </tbody>
                     </table>
                     <details className='mt-2 border-t border-border/60 pt-1'>
-                      <summary className='min-h-11 cursor-pointer py-3 text-sm text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'>查看 5 轮原始耗时</summary>
+                      <summary className='min-h-11 cursor-pointer py-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'>查看 5 轮原始耗时</summary>
                       <table className='w-full table-fixed text-left text-xs tabular-nums sm:text-sm'>
                         <caption className='sr-only'>{scenario.totalOrders} 单下各轮的总耗时</caption>
-                        <thead className='text-muted'>
+                        <thead className='text-foreground/75'>
                           <tr>
                             <th scope='col' className='w-12 py-2 font-medium sm:w-16'>轮次</th>
                             {benchmarkActions.map((action) => <th key={action} scope='col' className='py-2 text-right font-medium'>{benchmarkActionLabel[action]}</th>)}
@@ -215,7 +215,7 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
                 <Button.Root className='min-h-11 w-full sm:w-auto' variant='outline' onPress={() => { void handleCopy() }}>
                   {copyState === 'copied' ? '已复制结果' : '复制测试结果'}
                 </Button.Root>
-                <p aria-live='polite' className='text-sm leading-6 text-muted'>
+                <p aria-live='polite' className='text-sm leading-6 text-foreground/75'>
                   {copyState === 'copied'
                     ? '已复制全部 5 轮、平均值和设备环境，可粘贴用于排查。'
                     : copyState === 'manual'
