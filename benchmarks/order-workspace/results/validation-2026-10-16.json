@@ -1,0 +1,107 @@
+{
+  "type": "legero-benchmark-independent-result-validation",
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-15T23:29:36.733Z",
+  "status": "passed",
+  "method": "Independent Node arithmetic over saved raw samples: per-trial means, equally weighted five-trial means, sample and trial min/max/population standard deviation; exact current source-file SHA-256; no performance implementation imports",
+  "files": [
+    {
+      "file": "baseline-v3-default-2026-10-16.json",
+      "status": "completed",
+      "protocol": 3,
+      "trials": 5,
+      "fixtures": 3,
+      "casesPerFixture": [
+        18,
+        18,
+        18
+      ],
+      "recordedOperations": 1350,
+      "bytes": 1287615,
+      "sha256": "0703aed1b6d555d557db1e5a2283a06391420c6be35e6a162f265c494cd80430",
+      "sourceCommit": "cd003baf4276bce9582855a0b99c39aa90959e41",
+      "sourceHashesMatchCurrentFiles": true,
+      "allSamplesCorrect": true,
+      "allMeansAndStatisticsRecomputed": true
+    },
+    {
+      "file": "baseline-v3-today-2026-10-16.json",
+      "status": "completed",
+      "protocol": 3,
+      "trials": 5,
+      "fixtures": 3,
+      "casesPerFixture": [
+        18,
+        18,
+        18
+      ],
+      "recordedOperations": 1350,
+      "bytes": 1281849,
+      "sha256": "7078d112adb7b712faa07d3b5e0e7dba01dc95d89e05f29943dc65482869582a",
+      "sourceCommit": "cd003baf4276bce9582855a0b99c39aa90959e41",
+      "sourceHashesMatchCurrentFiles": true,
+      "allSamplesCorrect": true,
+      "allMeansAndStatisticsRecomputed": true
+    },
+    {
+      "file": "baseline-v3-batch-2026-10-16.json",
+      "status": "completed",
+      "protocol": 3,
+      "trials": 5,
+      "fixtures": 1,
+      "casesPerFixture": [
+        19
+      ],
+      "recordedOperations": 475,
+      "bytes": 453041,
+      "sha256": "2dac6ed1d6fae00b68c0b965e775fb331cb619b0282a1b441da5b936b186d8f1",
+      "sourceCommit": "cd003baf4276bce9582855a0b99c39aa90959e41",
+      "sourceHashesMatchCurrentFiles": true,
+      "allSamplesCorrect": true,
+      "allMeansAndStatisticsRecomputed": true
+    },
+    {
+      "file": "baseline-v3-history-2026-10-16.json",
+      "status": "completed",
+      "protocol": 3,
+      "trials": 5,
+      "fixtures": 2,
+      "casesPerFixture": [
+        18,
+        18
+      ],
+      "recordedOperations": 900,
+      "bytes": 856044,
+      "sha256": "eca23889adf0f1fa401c000325a74bed7e040d3b7865fc7a9d5a0f6081560a4c",
+      "sourceCommit": "cd003baf4276bce9582855a0b99c39aa90959e41",
+      "sourceHashesMatchCurrentFiles": true,
+      "allSamplesCorrect": true,
+      "allMeansAndStatisticsRecomputed": true
+    }
+  ],
+  "recordedOperations": 4075,
+  "exportFixture": {
+    "bytes": 1470816,
+    "largerThanEveryComputationalResult": true
+  },
+  "limitations": [
+    "development machine only",
+    "does not validate Android native delivery or actual business pixels"
+  ],
+  "additionalFunctionalValidation": {
+    "file": "workspace-clients-desktop-2026-10-16.json",
+    "sha256": "585e5582af9c48a058ab460d619cd224b15e0add586448573432367d5cc401cd",
+    "bytes": 1466131,
+    "clientCounts": [
+      1,
+      2,
+      3
+    ],
+    "trialsPerCount": 5,
+    "checksPerTrial": 14,
+    "recordedSamples": 2775,
+    "allSuccessfulStageFiveTrialMeansRecomputed": true,
+    "sourceHashesMatchCurrentFiles": true,
+    "largerExportFixture": true
+  }
+}

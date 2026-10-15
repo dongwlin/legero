@@ -98,3 +98,9 @@ pnpm benchmark:soak --profile 8h --output /tmp/soak-8h.json
 主动记录的请求才携带随机 `X-Performance-Request-ID`。新后端回显受控关联号，并暴露 `Server-Timing: app;dur=..., db;dur=...`；旧后端缺失时不填零。`app` 截至首次响应头，`db` 是 Bun 查询 hook 累计（含连接池／驱动等开销），不是 PostgreSQL 引擎独占时间。阶段可重叠，不能相加。后端说明见相邻仓库的 `docs/performance-timing.md`；没有默认开放 pprof。
 
 所有开发电脑报告与门店 Android 结果分别解读。现场照片转录仍见 [2026-10-15 记录](../../docs/order-benchmark-onsite-2026-10-15.md)，不视为完整可复算的五轮 JSON。阶段状态、采样证据与待验收项见 [扩展方案](../../docs/performance-benchmark-expansion-plan.md)。
+
+## 桌面独立客户端功能流程
+
+`pnpm benchmark:clients --output benchmarks/order-workspace/results/workspace-clients-desktop-2026-10-16.json` 顺序运行 1／2／3 客户端各五轮。每个客户端使用全新浏览器上下文和独立 singleton，实际调用同步及按钮 action hook；传输为合成 HTTP／WebSocket。覆盖分页、HTTP／WS 交错、失败回滚、断线快照期间删除／清空／批量更新、工作区切换及连接清理。完整边界见[多客户端说明](../browser-workspace/README.md)。这是桌面开发构建功能轨迹，不能用来推导真实设备间的端到端呈现耗时。
+
+本次所有基线、开销、短跑和未完成验收汇总于[2026-10-16 实施记录](../../docs/performance-benchmark-expansion-implementation-2026-10-16.md)。

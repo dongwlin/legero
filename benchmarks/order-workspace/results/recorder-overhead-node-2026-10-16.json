@@ -1,0 +1,461 @@
+{
+  "type": "legero-recorder-stage-switch-overhead",
+  "schemaVersion": 1,
+  "status": "completed",
+  "capturedAt": "2026-10-15T23:28:02.713Z",
+  "source": {
+    "commit": "cd003baf4276bce9582855a0b99c39aa90959e41",
+    "branch": "main",
+    "workingTreeStatus": "M benchmarks/order-workspace/README.md\n M docs/order-benchmark-onsite-2026-10-15.md\n M docs/performance-benchmark-expansion-plan.md\n M package.json\n M tests/performance/README.md\n?? benchmarks/browser-workspace/\n?? benchmarks/order-workspace/results/baseline-v2-batch-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v2-default-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v2-history-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v2-today-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v3-batch-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v3-default-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v3-history-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v3-today-2026-10-16.json\n?? docs/performance-benchmark-expansion-implementation-2026-10-16.md",
+    "sha256": {
+      "src/services/performanceRecorder.ts": "c370aa43331c634e0dcd105563d9cc15ed9d8bd3da10de979a2be1886fc98f3b",
+      "src/services/buildMetadata.ts": "1d9ef62252c742d582dc7fbd067085f3b3d5e0f8455de478f4197a4ff3727c50",
+      "benchmarks/order-workspace/recorder-overhead.mjs": "bba421827b8f66b2d7c6b93f6cde256dedc73aedfc253fe9027f3f31258b3846",
+      "benchmarks/order-workspace/recorder-overhead-workload.ts": "840f617f2f2b63f9a1e69f3452dc3313b439502d27d12420b376d5907b8fb385",
+      "package.json": "4572e214823775a2e4f826419f33134024421a287c7f1d3cde28b46231303f23",
+      "pnpm-lock.yaml": "8ec564c245a62008ff222f04645185c55edc155d03eb034b0200beea10f2a24b"
+    }
+  },
+  "environment": {
+    "runtime": "node",
+    "node": "v24.18.0",
+    "v8": "13.6.233.17-node.50",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "logicalCpus": 16,
+    "memoryBytes": 33478365184,
+    "pnpm": "pnpm/11.28.4 npm/? node/v24.18.0 linux x64",
+    "timezone": "UTC",
+    "build": {
+      "appVersion": "0.0.23",
+      "mode": "production-ssr",
+      "profiling": false,
+      "commit": "cd003baf4276bce9582855a0b99c39aa90959e41",
+      "dirty": true,
+      "sourceSha256": {
+        "src/services/performanceRecorder.ts": "c370aa43331c634e0dcd105563d9cc15ed9d8bd3da10de979a2be1886fc98f3b",
+        "src/services/buildMetadata.ts": "1d9ef62252c742d582dc7fbd067085f3b3d5e0f8455de478f4197a4ff3727c50",
+        "benchmarks/order-workspace/recorder-overhead.mjs": "bba421827b8f66b2d7c6b93f6cde256dedc73aedfc253fe9027f3f31258b3846",
+        "benchmarks/order-workspace/recorder-overhead-workload.ts": "840f617f2f2b63f9a1e69f3452dc3313b439502d27d12420b376d5907b8fb385",
+        "package.json": "4572e214823775a2e4f826419f33134024421a287c7f1d3cde28b46231303f23",
+        "pnpm-lock.yaml": "8ec564c245a62008ff222f04645185c55edc155d03eb034b0200beea10f2a24b"
+      },
+      "unavailableReason": null
+    }
+  },
+  "protocol": {
+    "version": 1,
+    "plannedTrials": 5,
+    "isolation": "five sequential fresh Node processes",
+    "warmupCallsPerCondition": 1000,
+    "measuredCallsPerCondition": 5000,
+    "conditionOrder": "odd trials disabled then enabled; even trials enabled then disabled",
+    "workload": "actual createPerformanceRecorder beginStage(store_commit)/finishStage around an empty workload; no business/store mutation",
+    "activeSampleCapacity": 2000,
+    "activeMaxDurationMs": 120000,
+    "boundary": "outer synchronous loop duration divided by 5,000 measured calls; includes collector, real User Timing, bounded sample retention and loop overhead; excludes start/stop, warmup and snapshot cloning",
+    "aggregation": "each condition retains five trial per-call means; final values are their equally weighted arithmetic means; difference is enabled minus disabled, not a business speedup",
+    "verification": "enabled runs retain 2,000 samples and drop 4,001 (6,000 stage calls plus one initial resource-trend sample); both conditions leave zero owned timers, marks and measures",
+    "excludes": [
+      "browser Event Timing/Long Task/LoAF/resource/scroll observer overhead (unavailable in this Node adapter)",
+      "React profiling and UI",
+      "real business code, HTTP/server/database and Android devices",
+      "recorder getSnapshot/start/stop overhead"
+    ]
+  },
+  "trials": [
+    {
+      "run": 1,
+      "status": "completed",
+      "conditionOrder": [
+        "disabled",
+        "enabled"
+      ],
+      "observations": [
+        {
+          "condition": "disabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 0.8900410000000001,
+          "measuredPerCallMeanMs": 0.00017800820000000002,
+          "activeBeforeStop": false,
+          "statusAfterStop": "never_started",
+          "retainedSamples": 0,
+          "droppedSamples": 0,
+          "incompleteStages": 0,
+          "capabilities": null,
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        },
+        {
+          "condition": "enabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 30.356778999999996,
+          "measuredPerCallMeanMs": 0.006071355799999999,
+          "activeBeforeStop": true,
+          "statusAfterStop": "stopped",
+          "retainedSamples": 2000,
+          "droppedSamples": 4001,
+          "incompleteStages": 0,
+          "capabilities": {
+            "eventTiming": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver event entries unavailable"
+            },
+            "longTasks": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver longtask entries unavailable"
+            },
+            "longAnimationFrames": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver long-animation-frame entries unavailable"
+            },
+            "resources": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver resource entries unavailable"
+            },
+            "scrollFrames": {
+              "status": "unavailable",
+              "reason": "Scroll/rAF APIs unavailable"
+            },
+            "heap": {
+              "status": "unavailable",
+              "reason": "Nonstandard performance.memory unavailable"
+            },
+            "reactProfiler": {
+              "status": "unavailable",
+              "reason": "Requires a dedicated React profiling build"
+            }
+          },
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "status": "completed",
+      "conditionOrder": [
+        "enabled",
+        "disabled"
+      ],
+      "observations": [
+        {
+          "condition": "enabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 30.014932,
+          "measuredPerCallMeanMs": 0.0060029864,
+          "activeBeforeStop": true,
+          "statusAfterStop": "stopped",
+          "retainedSamples": 2000,
+          "droppedSamples": 4001,
+          "incompleteStages": 0,
+          "capabilities": {
+            "eventTiming": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver event entries unavailable"
+            },
+            "longTasks": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver longtask entries unavailable"
+            },
+            "longAnimationFrames": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver long-animation-frame entries unavailable"
+            },
+            "resources": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver resource entries unavailable"
+            },
+            "scrollFrames": {
+              "status": "unavailable",
+              "reason": "Scroll/rAF APIs unavailable"
+            },
+            "heap": {
+              "status": "unavailable",
+              "reason": "Nonstandard performance.memory unavailable"
+            },
+            "reactProfiler": {
+              "status": "unavailable",
+              "reason": "Requires a dedicated React profiling build"
+            }
+          },
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        },
+        {
+          "condition": "disabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 0.3292639999999949,
+          "measuredPerCallMeanMs": 0.00006585279999999898,
+          "activeBeforeStop": false,
+          "statusAfterStop": "never_started",
+          "retainedSamples": 0,
+          "droppedSamples": 0,
+          "incompleteStages": 0,
+          "capabilities": null,
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "status": "completed",
+      "conditionOrder": [
+        "disabled",
+        "enabled"
+      ],
+      "observations": [
+        {
+          "condition": "disabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 0.8542839999999998,
+          "measuredPerCallMeanMs": 0.00017085679999999997,
+          "activeBeforeStop": false,
+          "statusAfterStop": "never_started",
+          "retainedSamples": 0,
+          "droppedSamples": 0,
+          "incompleteStages": 0,
+          "capabilities": null,
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        },
+        {
+          "condition": "enabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 29.214498000000006,
+          "measuredPerCallMeanMs": 0.005842899600000001,
+          "activeBeforeStop": true,
+          "statusAfterStop": "stopped",
+          "retainedSamples": 2000,
+          "droppedSamples": 4001,
+          "incompleteStages": 0,
+          "capabilities": {
+            "eventTiming": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver event entries unavailable"
+            },
+            "longTasks": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver longtask entries unavailable"
+            },
+            "longAnimationFrames": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver long-animation-frame entries unavailable"
+            },
+            "resources": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver resource entries unavailable"
+            },
+            "scrollFrames": {
+              "status": "unavailable",
+              "reason": "Scroll/rAF APIs unavailable"
+            },
+            "heap": {
+              "status": "unavailable",
+              "reason": "Nonstandard performance.memory unavailable"
+            },
+            "reactProfiler": {
+              "status": "unavailable",
+              "reason": "Requires a dedicated React profiling build"
+            }
+          },
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "status": "completed",
+      "conditionOrder": [
+        "enabled",
+        "disabled"
+      ],
+      "observations": [
+        {
+          "condition": "enabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 29.195562000000002,
+          "measuredPerCallMeanMs": 0.005839112400000001,
+          "activeBeforeStop": true,
+          "statusAfterStop": "stopped",
+          "retainedSamples": 2000,
+          "droppedSamples": 4001,
+          "incompleteStages": 0,
+          "capabilities": {
+            "eventTiming": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver event entries unavailable"
+            },
+            "longTasks": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver longtask entries unavailable"
+            },
+            "longAnimationFrames": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver long-animation-frame entries unavailable"
+            },
+            "resources": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver resource entries unavailable"
+            },
+            "scrollFrames": {
+              "status": "unavailable",
+              "reason": "Scroll/rAF APIs unavailable"
+            },
+            "heap": {
+              "status": "unavailable",
+              "reason": "Nonstandard performance.memory unavailable"
+            },
+            "reactProfiler": {
+              "status": "unavailable",
+              "reason": "Requires a dedicated React profiling build"
+            }
+          },
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        },
+        {
+          "condition": "disabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 0.26676700000000153,
+          "measuredPerCallMeanMs": 0.00005335340000000031,
+          "activeBeforeStop": false,
+          "statusAfterStop": "never_started",
+          "retainedSamples": 0,
+          "droppedSamples": 0,
+          "incompleteStages": 0,
+          "capabilities": null,
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "status": "completed",
+      "conditionOrder": [
+        "disabled",
+        "enabled"
+      ],
+      "observations": [
+        {
+          "condition": "disabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 0.9300959999999989,
+          "measuredPerCallMeanMs": 0.0001860191999999998,
+          "activeBeforeStop": false,
+          "statusAfterStop": "never_started",
+          "retainedSamples": 0,
+          "droppedSamples": 0,
+          "incompleteStages": 0,
+          "capabilities": null,
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        },
+        {
+          "condition": "enabled",
+          "warmupCalls": 1000,
+          "measuredCalls": 5000,
+          "measuredTotalMs": 29.165717000000008,
+          "measuredPerCallMeanMs": 0.005833143400000002,
+          "activeBeforeStop": true,
+          "statusAfterStop": "stopped",
+          "retainedSamples": 2000,
+          "droppedSamples": 4001,
+          "incompleteStages": 0,
+          "capabilities": {
+            "eventTiming": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver event entries unavailable"
+            },
+            "longTasks": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver longtask entries unavailable"
+            },
+            "longAnimationFrames": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver long-animation-frame entries unavailable"
+            },
+            "resources": {
+              "status": "unavailable",
+              "reason": "PerformanceObserver resource entries unavailable"
+            },
+            "scrollFrames": {
+              "status": "unavailable",
+              "reason": "Scroll/rAF APIs unavailable"
+            },
+            "heap": {
+              "status": "unavailable",
+              "reason": "Nonstandard performance.memory unavailable"
+            },
+            "reactProfiler": {
+              "status": "unavailable",
+              "reason": "Requires a dedicated React profiling build"
+            }
+          },
+          "cleanup": {
+            "activeTimers": 0,
+            "remainingMarks": 0,
+            "remainingMeasures": 0
+          }
+        }
+      ]
+    }
+  ],
+  "means": {
+    "disabled": {
+      "sampleCount": 5,
+      "meanPerCallMs": 0.0001308180799999998,
+      "minTrialPerCallMs": 0.00005335340000000031,
+      "maxTrialPerCallMs": 0.0001860191999999998,
+      "standardDeviationPerCallMs": 0.000058478088934383036
+    },
+    "enabled": {
+      "sampleCount": 5,
+      "meanPerCallMs": 0.00591789952,
+      "minTrialPerCallMs": 0.005833143400000002,
+      "maxTrialPerCallMs": 0.006071355799999999,
+      "standardDeviationPerCallMs": 0.000099804413905325
+    }
+  },
+  "enabledMinusDisabledPerCallMs": 0.00578708144
+}

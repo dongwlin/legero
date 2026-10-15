@@ -1,0 +1,1699 @@
+{
+  "schemaVersion": 1,
+  "type": "isolated-order-soak",
+  "sceneId": "L01",
+  "status": "completed",
+  "capturedAt": "2026-10-15T23:28:08.383Z",
+  "build": {
+    "appVersion": "0.0.23",
+    "mode": "production-ssr",
+    "profiling": false,
+    "commit": "cd003baf4276bce9582855a0b99c39aa90959e41",
+    "dirty": true,
+    "sourceSha256": {
+      "src/services/orderSoak.ts": "c09bbf8eb9a2dfaffdde0ef325532b5075084ec8d83e97700b21cb487a6b8182",
+      "src/services/orderBenchmarkScenes.ts": "68839336a34fa5c97b0be7238650f5d13d350aecdabac0bdb2d810b3e7ec392c",
+      "src/services/orderBenchmarkFixtures.ts": "83b268e7afdb4c6e30952927d7a40bc272c39d70cb79a259b84764889b8267f1",
+      "src/services/orderOptimistic.ts": "71a159497ad48f0e45de5a98ca2177b18b626c16a7538c39a06a47d9163c6739",
+      "src/services/orderWorkspaceView.ts": "5c78c7aac9e89e7d219b0111872ea3c471c329cfd741bbd36b650f3881e2d00a",
+      "src/services/orderSorting.ts": "7a54df73ff573c8e54470dd81f6ff43d58323e3e5e6f762c507bb202b7a2a7c1",
+      "src/services/orderStatus.ts": "db04539bd82648dcbd69900f10207c6d6e59b48ed56218674aa52b1c84726f3e",
+      "src/store/order.ts": "f48b1bee57cee9bba80684abe7b34e15d5301dcfe1df1d12ea07199535c8a14e",
+      "benchmarks/order-workspace/soak.mjs": "c8f9315ec5e6afce3f048879b8ca1fc227aacb4e07762c27fa959a5cadc09759",
+      "benchmarks/order-workspace/workload.ts": "b4d1a072ba635f3e2057b168b65b151b1e64ce921092a26322d251a454b18514",
+      "pnpm-lock.yaml": "8ec564c245a62008ff222f04645185c55edc155d03eb034b0200beea10f2a24b"
+    },
+    "unavailableReason": null
+  },
+  "protocol": {
+    "version": 1,
+    "plannedRounds": 5,
+    "profile": "quick",
+    "roundDurationMs": 1000,
+    "intervalMs": 50,
+    "totalOrders": 520,
+    "todayOrders": 130,
+    "sequence": [
+      "meat",
+      "staple",
+      "served",
+      "remote-batch-10",
+      "failed-toggle-rollback",
+      "snapshot-journal-prune"
+    ],
+    "referenceTime": "2026-10-15T12:00:00+08:00",
+    "sampleCapacityPerRound": 1000,
+    "windowCapacityPerRound": 120,
+    "windowMs": 60000,
+    "retention": "latest bounded samples/windows per round; round statistics include all successful operations using constant-space online aggregation; no percentiles",
+    "boundaries": "synchronous isolated store/journal action through all-list/count derivation; correctness, heap probes and scheduling excluded; each cold round excludes fixture creation/injection",
+    "excludes": [
+      "real WebSocket connections/reconnects and network",
+      "React render/layout/paint",
+      "Android process memory",
+      "foreground/background lifecycle and business-day changes",
+      "historical data growth (fixed fixture size)"
+    ],
+    "overhead": "one owned store subscription; bounded samples/windows; one heap probe and correctness checks per operation outside timed action; these can affect later scheduling and GC"
+  },
+  "rounds": [
+    {
+      "run": 1,
+      "status": "completed",
+      "elapsedMs": 1002.352093,
+      "operationCount": 21,
+      "failureCount": 0,
+      "failure": null,
+      "retainedSamples": [
+        {
+          "operation": "meat",
+          "sequence": 0,
+          "elapsedMs": 5.868614000000001,
+          "storeCommitMs": 2.0316119999999955,
+          "viewDerivationMs": 3.6831339999999955,
+          "totalMs": 5.859956999999994,
+          "heap": {
+            "bytes": 6330648,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 1,
+          "elapsedMs": 51.62315300000001,
+          "storeCommitMs": 0.06680400000000475,
+          "viewDerivationMs": 1.4918250000000057,
+          "totalMs": 1.5811309999999992,
+          "heap": {
+            "bytes": 7193584,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 2,
+          "elapsedMs": 100.80984699999999,
+          "storeCommitMs": 0.07348700000000008,
+          "viewDerivationMs": 1.3154849999999954,
+          "totalMs": 1.5359569999999962,
+          "heap": {
+            "bytes": 8001560,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 3,
+          "elapsedMs": 151.62424,
+          "storeCommitMs": 0.460378999999989,
+          "viewDerivationMs": 1.2411069999999995,
+          "totalMs": 1.7916639999999973,
+          "heap": {
+            "bytes": 7017312,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 4,
+          "elapsedMs": 200.824219,
+          "storeCommitMs": 0.14160400000002937,
+          "viewDerivationMs": 1.3729319999999916,
+          "totalMs": 1.5357960000000048,
+          "heap": {
+            "bytes": 7844760,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 5,
+          "elapsedMs": 251.84238200000001,
+          "storeCommitMs": 0.6409059999999727,
+          "viewDerivationMs": 1.352484000000004,
+          "totalMs": 2.156224000000009,
+          "heap": {
+            "bytes": 7484008,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 6,
+          "elapsedMs": 301.02449800000005,
+          "storeCommitMs": 0.05528300000003128,
+          "viewDerivationMs": 1.2852680000000305,
+          "totalMs": 1.365017000000023,
+          "heap": {
+            "bytes": 8285408,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 7,
+          "elapsedMs": 351.249661,
+          "storeCommitMs": 0.06623299999995425,
+          "viewDerivationMs": 1.3479649999999879,
+          "totalMs": 1.439976999999999,
+          "heap": {
+            "bytes": 7058112,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 8,
+          "elapsedMs": 401.11199700000003,
+          "storeCommitMs": 0.05467199999998229,
+          "viewDerivationMs": 1.1363610000000222,
+          "totalMs": 1.2204679999999826,
+          "heap": {
+            "bytes": 7852104,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 9,
+          "elapsedMs": 450.82531500000005,
+          "storeCommitMs": 0.41811999999993077,
+          "viewDerivationMs": 1.3463629999999966,
+          "totalMs": 1.7865249999999833,
+          "heap": {
+            "bytes": 7077936,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 10,
+          "elapsedMs": 501.14708800000005,
+          "storeCommitMs": 0.044243000000051325,
+          "viewDerivationMs": 1.0562820000000102,
+          "totalMs": 1.122696000000019,
+          "heap": {
+            "bytes": 7933648,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 11,
+          "elapsedMs": 550.700547,
+          "storeCommitMs": 0.5234870000000456,
+          "viewDerivationMs": 1.1539739999999483,
+          "totalMs": 1.7083790000000363,
+          "heap": {
+            "bytes": 7553272,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 12,
+          "elapsedMs": 600.573252,
+          "storeCommitMs": 0.05211800000006406,
+          "viewDerivationMs": 1.2076540000000477,
+          "totalMs": 1.295788000000016,
+          "heap": {
+            "bytes": 8347600,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 13,
+          "elapsedMs": 650.658454,
+          "storeCommitMs": 0.05628500000000258,
+          "viewDerivationMs": 1.2377299999999423,
+          "totalMs": 1.3391900000000305,
+          "heap": {
+            "bytes": 7095736,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 14,
+          "elapsedMs": 700.600618,
+          "storeCommitMs": 0.05521299999998064,
+          "viewDerivationMs": 1.2718730000000278,
+          "totalMs": 1.3594370000000708,
+          "heap": {
+            "bytes": 7904096,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 15,
+          "elapsedMs": 751.865322,
+          "storeCommitMs": 0.3524880000001076,
+          "viewDerivationMs": 1.1838599999999815,
+          "totalMs": 1.5526479999999765,
+          "heap": {
+            "bytes": 7178600,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 16,
+          "elapsedMs": 800.619559,
+          "storeCommitMs": 0.04428199999995286,
+          "viewDerivationMs": 1.148413000000005,
+          "totalMs": 1.2144270000000006,
+          "heap": {
+            "bytes": 7971744,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 17,
+          "elapsedMs": 851.3510670000001,
+          "storeCommitMs": 0.43673499999999876,
+          "viewDerivationMs": 1.1661260000000766,
+          "totalMs": 1.633228000000031,
+          "heap": {
+            "bytes": 7646832,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 18,
+          "elapsedMs": 901.065386,
+          "storeCommitMs": 0.0482600000000275,
+          "viewDerivationMs": 1.0758569999999281,
+          "totalMs": 1.1486629999999423,
+          "heap": {
+            "bytes": 8440200,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 19,
+          "elapsedMs": 950.945766,
+          "storeCommitMs": 0.0473779999999806,
+          "viewDerivationMs": 1.0609299999999848,
+          "totalMs": 1.1317320000000564,
+          "heap": {
+            "bytes": 7216064,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 20,
+          "elapsedMs": 1000.6538439999999,
+          "storeCommitMs": 0.047489000000041415,
+          "viewDerivationMs": 1.1175859999998465,
+          "totalMs": 1.1786899999999605,
+          "heap": {
+            "bytes": 8008904,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        }
+      ],
+      "droppedSamples": 0,
+      "windows": [
+        {
+          "startedAtElapsedMs": 0,
+          "finishedAtElapsedMs": 1002.352093,
+          "operationCount": 21,
+          "failureCount": 0,
+          "statistics": {
+            "count": 21,
+            "meanMs": 1.6646473333333394,
+            "minMs": 1.122696000000019,
+            "maxMs": 5.859956999999994,
+            "standardDeviationMs": 0.973073840122472
+          }
+        }
+      ],
+      "droppedWindows": 0,
+      "statistics": {
+        "count": 21,
+        "meanMs": 1.6646473333333394,
+        "minMs": 1.122696000000019,
+        "maxMs": 5.859956999999994,
+        "standardDeviationMs": 0.973073840122472
+      },
+      "resources": {
+        "harnessSubscriptionsBeforeCleanup": 1,
+        "harnessSubscriptionsAfterCleanup": 0,
+        "initialHeap": {
+          "bytes": 5823832,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "finalHeap": {
+          "bytes": 6436120,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "actualWebSocketConnections": null
+      }
+    },
+    {
+      "run": 2,
+      "status": "completed",
+      "elapsedMs": 1002.8957480000001,
+      "operationCount": 21,
+      "failureCount": 0,
+      "failure": null,
+      "retainedSamples": [
+        {
+          "operation": "meat",
+          "sequence": 0,
+          "elapsedMs": 1.1934770000000299,
+          "storeCommitMs": 0.03629700000010416,
+          "viewDerivationMs": 1.1427220000000489,
+          "totalMs": 1.1895099999999275,
+          "heap": {
+            "bytes": 8474296,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 1,
+          "elapsedMs": 51.95687500000008,
+          "storeCommitMs": 0.05567400000018097,
+          "viewDerivationMs": 1.357494000000088,
+          "totalMs": 1.4280760000001465,
+          "heap": {
+            "bytes": 7483464,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 2,
+          "elapsedMs": 101.00495099999989,
+          "storeCommitMs": 0.04551500000025044,
+          "viewDerivationMs": 1.458451999999852,
+          "totalMs": 1.5266899999999168,
+          "heap": {
+            "bytes": 8259416,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 3,
+          "elapsedMs": 151.311105,
+          "storeCommitMs": 0.36641400000007707,
+          "viewDerivationMs": 1.1736009999999624,
+          "totalMs": 1.5602420000000166,
+          "heap": {
+            "bytes": 7564992,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 4,
+          "elapsedMs": 201.2552330000001,
+          "storeCommitMs": 0.04228900000020985,
+          "viewDerivationMs": 1.3838230000001204,
+          "totalMs": 1.4368420000000697,
+          "heap": {
+            "bytes": 8340576,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 5,
+          "elapsedMs": 251.64380099999994,
+          "storeCommitMs": 0.5184270000002016,
+          "viewDerivationMs": 1.1183469999998579,
+          "totalMs": 1.686657999999852,
+          "heap": {
+            "bytes": 7995120,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 6,
+          "elapsedMs": 301.40991699999995,
+          "storeCommitMs": 0.045405000000073414,
+          "viewDerivationMs": 1.1838689999999588,
+          "totalMs": 1.2412970000000314,
+          "heap": {
+            "bytes": 8771016,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 7,
+          "elapsedMs": 351.4015239999999,
+          "storeCommitMs": 0.04623599999990802,
+          "viewDerivationMs": 1.258047999999917,
+          "totalMs": 1.3165569999998752,
+          "heap": {
+            "bytes": 7505448,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 8,
+          "elapsedMs": 401.5676169999999,
+          "storeCommitMs": 0.06303800000000592,
+          "viewDerivationMs": 1.5731059999998251,
+          "totalMs": 1.6587859999999637,
+          "heap": {
+            "bytes": 8281264,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 9,
+          "elapsedMs": 451.2369920000001,
+          "storeCommitMs": 0.4458420000000842,
+          "viewDerivationMs": 1.6175590000000284,
+          "totalMs": 2.0778980000000047,
+          "heap": {
+            "bytes": 7146280,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 10,
+          "elapsedMs": 501.3250700000001,
+          "storeCommitMs": 0.1191430000001219,
+          "viewDerivationMs": 1.2394340000000739,
+          "totalMs": 1.374366000000009,
+          "heap": {
+            "bytes": 7922064,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 11,
+          "elapsedMs": 552.3957210000001,
+          "storeCommitMs": 0.7590470000000096,
+          "viewDerivationMs": 1.74899500000015,
+          "totalMs": 2.5591370000001916,
+          "heap": {
+            "bytes": 7204160,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 12,
+          "elapsedMs": 601.6277499999999,
+          "storeCommitMs": 0.05095500000015818,
+          "viewDerivationMs": 1.4913039999999,
+          "totalMs": 1.5550029999999424,
+          "heap": {
+            "bytes": 7981440,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 13,
+          "elapsedMs": 651.864695,
+          "storeCommitMs": 0.04928199999994831,
+          "viewDerivationMs": 1.7155219999999645,
+          "totalMs": 1.7779189999998835,
+          "heap": {
+            "bytes": 8758096,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 14,
+          "elapsedMs": 701.2218170000001,
+          "storeCommitMs": 0.06727599999976519,
+          "viewDerivationMs": 1.3700070000002142,
+          "totalMs": 1.463952000000063,
+          "heap": {
+            "bytes": 7476016,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 15,
+          "elapsedMs": 751.6013680000001,
+          "storeCommitMs": 0.3809209999999439,
+          "viewDerivationMs": 1.070077000000083,
+          "totalMs": 1.4650940000001356,
+          "heap": {
+            "bytes": 8414448,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 16,
+          "elapsedMs": 801.463233,
+          "storeCommitMs": 0.04550500000004831,
+          "viewDerivationMs": 1.059045999999853,
+          "totalMs": 1.114699999999857,
+          "heap": {
+            "bytes": 7515136,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 17,
+          "elapsedMs": 851.6598529999999,
+          "storeCommitMs": 0.4992419999998674,
+          "viewDerivationMs": 1.1187279999999191,
+          "totalMs": 1.6488479999998162,
+          "heap": {
+            "bytes": 8845760,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 18,
+          "elapsedMs": 900.96063,
+          "storeCommitMs": 0.048240000000078,
+          "viewDerivationMs": 1.5457149999999729,
+          "totalMs": 1.607159000000138,
+          "heap": {
+            "bytes": 7606808,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 19,
+          "elapsedMs": 951.6903649999999,
+          "storeCommitMs": 0.05358100000034938,
+          "viewDerivationMs": 1.9083519999999226,
+          "totalMs": 1.9765889999998763,
+          "heap": {
+            "bytes": 8383640,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 20,
+          "elapsedMs": 1001.4532149999998,
+          "storeCommitMs": 0.05621400000018184,
+          "viewDerivationMs": 1.6122889999996914,
+          "totalMs": 1.6923289999999724,
+          "heap": {
+            "bytes": 7504184,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        }
+      ],
+      "droppedSamples": 0,
+      "windows": [
+        {
+          "startedAtElapsedMs": 0,
+          "finishedAtElapsedMs": 1002.8957480000001,
+          "operationCount": 21,
+          "failureCount": 0,
+          "statistics": {
+            "count": 21,
+            "meanMs": 1.5884596190476041,
+            "minMs": 1.114699999999857,
+            "maxMs": 2.5591370000001916,
+            "standardDeviationMs": 0.3167347426223719
+          }
+        }
+      ],
+      "droppedWindows": 0,
+      "statistics": {
+        "count": 21,
+        "meanMs": 1.5884596190476041,
+        "minMs": 1.114699999999857,
+        "maxMs": 2.5591370000001916,
+        "standardDeviationMs": 0.3167347426223719
+      },
+      "resources": {
+        "harnessSubscriptionsBeforeCleanup": 1,
+        "harnessSubscriptionsAfterCleanup": 0,
+        "initialHeap": {
+          "bytes": 6446744,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "finalHeap": {
+          "bytes": 7613880,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "actualWebSocketConnections": null
+      }
+    },
+    {
+      "run": 3,
+      "status": "completed",
+      "elapsedMs": 1002.9788330000001,
+      "operationCount": 21,
+      "failureCount": 0,
+      "failure": null,
+      "retainedSamples": [
+        {
+          "operation": "meat",
+          "sequence": 0,
+          "elapsedMs": 1.3951340000003256,
+          "storeCommitMs": 0.015688999999838416,
+          "viewDerivationMs": 1.3692360000000008,
+          "totalMs": 1.3918680000001586,
+          "heap": {
+            "bytes": 7544520,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 1,
+          "elapsedMs": 51.577346000000034,
+          "storeCommitMs": 0.06335700000045108,
+          "viewDerivationMs": 1.5719239999998535,
+          "totalMs": 1.6457409999998163,
+          "heap": {
+            "bytes": 8322176,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 2,
+          "elapsedMs": 102.26065500000004,
+          "storeCommitMs": 0.05772799999976996,
+          "viewDerivationMs": 2.0413309999999,
+          "totalMs": 2.1650009999998474,
+          "heap": {
+            "bytes": 7188296,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 3,
+          "elapsedMs": 151.8210670000003,
+          "storeCommitMs": 0.5884379999997691,
+          "viewDerivationMs": 1.178490000000238,
+          "totalMs": 1.783339000000069,
+          "heap": {
+            "bytes": 8096040,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 4,
+          "elapsedMs": 201.062183,
+          "storeCommitMs": 0.07989899999984118,
+          "viewDerivationMs": 1.4441359999996166,
+          "totalMs": 1.540164999999888,
+          "heap": {
+            "bytes": 8871480,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 5,
+          "elapsedMs": 250.9508380000002,
+          "storeCommitMs": 0.4531759999999849,
+          "viewDerivationMs": 1.162018999999873,
+          "totalMs": 1.6373859999998785,
+          "heap": {
+            "bytes": 8310808,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 6,
+          "elapsedMs": 300.87165200000027,
+          "storeCommitMs": 0.04388199999993958,
+          "viewDerivationMs": 1.340802000000167,
+          "totalMs": 1.3961349999999584,
+          "heap": {
+            "bytes": 9086688,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 7,
+          "elapsedMs": 350.96878600000036,
+          "storeCommitMs": 0.052238000000215834,
+          "viewDerivationMs": 1.3842530000001716,
+          "totalMs": 1.446990000000369,
+          "heap": {
+            "bytes": 9863288,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 8,
+          "elapsedMs": 402.7279630000003,
+          "storeCommitMs": 0.093876000000364,
+          "viewDerivationMs": 2.9776780000001963,
+          "totalMs": 3.113350999999966,
+          "heap": {
+            "bytes": 10639696,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 9,
+          "elapsedMs": 451.390218,
+          "storeCommitMs": 0.25833300000022064,
+          "viewDerivationMs": 0.9749589999996715,
+          "totalMs": 1.2457749999998668,
+          "heap": {
+            "bytes": 7914752,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 10,
+          "elapsedMs": 501.28224,
+          "storeCommitMs": 0.04736899999988964,
+          "viewDerivationMs": 1.3436879999999292,
+          "totalMs": 1.4009549999996125,
+          "heap": {
+            "bytes": 8690240,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 11,
+          "elapsedMs": 552.3291560000002,
+          "storeCommitMs": 0.7667310000001635,
+          "viewDerivationMs": 1.6353119999998853,
+          "totalMs": 2.4247260000001916,
+          "heap": {
+            "bytes": 10023184,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 12,
+          "elapsedMs": 601.9986720000002,
+          "storeCommitMs": 0.07540100000005623,
+          "viewDerivationMs": 2.0051330000001144,
+          "totalMs": 2.095049999999901,
+          "heap": {
+            "bytes": 10798944,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 13,
+          "elapsedMs": 651.024586,
+          "storeCommitMs": 0.03771099999994476,
+          "viewDerivationMs": 1.0060669999998026,
+          "totalMs": 1.0532649999995556,
+          "heap": {
+            "bytes": 7787472,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 14,
+          "elapsedMs": 700.653276,
+          "storeCommitMs": 0.04431300000032934,
+          "viewDerivationMs": 1.066910999999891,
+          "totalMs": 1.1208619999997609,
+          "heap": {
+            "bytes": 8563232,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 15,
+          "elapsedMs": 751.4919140000002,
+          "storeCommitMs": 0.30692199999975855,
+          "viewDerivationMs": 0.998913999999786,
+          "totalMs": 1.3212659999999232,
+          "heap": {
+            "bytes": 9454376,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 16,
+          "elapsedMs": 801.1679320000003,
+          "storeCommitMs": 0.04432200000019293,
+          "viewDerivationMs": 1.114039000000048,
+          "totalMs": 1.1682000000000698,
+          "heap": {
+            "bytes": 10229880,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 17,
+          "elapsedMs": 851.557953,
+          "storeCommitMs": 0.45814500000005864,
+          "viewDerivationMs": 1.4010049999997136,
+          "totalMs": 1.8838669999995545,
+          "heap": {
+            "bytes": 7394224,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 18,
+          "elapsedMs": 901.3199010000003,
+          "storeCommitMs": 0.04006400000025678,
+          "viewDerivationMs": 1.0615410000000338,
+          "totalMs": 1.111515000000054,
+          "heap": {
+            "bytes": 8170560,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 19,
+          "elapsedMs": 951.0685240000003,
+          "storeCommitMs": 0.038422000000082335,
+          "viewDerivationMs": 1.1949399999998604,
+          "totalMs": 1.2438310000002275,
+          "heap": {
+            "bytes": 8947128,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 20,
+          "elapsedMs": 1001.317712,
+          "storeCommitMs": 0.06260800000018207,
+          "viewDerivationMs": 1.522831999999653,
+          "totalMs": 1.5985129999999117,
+          "heap": {
+            "bytes": 9722888,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        }
+      ],
+      "droppedSamples": 0,
+      "windows": [
+        {
+          "startedAtElapsedMs": 0,
+          "finishedAtElapsedMs": 1002.9788330000001,
+          "operationCount": 21,
+          "failureCount": 0,
+          "statistics": {
+            "count": 21,
+            "meanMs": 1.608942904761837,
+            "minMs": 1.0532649999995556,
+            "maxMs": 3.113350999999966,
+            "standardDeviationMs": 0.49211825096607614
+          }
+        }
+      ],
+      "droppedWindows": 0,
+      "statistics": {
+        "count": 21,
+        "meanMs": 1.608942904761837,
+        "minMs": 1.0532649999995556,
+        "maxMs": 3.113350999999966,
+        "standardDeviationMs": 0.49211825096607614
+      },
+      "resources": {
+        "harnessSubscriptionsBeforeCleanup": 1,
+        "harnessSubscriptionsAfterCleanup": 0,
+        "initialHeap": {
+          "bytes": 7624464,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "finalHeap": {
+          "bytes": 9832848,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "actualWebSocketConnections": null
+      }
+    },
+    {
+      "run": 4,
+      "status": "completed",
+      "elapsedMs": 1001.8520999999996,
+      "operationCount": 21,
+      "failureCount": 0,
+      "failure": null,
+      "retainedSamples": [
+        {
+          "operation": "meat",
+          "sequence": 0,
+          "elapsedMs": 1.0459929999997257,
+          "storeCommitMs": 0.01371599999947648,
+          "viewDerivationMs": 1.020614999999907,
+          "totalMs": 1.042957000000115,
+          "heap": {
+            "bytes": 9632224,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 1,
+          "elapsedMs": 50.8447799999999,
+          "storeCommitMs": 0.04166699999996126,
+          "viewDerivationMs": 1.24660700000004,
+          "totalMs": 1.298113000000285,
+          "heap": {
+            "bytes": 10408824,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 2,
+          "elapsedMs": 101.2409719999996,
+          "storeCommitMs": 0.04424099999960163,
+          "viewDerivationMs": 1.466356999999789,
+          "totalMs": 1.5205879999998615,
+          "heap": {
+            "bytes": 8018648,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 3,
+          "elapsedMs": 151.12023899999986,
+          "storeCommitMs": 0.3318899999999303,
+          "viewDerivationMs": 1.0014790000000175,
+          "totalMs": 1.348026000000118,
+          "heap": {
+            "bytes": 8909288,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 4,
+          "elapsedMs": 200.9048499999999,
+          "storeCommitMs": 0.05105500000036045,
+          "viewDerivationMs": 1.218134000000191,
+          "totalMs": 1.2798790000001645,
+          "heap": {
+            "bytes": 9684400,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 5,
+          "elapsedMs": 251.01878499999975,
+          "storeCommitMs": 0.3679269999997814,
+          "viewDerivationMs": 1.2202480000000833,
+          "totalMs": 1.6199639999999818,
+          "heap": {
+            "bytes": 10994584,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 6,
+          "elapsedMs": 300.96881399999984,
+          "storeCommitMs": 0.040957000000162225,
+          "viewDerivationMs": 1.1135180000001128,
+          "totalMs": 1.165335000000141,
+          "heap": {
+            "bytes": 8100384,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 7,
+          "elapsedMs": 351.09376999999995,
+          "storeCommitMs": 0.05700600000000122,
+          "viewDerivationMs": 1.1840400000000955,
+          "totalMs": 1.2531690000000708,
+          "heap": {
+            "bytes": 8886792,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 8,
+          "elapsedMs": 400.86603799999966,
+          "storeCommitMs": 0.04475300000012794,
+          "viewDerivationMs": 1.2139560000000529,
+          "totalMs": 1.268767999999909,
+          "heap": {
+            "bytes": 9641256,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 9,
+          "elapsedMs": 451.2892499999998,
+          "storeCommitMs": 0.4525050000002011,
+          "viewDerivationMs": 1.358534999999847,
+          "totalMs": 1.8273399999998219,
+          "heap": {
+            "bytes": 10510960,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 10,
+          "elapsedMs": 501.08821799999987,
+          "storeCommitMs": 0.04641699999956472,
+          "viewDerivationMs": 1.221129000000019,
+          "totalMs": 1.277704999999969,
+          "heap": {
+            "bytes": 11265112,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 11,
+          "elapsedMs": 551.3846739999999,
+          "storeCommitMs": 0.4549589999996897,
+          "viewDerivationMs": 1.129859000000124,
+          "totalMs": 1.597381999999925,
+          "heap": {
+            "bytes": 8633640,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 12,
+          "elapsedMs": 600.9640409999997,
+          "storeCommitMs": 0.04189799999994648,
+          "viewDerivationMs": 1.0099049999998897,
+          "totalMs": 1.063343999999688,
+          "heap": {
+            "bytes": 9388104,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 13,
+          "elapsedMs": 650.6412009999999,
+          "storeCommitMs": 0.043611999999939144,
+          "viewDerivationMs": 1.128316000000268,
+          "totalMs": 1.1829680000000735,
+          "heap": {
+            "bytes": 10143232,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 14,
+          "elapsedMs": 701.2224889999998,
+          "storeCommitMs": 0.04293000000006941,
+          "viewDerivationMs": 1.023279999999886,
+          "totalMs": 1.0762789999998859,
+          "heap": {
+            "bytes": 10897696,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 15,
+          "elapsedMs": 751.3372059999997,
+          "storeCommitMs": 0.31192200000032244,
+          "viewDerivationMs": 1.0539779999999155,
+          "totalMs": 1.3794450000000325,
+          "heap": {
+            "bytes": 8195704,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 16,
+          "elapsedMs": 801.0819919999999,
+          "storeCommitMs": 0.06305799999972805,
+          "viewDerivationMs": 1.1562979999998788,
+          "totalMs": 1.229725000000144,
+          "heap": {
+            "bytes": 8949808,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 17,
+          "elapsedMs": 850.9412619999998,
+          "storeCommitMs": 0.37111300000015035,
+          "viewDerivationMs": 0.9767529999999169,
+          "totalMs": 1.3598179999999047,
+          "heap": {
+            "bytes": 10248416,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 18,
+          "elapsedMs": 900.6766309999998,
+          "storeCommitMs": 0.041617999999743915,
+          "viewDerivationMs": 1.1961129999999685,
+          "totalMs": 1.2486410000001342,
+          "heap": {
+            "bytes": 11003120,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 19,
+          "elapsedMs": 950.643341,
+          "storeCommitMs": 0.042049000000133674,
+          "viewDerivationMs": 1.222461000000294,
+          "totalMs": 1.2740779999999177,
+          "heap": {
+            "bytes": 8073688,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 20,
+          "elapsedMs": 1000.35176,
+          "storeCommitMs": 0.04121600000007675,
+          "viewDerivationMs": 1.0915180000001783,
+          "totalMs": 1.1412910000003649,
+          "heap": {
+            "bytes": 8829672,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        }
+      ],
+      "droppedSamples": 0,
+      "windows": [
+        {
+          "startedAtElapsedMs": 0,
+          "finishedAtElapsedMs": 1001.8520999999996,
+          "operationCount": 21,
+          "failureCount": 0,
+          "statistics": {
+            "count": 21,
+            "meanMs": 1.307372142857167,
+            "minMs": 1.042957000000115,
+            "maxMs": 1.8273399999998219,
+            "standardDeviationMs": 0.19149595562783783
+          }
+        }
+      ],
+      "droppedWindows": 0,
+      "statistics": {
+        "count": 21,
+        "meanMs": 1.307372142857167,
+        "minMs": 1.042957000000115,
+        "maxMs": 1.8273399999998219,
+        "standardDeviationMs": 0.19149595562783783
+      },
+      "resources": {
+        "harnessSubscriptionsBeforeCleanup": 1,
+        "harnessSubscriptionsAfterCleanup": 0,
+        "initialHeap": {
+          "bytes": 9843200,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "finalHeap": {
+          "bytes": 8939496,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "actualWebSocketConnections": null
+      }
+    },
+    {
+      "run": 5,
+      "status": "completed",
+      "elapsedMs": 1002.3503800000008,
+      "operationCount": 21,
+      "failureCount": 0,
+      "failure": null,
+      "retainedSamples": [
+        {
+          "operation": "meat",
+          "sequence": 0,
+          "elapsedMs": 1.0466030000006867,
+          "storeCommitMs": 0.0154290000009496,
+          "viewDerivationMs": 1.0193120000003546,
+          "totalMs": 1.0427060000001802,
+          "heap": {
+            "bytes": 8552360,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 1,
+          "elapsedMs": 49.89513700000043,
+          "storeCommitMs": 0.0636080000003858,
+          "viewDerivationMs": 1.161087999999836,
+          "totalMs": 1.2406559999999445,
+          "heap": {
+            "bytes": 9307832,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 2,
+          "elapsedMs": 101.09453800000028,
+          "storeCommitMs": 0.047497999999905005,
+          "viewDerivationMs": 1.5870619999996052,
+          "totalMs": 1.645792000000256,
+          "heap": {
+            "bytes": 10062352,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 3,
+          "elapsedMs": 151.25005099999998,
+          "storeCommitMs": 0.3118819999999687,
+          "viewDerivationMs": 1.3082519999998112,
+          "totalMs": 1.631214999999429,
+          "heap": {
+            "bytes": 10932128,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 4,
+          "elapsedMs": 201.3461530000004,
+          "storeCommitMs": 0.04480399999920337,
+          "viewDerivationMs": 1.1182669999998325,
+          "totalMs": 1.1727090000003955,
+          "heap": {
+            "bytes": 8331232,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 5,
+          "elapsedMs": 251.58695500000067,
+          "storeCommitMs": 0.4737140000006548,
+          "viewDerivationMs": 1.2020330000004833,
+          "totalMs": 1.7051230000006399,
+          "heap": {
+            "bytes": 9620800,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 6,
+          "elapsedMs": 301.5066280000001,
+          "storeCommitMs": 0.042829999999412394,
+          "viewDerivationMs": 1.2946869999996125,
+          "totalMs": 1.3486069999999017,
+          "heap": {
+            "bytes": 10375320,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 7,
+          "elapsedMs": 351.31038400000034,
+          "storeCommitMs": 0.04246899999998277,
+          "viewDerivationMs": 1.222882000000027,
+          "totalMs": 1.2759820000001127,
+          "heap": {
+            "bytes": 11130448,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 8,
+          "elapsedMs": 401.3227800000004,
+          "storeCommitMs": 0.04061600000022736,
+          "viewDerivationMs": 1.2153490000000602,
+          "totalMs": 1.2649309999997058,
+          "heap": {
+            "bytes": 8303112,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 9,
+          "elapsedMs": 451.13556300000073,
+          "storeCommitMs": 0.2507580000001326,
+          "viewDerivationMs": 1.0073200000006182,
+          "totalMs": 1.270832000000155,
+          "heap": {
+            "bytes": 9172816,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 10,
+          "elapsedMs": 500.68078700000024,
+          "storeCommitMs": 0.039462999999159365,
+          "viewDerivationMs": 1.003472999999758,
+          "totalMs": 1.0512520000002041,
+          "heap": {
+            "bytes": 9926904,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 11,
+          "elapsedMs": 550.6685570000009,
+          "storeCommitMs": 0.39787299999989045,
+          "viewDerivationMs": 1.0768400000006295,
+          "totalMs": 1.4871460000003935,
+          "heap": {
+            "bytes": 11216968,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 12,
+          "elapsedMs": 600.7128120000007,
+          "storeCommitMs": 0.0567060000003039,
+          "viewDerivationMs": 1.2606430000005275,
+          "totalMs": 1.3290610000003653,
+          "heap": {
+            "bytes": 8305696,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 13,
+          "elapsedMs": 650.706733,
+          "storeCommitMs": 0.04591500000060478,
+          "viewDerivationMs": 1.4241579999998066,
+          "totalMs": 1.4818359999999302,
+          "heap": {
+            "bytes": 9060888,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 14,
+          "elapsedMs": 700.3441690000009,
+          "storeCommitMs": 0.043039999999564316,
+          "viewDerivationMs": 1.068915000000743,
+          "totalMs": 1.1216229999999996,
+          "heap": {
+            "bytes": 9815288,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "remote-batch-10",
+          "sequence": 15,
+          "elapsedMs": 751.3228080000008,
+          "storeCommitMs": 0.33492500000011205,
+          "viewDerivationMs": 1.104221000000507,
+          "totalMs": 1.4509780000007595,
+          "heap": {
+            "bytes": 10684968,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "failed-toggle-rollback",
+          "sequence": 16,
+          "elapsedMs": 801.1177580000003,
+          "storeCommitMs": 0.04296100000101433,
+          "viewDerivationMs": 1.1744920000001002,
+          "totalMs": 1.2271499999997104,
+          "heap": {
+            "bytes": 11446480,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "snapshot-journal-prune",
+          "sequence": 17,
+          "elapsedMs": 851.358741,
+          "storeCommitMs": 0.3946460000006482,
+          "viewDerivationMs": 1.1325039999992441,
+          "totalMs": 1.5391329999993104,
+          "heap": {
+            "bytes": 8818432,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "meat",
+          "sequence": 18,
+          "elapsedMs": 901.0744930000001,
+          "storeCommitMs": 0.03820199999972829,
+          "viewDerivationMs": 1.1734299999998257,
+          "totalMs": 1.2213599999995495,
+          "heap": {
+            "bytes": 9573176,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "staple",
+          "sequence": 19,
+          "elapsedMs": 950.7806970000001,
+          "storeCommitMs": 0.046275999999124906,
+          "viewDerivationMs": 1.1137089999992895,
+          "totalMs": 1.171966999999313,
+          "heap": {
+            "bytes": 10328248,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        },
+        {
+          "operation": "served",
+          "sequence": 20,
+          "elapsedMs": 1000.6018660000009,
+          "storeCommitMs": 0.044833999999355,
+          "viewDerivationMs": 1.2331920000005994,
+          "totalMs": 1.288194000000658,
+          "heap": {
+            "bytes": 11082712,
+            "source": "node.process.memoryUsage.heapUsed",
+            "unavailableReason": null
+          }
+        }
+      ],
+      "droppedSamples": 0,
+      "windows": [
+        {
+          "startedAtElapsedMs": 0,
+          "finishedAtElapsedMs": 1002.3503800000008,
+          "operationCount": 21,
+          "failureCount": 0,
+          "statistics": {
+            "count": 21,
+            "meanMs": 1.3318215714286148,
+            "minMs": 1.0427060000001802,
+            "maxMs": 1.7051230000006399,
+            "standardDeviationMs": 0.18691847749645224
+          }
+        }
+      ],
+      "droppedWindows": 0,
+      "statistics": {
+        "count": 21,
+        "meanMs": 1.3318215714286148,
+        "minMs": 1.0427060000001802,
+        "maxMs": 1.7051230000006399,
+        "standardDeviationMs": 0.18691847749645224
+      },
+      "resources": {
+        "harnessSubscriptionsBeforeCleanup": 1,
+        "harnessSubscriptionsAfterCleanup": 0,
+        "initialHeap": {
+          "bytes": 8949912,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "finalHeap": {
+          "bytes": 7674120,
+          "source": "node.process.memoryUsage.heapUsed",
+          "unavailableReason": null
+        },
+        "actualWebSocketConnections": null
+      }
+    }
+  ],
+  "fiveRoundMeanMs": 1.5002487142857124,
+  "source": {
+    "commit": "cd003baf4276bce9582855a0b99c39aa90959e41",
+    "workingTreeStatus": "M benchmarks/order-workspace/README.md\n M docs/order-benchmark-onsite-2026-10-15.md\n M docs/performance-benchmark-expansion-plan.md\n M package.json\n M tests/performance/README.md\n?? benchmarks/browser-workspace/\n?? benchmarks/order-workspace/results/baseline-v2-batch-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v2-default-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v2-history-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v2-today-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v3-batch-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v3-default-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v3-history-2026-10-16.json\n?? benchmarks/order-workspace/results/baseline-v3-today-2026-10-16.json\n?? benchmarks/order-workspace/results/recorder-overhead-node-2026-10-16.json\n?? docs/performance-benchmark-expansion-implementation-2026-10-16.md",
+    "sha256": {
+      "src/services/orderSoak.ts": "c09bbf8eb9a2dfaffdde0ef325532b5075084ec8d83e97700b21cb487a6b8182",
+      "src/services/orderBenchmarkScenes.ts": "68839336a34fa5c97b0be7238650f5d13d350aecdabac0bdb2d810b3e7ec392c",
+      "src/services/orderBenchmarkFixtures.ts": "83b268e7afdb4c6e30952927d7a40bc272c39d70cb79a259b84764889b8267f1",
+      "src/services/orderOptimistic.ts": "71a159497ad48f0e45de5a98ca2177b18b626c16a7538c39a06a47d9163c6739",
+      "src/services/orderWorkspaceView.ts": "5c78c7aac9e89e7d219b0111872ea3c471c329cfd741bbd36b650f3881e2d00a",
+      "src/services/orderSorting.ts": "7a54df73ff573c8e54470dd81f6ff43d58323e3e5e6f762c507bb202b7a2a7c1",
+      "src/services/orderStatus.ts": "db04539bd82648dcbd69900f10207c6d6e59b48ed56218674aa52b1c84726f3e",
+      "src/store/order.ts": "f48b1bee57cee9bba80684abe7b34e15d5301dcfe1df1d12ea07199535c8a14e",
+      "benchmarks/order-workspace/soak.mjs": "c8f9315ec5e6afce3f048879b8ca1fc227aacb4e07762c27fa959a5cadc09759",
+      "benchmarks/order-workspace/workload.ts": "b4d1a072ba635f3e2057b168b65b151b1e64ce921092a26322d251a454b18514",
+      "pnpm-lock.yaml": "8ec564c245a62008ff222f04645185c55edc155d03eb034b0200beea10f2a24b"
+    }
+  },
+  "environment": {
+    "runtime": "node",
+    "node": "v24.18.0",
+    "v8": "13.6.233.17-node.50",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "logicalCpus": 16,
+    "timezone": "UTC"
+  }
+}
