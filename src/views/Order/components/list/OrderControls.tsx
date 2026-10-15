@@ -2,18 +2,20 @@ import OrderForm from '../forms/OrderForm'
 import { useOrderStore } from '@/store/order'
 import { Filter } from '@/types'
 import { countTodayOrders } from '@/services/orderWorkspaceView'
+import { useOrderBusinessDay } from '@/hooks/useOrderBusinessDay'
 import { Card, ListBox, Select } from '@heroui/react'
 import React, { useMemo } from 'react'
 
 const OrderControls: React.FC = () => {
+  const businessDay = useOrderBusinessDay()
   const ordersById = useOrderStore((state) => state.ordersById)
   const orderDisplayIds = useOrderStore((state) => state.orderDisplayIds)
   const filter = useOrderStore((state) => state.filter)
   const setFilter = useOrderStore((state) => state.setFilter)
 
   const { todayCompletedCount, uncompletedCount } = useMemo(
-    () => countTodayOrders(ordersById, orderDisplayIds),
-    [ordersById, orderDisplayIds],
+    () => countTodayOrders(ordersById, orderDisplayIds, businessDay),
+    [ordersById, orderDisplayIds, businessDay],
   )
 
   return (

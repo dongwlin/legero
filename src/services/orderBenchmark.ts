@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import type { AppInfo } from '@capacitor/app'
 import { countTodayOrders, selectTodayOrderIds } from '@/services/orderWorkspaceView'
 import { toggleOrderServed, toggleOrderStepStatus } from '@/services/orderStatus'
 import { createOrderStore } from '@/store/order'
@@ -97,6 +98,31 @@ const yieldToBrowser = async (signal?: AbortSignal): Promise<void> => {
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
   throwIfAborted(signal)
 }
+
+const readAppInfo = (signal?: AbortSignal): Promise<AppInfo | null> => new Promise((resolve, reject) => {
+  let settled = false
+  const finish = (info: AppInfo | null, aborted = false): void => {
+    if (settled) return
+    settled = true
+    clearTimeout(timeout)
+    signal?.removeEventListener('abort', onAbort)
+    if (aborted) reject(new DOMException('Benchmark cancelled', 'AbortError'))
+    else resolve(info)
+  }
+  const onAbort = (): void => { finish(null, true) }
+  // Metadata is optional; both lazy-module loading and the native bridge are bounded.
+  const timeout = setTimeout(() => { finish(null) }, 1000)
+  signal?.addEventListener('abort', onAbort, { once: true })
+
+  if (signal?.aborted) {
+    onAbort()
+    return
+  }
+
+  void import('@capacitor/app')
+    .then(({ App }) => App.getInfo())
+    .then((info) => { finish(info) }, () => { finish(null) })
+})
 
 const makeOrders = async (total: number, signal?: AbortSignal): Promise<OrderRecord[]> => {
   const start = dayjs(ORDER_BENCHMARK_PROTOCOL.referenceTime)
@@ -276,13 +302,10 @@ export const runOrderBenchmark = async (options: BenchmarkOptions = {}): Promise
   const result = summarizeOrderBenchmark(trials)
 
   if (typeof window !== 'undefined') {
-    try {
-      const { App } = await import('@capacitor/app')
-      const info = await App.getInfo()
+    const info = await readAppInfo(options.signal)
+    if (info) {
       result.environment.appVersion = info.version
       result.environment.appBuild = info.build
-    } catch {
-      // App identity is unavailable in a regular browser.
     }
   }
 

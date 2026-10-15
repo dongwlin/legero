@@ -4,6 +4,7 @@ import { useOrderStore } from '@/store/order'
 import { List, RowComponentProps, useDynamicRowHeight } from 'react-window'
 import { AutoSizer } from 'react-virtualized-auto-sizer'
 import { selectTodayOrderIds } from '@/services/orderWorkspaceView'
+import { useOrderBusinessDay } from '@/hooks/useOrderBusinessDay'
 import { formatPriceCents } from '@/services/orderPricing'
 import { CarbonArrowUp } from '@/components/Icon'
 import { Button, Card, EmptyState } from '@heroui/react'
@@ -179,6 +180,7 @@ const VirtualOrderList: React.FC<VirtualOrderListProps> = ({
 }
 
 const OrderList: React.FC = () => {
+  const businessDay = useOrderBusinessDay()
   const ordersById = useOrderStore((state) => state.ordersById)
   const orderDisplayIds = useOrderStore((state) => state.orderDisplayIds)
   const filter = useOrderStore((state) => state.filter)
@@ -196,8 +198,8 @@ const OrderList: React.FC = () => {
   )
 
   const filteredOrderIds = useMemo(
-    () => selectTodayOrderIds(ordersById, orderDisplayIds, filter),
-    [ordersById, orderDisplayIds, filter],
+    () => selectTodayOrderIds(ordersById, orderDisplayIds, filter, businessDay),
+    [ordersById, orderDisplayIds, filter, businessDay],
   )
 
   const selectedOrderIdSet = useMemo(

@@ -1,5 +1,5 @@
 import type { ConfigType } from 'dayjs'
-import { isOrderCreatedToday } from '@/services/orderDomainUtils'
+import { getOrderDayRange, isOrderInDayRange } from '@/services/orderDomainUtils'
 import type { Filter, OrderRecord } from '@/types'
 
 export const selectTodayOrderIds = (
@@ -8,8 +8,9 @@ export const selectTodayOrderIds = (
   filter: Filter,
   referenceTime?: ConfigType,
 ): string[] => {
+  const dayRange = getOrderDayRange(referenceTime)
   const todayIds = orderDisplayIds.filter((id) =>
-    isOrderCreatedToday(ordersById[id], referenceTime),
+    isOrderInDayRange(ordersById[id], dayRange),
   )
 
   switch (filter) {
@@ -33,13 +34,14 @@ export const countTodayOrders = (
   orderDisplayIds: string[],
   referenceTime?: ConfigType,
 ): { todayCompletedCount: number; uncompletedCount: number } => {
+  const dayRange = getOrderDayRange(referenceTime)
   let todayCompletedCount = 0
   let uncompletedCount = 0
 
   for (const id of orderDisplayIds) {
     const record = ordersById[id]
 
-    if (!isOrderCreatedToday(record, referenceTime)) {
+    if (!isOrderInDayRange(record, dayRange)) {
       continue
     }
 

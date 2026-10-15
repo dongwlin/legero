@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import dayjs from 'dayjs'
+import { describe, expect, it, vi } from 'vitest'
 import { countTodayOrders, selectTodayOrderIds } from '@/services/orderWorkspaceView'
 import { DEFAULT_ORDER_FORM_VALUE, STEP_STATUS, type OrderRecord } from '@/types'
 
@@ -77,5 +78,32 @@ describe('order workspace view', () => {
       todayCompletedCount: 0,
       uncompletedCount: 0,
     })
+  })
+
+  it('keeps timezone conversion work constant as history grows', () => {
+    const tz = vi.spyOn(dayjs.prototype, 'tz')
+    selectTodayOrderIds(ordersById, ids, 'all', referenceTime)
+    countTodayOrders(ordersById, ids, referenceTime)
+    const smallHistoryConversions = tz.mock.calls.length
+    tz.mockClear()
+
+    const historicalOrders = Array.from({ length: 520 }, (_, index) =>
+      makeOrder(`history-${index}`, '2026-10-14T09:00:00+08:00'),
+    )
+    const largeOrdersById = {
+      ...ordersById,
+      ...Object.fromEntries(historicalOrders.map((order) => [order.id, order])),
+    }
+    const largeIds = [...historicalOrders.map((order) => order.id), ...ids]
+
+    expect(selectTodayOrderIds(largeOrdersById, largeIds, 'all', referenceTime)).toEqual([
+      'start', 'early', 'late', 'end',
+    ])
+    expect(countTodayOrders(largeOrdersById, largeIds, referenceTime)).toEqual({
+      todayCompletedCount: 2,
+      uncompletedCount: 2,
+    })
+    expect(smallHistoryConversions).toBeGreaterThan(0)
+    expect(tz.mock.calls.length).toBe(smallHistoryConversions)
   })
 })

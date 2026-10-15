@@ -10,6 +10,9 @@ import {
 } from '@/services/orderBenchmark'
 import { useOrderStore } from '@/store/order'
 
+const { getAppInfo } = vi.hoisted(() => ({ getAppInfo: vi.fn() }))
+vi.mock('@capacitor/app', () => ({ App: { getInfo: getAppInfo } }))
+
 // These tests verify orchestration and isolation; production selector correctness
 // is covered by orderWorkspaceView.test.ts, rather than timing wall-clock work here.
 vi.mock('@/services/orderWorkspaceView', () => ({
@@ -98,5 +101,37 @@ describe('order benchmark', () => {
 
     expect(progress.at(-1)).toMatchObject({ totalOrders: 520, action: null })
     expect(progress.some((value) => value.totalOrders === 1820)).toBe(false)
+  })
+
+  it('keeps all five completed trials when the optional native bridge times out', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', {})
+    await import('@capacitor/app')
+    getAppInfo.mockImplementation(() => new Promise(() => {}))
+    const pending = runOrderBenchmark()
+    await vi.runAllTimersAsync()
+    const result = await pending
+
+    expect(result.trials).toHaveLength(5)
+    expect(result.environment.appVersion).toBeNull()
+    expect(result.environment.appBuild).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('cancels a stalled optional native bridge and clears its timeout', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', {})
+    await import('@capacitor/app')
+    const controller = new AbortController()
+    getAppInfo.mockImplementation(() => {
+      setTimeout(() => { controller.abort() }, 0)
+      return new Promise(() => {})
+    })
+    const pending = runOrderBenchmark({ signal: controller.signal })
+    const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.runAllTimersAsync()
+    await rejection
+
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
