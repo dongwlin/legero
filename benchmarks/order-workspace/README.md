@@ -19,3 +19,5 @@ This measures synchronous JavaScript work associated with one successful action.
 Compare results only with the same fixture, warmup, iteration counts, machine and Node version. Avoid running builds or tests concurrently. Timings are observations, not CI pass/fail thresholds.
 
 The planned expansion into realtime batches, UI interactions, loading/synchronization, long-running tests and onsite diagnostics is specified in the [performance benchmark and diagnostics expansion plan](../../docs/performance-benchmark-expansion-plan.md). That document describes future work; the workload and exclusions above describe the current implementation.
+
+[Store-device observations from 2026-10-15](../../docs/order-benchmark-onsite-2026-10-15.md) transcribe the displayed aggregates from a user-provided photograph; the image is not stored in this repository. They are not a complete benchmark export and must not be used as an input to the CLI comparator. Complete JSON file export is the next prerequisite for onsite collection; it is planned and not yet implemented.
