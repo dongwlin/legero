@@ -42,12 +42,14 @@ export const getOrderDateKey = (value: ConfigType): string =>
 
 export const getOrderDayRange = (referenceTime?: ConfigType): OrderDayRange => {
   const day = dayjs(referenceTime).tz(ORDER_TIME_ZONE)
+  const currentDate = day.format('YYYY-MM-DD')
+  const nextDate = day.add(1, 'day').format('YYYY-MM-DD')
 
-  // Resolve both boundaries in the business timezone rather than assuming
-  // every local day is 24 hours (Shanghai historically observed DST).
+  // Parse each calendar boundary in the business timezone. Dayjs startOf/endOf
+  // can use the host timezone while resolving historical offset transitions.
   return {
-    startAt: day.startOf('day').valueOf(),
-    endAt: day.endOf('day').valueOf() + 1,
+    startAt: dayjs.tz(currentDate, ORDER_TIME_ZONE).valueOf(),
+    endAt: dayjs.tz(nextDate, ORDER_TIME_ZONE).valueOf(),
   }
 }
 
