@@ -83,6 +83,8 @@ const ProtectedRoute: React.FC = () => {
   const { status, errorMessage, retrySync, getDiagnostics } =
     useOrderWorkspaceSync()
   const isDiagnosticsRoute = useMatch('/settings/diagnostics') !== null
+  const isBenchmarkRoute = useMatch('/settings/benchmark') !== null
+  const isTroubleshootingRoute = isDiagnosticsRoute || isBenchmarkRoute
 
   if (
     authStatus === 'loading' &&
@@ -118,10 +120,10 @@ const ProtectedRoute: React.FC = () => {
     return <Navigate to='/auth' replace />
   }
 
-  // Diagnostics is intentionally available while the single workspace sync
+  // Troubleshooting is intentionally available while the single workspace sync
   // owner is still connecting or has reached a terminal error. The provider
   // only exposes that owner's getter; it never creates another subscription.
-  if (!isDiagnosticsRoute && (status === 'loading' || status === 'idle')) {
+  if (!isTroubleshootingRoute && (status === 'loading' || status === 'idle')) {
     return (
       <ProtectedRouteState
         title='正在同步订单'
@@ -131,7 +133,7 @@ const ProtectedRoute: React.FC = () => {
     )
   }
 
-  if (!isDiagnosticsRoute && status === 'error') {
+  if (!isTroubleshootingRoute && status === 'error') {
     return (
       <ProtectedRouteState
         title='订单同步失败'

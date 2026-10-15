@@ -6,6 +6,7 @@ import OrderSettings from './components/OrderSettings'
 import DataManagement from './components/DataManagement'
 import AuthSettings from './components/AuthSettings'
 import RealtimeDiagnosticsSettings from './components/RealtimeDiagnosticsSettings'
+import OrderBenchmarkSettings from '@/views/Settings/components/OrderBenchmarkSettings'
 
 const Settings: React.FC = () => {
   return (
@@ -16,6 +17,7 @@ const Settings: React.FC = () => {
         <div className='space-y-6'>
           <ApiConnectionSettings />
           <RealtimeDiagnosticsSettings />
+          <OrderBenchmarkSettings />
           <AuthSettings />
           <ThemeSettings />
           <OrderSettings />

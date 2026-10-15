@@ -200,6 +200,24 @@ describe('ProtectedRoute realtime diagnostics access', () => {
     expect(screen.queryByText('正在同步订单')).toBeNull()
   })
 
+  it.each(['idle', 'loading', 'error'] as const)(
+    'keeps the local benchmark accessible while order sync is %s',
+    (status) => {
+      mocks.useOrderWorkspaceSync.mockReturnValue({
+        status,
+        errorMessage: status === 'error' ? 'Offline' : null,
+        retrySync: vi.fn(),
+        getDiagnostics: mocks.getDiagnostics,
+      })
+
+      renderProtectedRoute('/settings/benchmark', <output>local benchmark</output>)
+
+      expect(screen.getByText('local benchmark')).not.toBeNull()
+      expect(screen.queryByText('正在同步订单')).toBeNull()
+      expect(screen.queryByText('订单同步失败')).toBeNull()
+    },
+  )
+
   it('keeps the loading gate for ordinary business routes', () => {
     mocks.useOrderWorkspaceSync.mockReturnValue({
       status: 'loading',
