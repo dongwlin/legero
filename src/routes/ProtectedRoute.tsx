@@ -63,12 +63,20 @@ const ProtectedRouteState: React.FC<ProtectedRouteStateProps> = ({
               </Button.Root>
             ) : null}
             {showDiagnosticsLink ? (
-              <Link
-                to='/settings/diagnostics'
-                className='inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border/70 bg-background-secondary/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/40 hover:bg-background-secondary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto'
-              >
-                查看连接诊断
-              </Link>
+              <>
+                <Link
+                  to='/settings/diagnostics'
+                  className='inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border/70 bg-background-secondary/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/40 hover:bg-background-secondary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto'
+                >
+                  查看连接诊断
+                </Link>
+                <Link
+                  to='/settings/benchmark'
+                  className='inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border/70 bg-background-secondary/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/40 hover:bg-background-secondary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto'
+                >
+                  测试本机性能
+                </Link>
+              </>
             ) : null}
           </div>
         ) : null}
@@ -83,6 +91,8 @@ const ProtectedRoute: React.FC = () => {
   const { status, errorMessage, retrySync, getDiagnostics } =
     useOrderWorkspaceSync()
   const isDiagnosticsRoute = useMatch('/settings/diagnostics') !== null
+  const isBenchmarkRoute = useMatch('/settings/benchmark') !== null
+  const isTroubleshootingRoute = isDiagnosticsRoute || isBenchmarkRoute
 
   if (
     authStatus === 'loading' &&
@@ -118,10 +128,10 @@ const ProtectedRoute: React.FC = () => {
     return <Navigate to='/auth' replace />
   }
 
-  // Diagnostics is intentionally available while the single workspace sync
+  // Troubleshooting is intentionally available while the single workspace sync
   // owner is still connecting or has reached a terminal error. The provider
   // only exposes that owner's getter; it never creates another subscription.
-  if (!isDiagnosticsRoute && (status === 'loading' || status === 'idle')) {
+  if (!isTroubleshootingRoute && (status === 'loading' || status === 'idle')) {
     return (
       <ProtectedRouteState
         title='正在同步订单'
@@ -131,7 +141,7 @@ const ProtectedRoute: React.FC = () => {
     )
   }
 
-  if (!isDiagnosticsRoute && status === 'error') {
+  if (!isTroubleshootingRoute && status === 'error') {
     return (
       <ProtectedRouteState
         title='订单同步失败'

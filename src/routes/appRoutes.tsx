@@ -48,6 +48,12 @@ export const createAppRoutes = (): RouteObject[] => [
         path: '/settings/diagnostics',
         element: <RealtimeDiagnostics />,
       },
+      {
+        path: '/settings/benchmark',
+        lazy: async () => ({
+          Component: (await import('@/views/Settings/Benchmark')).default,
+        }),
+      },
     ],
   },
   {

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import { Filter, type OrderRecord } from '@/types'
 import {
   compareOrderRecordsByTimeline,
@@ -112,7 +112,7 @@ interface OrderState {
   findOrder: (id: string) => OrderRecord
 }
 
-export const useOrderStore = create<OrderState>()(
+export const createOrderStore = (storage?: StateStorage) => create<OrderState>()(
   persist(
     (set, get) => ({
       ordersById: {},
@@ -325,10 +325,12 @@ export const useOrderStore = create<OrderState>()(
     }),
     {
       name: 'order-store-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => storage ?? localStorage),
       partialize: (state) => ({
         filter: state.filter,
       }),
     },
   ),
 )
+
+export const useOrderStore = createOrderStore()

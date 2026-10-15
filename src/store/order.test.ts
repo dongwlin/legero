@@ -6,7 +6,7 @@ import {
   STEP_STATUS,
   type OrderRecord,
 } from '@/types'
-import { useOrderStore } from './order'
+import { createOrderStore, useOrderStore } from './order'
 
 const makeOrder = (
   id: string,
@@ -83,5 +83,29 @@ describe('order store authoritative merge', () => {
       makeOrder('a', 10, 'a-stale'),
     ])
     expect(useOrderStore.getState().ordersById['a']?.note).toBe('a-v12')
+  })
+})
+
+describe('isolated order stores', () => {
+  it('keeps benchmark orders and persisted filters separate from the live store', () => {
+    const saved = new Map<string, string>()
+    const isolated = createOrderStore({
+      getItem: (key) => saved.get(key) ?? null,
+      setItem: (key, value) => { saved.set(key, value) },
+      removeItem: (key) => { saved.delete(key) },
+    })
+    const liveOrders = useOrderStore.getState().ordersById
+    const liveStorage = localStorage.getItem('order-store-storage')
+
+    isolated.getState().setOrders([makeOrder('synthetic', 1, 'benchmark')])
+    isolated.getState().setFilter('completed')
+
+    expect(useOrderStore.getState().ordersById).toBe(liveOrders)
+    expect(localStorage.getItem('order-store-storage')).toBe(liveStorage)
+    expect(isolated.getState().ordersById.synthetic.note).toBe('benchmark')
+    expect(JSON.parse(saved.get('order-store-storage')!)).toEqual({
+      state: { filter: 'completed' },
+      version: 0,
+    })
   })
 })

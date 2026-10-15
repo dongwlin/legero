@@ -6,6 +6,7 @@ import {
   ALL_MEAT_CODES_IN_ORDER,
   deriveDisplayNoFromId,
   getOrderDateKey,
+  getOrderDayRange,
   getVisibleMeatCodes,
   isOrderCreatedToday,
   normalizeSelectedMeatCodes,
@@ -63,6 +64,22 @@ describe('order domain utilities', () => {
         '2026-01-01T16:00:00Z',
       ),
     ).toBe(false)
+  })
+
+  it('resolves Shanghai business-day boundaries independently of the host timezone', () => {
+    const range = getOrderDayRange('2026-10-15T03:00:00-07:00')
+    expect(range).toEqual({
+      startAt: dayjs('2026-10-14T16:00:00Z').valueOf(),
+      endAt: dayjs('2026-10-15T16:00:00Z').valueOf(),
+    })
+    expect(isOrderCreatedToday({ createdAt: 'invalid' }, range.startAt)).toBe(false)
+  })
+
+  it('does not assume historical Shanghai business days are always 24 hours', () => {
+    const spring = getOrderDayRange('1991-04-14T12:00:00+09:00')
+    const autumn = getOrderDayRange('1991-09-15T12:00:00+08:00')
+    expect(spring.endAt - spring.startAt).toBe(23 * 60 * 60 * 1000)
+    expect(autumn.endAt - autumn.startAt).toBe(25 * 60 * 60 * 1000)
   })
 
   it('derives the last four digits only from a twelve digit order id', () => {

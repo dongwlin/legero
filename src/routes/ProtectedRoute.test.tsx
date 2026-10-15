@@ -200,6 +200,24 @@ describe('ProtectedRoute realtime diagnostics access', () => {
     expect(screen.queryByText('正在同步订单')).toBeNull()
   })
 
+  it.each(['idle', 'loading', 'error'] as const)(
+    'keeps the local benchmark accessible while order sync is %s',
+    (status) => {
+      mocks.useOrderWorkspaceSync.mockReturnValue({
+        status,
+        errorMessage: status === 'error' ? 'Offline' : null,
+        retrySync: vi.fn(),
+        getDiagnostics: mocks.getDiagnostics,
+      })
+
+      renderProtectedRoute('/settings/benchmark', <output>local benchmark</output>)
+
+      expect(screen.getByText('local benchmark')).not.toBeNull()
+      expect(screen.queryByText('正在同步订单')).toBeNull()
+      expect(screen.queryByText('订单同步失败')).toBeNull()
+    },
+  )
+
   it('keeps the loading gate for ordinary business routes', () => {
     mocks.useOrderWorkspaceSync.mockReturnValue({
       status: 'loading',
@@ -213,6 +231,7 @@ describe('ProtectedRoute realtime diagnostics access', () => {
     expect(screen.getByText('正在同步订单')).not.toBeNull()
     const diagnosticsLink = screen.getByRole('link', { name: '查看连接诊断' })
     expect(diagnosticsLink.getAttribute('href')).toBe('/settings/diagnostics')
+    expect(screen.getByRole('link', { name: '测试本机性能' }).getAttribute('href')).toBe('/settings/benchmark')
     expect(screen.queryByText('business route')).toBeNull()
   })
 
@@ -231,12 +250,41 @@ describe('ProtectedRoute realtime diagnostics access', () => {
     const diagnosticsLink = screen.getByRole('link', { name: '查看连接诊断' })
     expect(diagnosticsLink.getAttribute('href')).toBe('/settings/diagnostics')
     const retryButton = screen.getByRole('button', { name: '重试' })
+    const benchmarkLink = screen.getByRole('link', { name: '测试本机性能' })
     expect(retryButton).not.toBeNull()
     expect(retryButton.parentElement?.firstElementChild).toBe(retryButton)
-    expect(retryButton.parentElement?.lastElementChild).toBe(diagnosticsLink)
+    expect(retryButton.nextElementSibling).toBe(diagnosticsLink)
+    expect(retryButton.parentElement?.lastElementChild).toBe(benchmarkLink)
+    expect(benchmarkLink.getAttribute('href')).toBe('/settings/benchmark')
     expect(retryButton.className).toContain('w-full')
     expect(diagnosticsLink.className).toContain('w-full')
+    expect(benchmarkLink.className).toContain('w-full')
     expect(screen.queryByText('business route')).toBeNull()
+  })
+
+  it('navigates from an order sync failure to the local benchmark', () => {
+    mocks.useOrderWorkspaceSync.mockReturnValue({
+      status: 'error',
+      errorMessage: 'Realtime subscription failed.',
+      retrySync: vi.fn(),
+      getDiagnostics: mocks.getDiagnostics,
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/order']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path='/order' element={<output>business route</output>} />
+            <Route path='/settings/benchmark' element={<output>local benchmark</output>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('link', { name: '测试本机性能' }))
+
+    expect(screen.getByText('local benchmark')).not.toBeNull()
+    expect(screen.queryByText('订单同步失败')).toBeNull()
   })
 
   it('exposes a cancellation action while restoring the session', () => {

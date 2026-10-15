@@ -12,6 +12,7 @@
     "test:unit": "vitest run --project=unit",
     "test:coverage": "vitest run --coverage",
     "test:storybook": "vitest --project=storybook",
+    "benchmark:orders": "node benchmarks/order-workspace/run.mjs",
     "preview": "vite preview",
     "sync": "pnpm cap sync",
     "gen-icon": "npx @capacitor/assets generate --assetPath public --android",

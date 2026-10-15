@@ -8,6 +8,11 @@ type OrderDateInput = {
   createdAt: string
 }
 
+export type OrderDayRange = {
+  startAt: number
+  endAt: number
+}
+
 export const ALL_MEAT_CODES_IN_ORDER = [
   MEAT.leanPork,
   MEAT.liver,
@@ -35,10 +40,31 @@ export const normalizeSelectedMeatCodes = (
 export const getOrderDateKey = (value: ConfigType): string =>
   dayjs(value).tz(ORDER_TIME_ZONE).format('YYYY-MM-DD')
 
+export const getOrderDayRange = (referenceTime?: ConfigType): OrderDayRange => {
+  const day = dayjs(referenceTime).tz(ORDER_TIME_ZONE)
+  const currentDate = day.format('YYYY-MM-DD')
+  const nextDate = day.add(1, 'day').format('YYYY-MM-DD')
+
+  // Parse each calendar boundary in the business timezone. Dayjs startOf/endOf
+  // can use the host timezone while resolving historical offset transitions.
+  return {
+    startAt: dayjs.tz(currentDate, ORDER_TIME_ZONE).valueOf(),
+    endAt: dayjs.tz(nextDate, ORDER_TIME_ZONE).valueOf(),
+  }
+}
+
+export const isOrderInDayRange = (
+  order: OrderDateInput,
+  { startAt, endAt }: OrderDayRange,
+): boolean => {
+  const createdAt = dayjs(order.createdAt).valueOf()
+  return createdAt >= startAt && createdAt < endAt
+}
+
 export const isOrderCreatedToday = (
   order: OrderDateInput,
-  referenceTime: ConfigType = new Date(),
-): boolean => getOrderDateKey(order.createdAt) === getOrderDateKey(referenceTime)
+  referenceTime?: ConfigType,
+): boolean => isOrderInDayRange(order, getOrderDayRange(referenceTime))
 
 export const deriveDisplayNoFromId = (id: string): string | null => {
   if (!id) {

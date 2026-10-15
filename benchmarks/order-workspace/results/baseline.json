@@ -1,0 +1,586 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-15T07:05:00.644Z",
+  "environment": {
+    "runtime": "node",
+    "userAgent": "Node.js/24",
+    "logicalCpus": 16,
+    "appVersion": "0.0.22",
+    "appBuild": null,
+    "node": "v24.18.0",
+    "v8": "13.6.233.17-node.50",
+    "pnpm": "pnpm/12.6.0 npm/? node/? linux x64",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "memoryBytes": 33478365184,
+    "dependencies": {
+      "vite": "8.2.1",
+      "dayjs": "1.11.21",
+      "zustand": "5.0.14"
+    },
+    "timezone": "UTC"
+  },
+  "protocol": {
+    "protocolVersion": 1,
+    "runs": 5,
+    "scenarioTotalOrders": [
+      130,
+      520,
+      1820
+    ],
+    "todayOrders": 130,
+    "warmupOperationsPerMetric": 2,
+    "measuredOperationsPerMetric": 5,
+    "referenceTime": "2026-10-15T12:00:00+08:00",
+    "filter": "all",
+    "unit": "milliseconds per action",
+    "action": "optimistic domain toggle/store commit + controls/list derivation, then simulated authoritative store commit + controls/list derivation",
+    "excludes": [
+      "network",
+      "HTTP/server/PostgreSQL",
+      "React render and DOM/layout/paint",
+      "localStorage disk I/O",
+      "optimistic mutation journal and request bookkeeping",
+      "300 ms duplicate-tap guard"
+    ],
+    "aggregation": "arithmetic mean of the five fresh-process trial means",
+    "additionalExcludes": [
+      "Android WebView"
+    ]
+  },
+  "trials": [
+    {
+      "run": 1,
+      "scenarios": [
+        {
+          "totalOrders": 130,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.05067859999998632,
+              "optimisticViewsMs": 30.46503820000001,
+              "authoritativeCommitMs": 0.04764879999999039,
+              "authoritativeViewsMs": 33.27779000000002,
+              "totalMs": 63.8411556
+            },
+            "staple": {
+              "optimisticCommitMs": 0.03335400000000845,
+              "optimisticViewsMs": 29.648821199999997,
+              "authoritativeCommitMs": 0.03365459999997711,
+              "authoritativeViewsMs": 32.56906919999999,
+              "totalMs": 62.284898999999974
+            },
+            "served": {
+              "optimisticCommitMs": 0.04001879999996163,
+              "optimisticViewsMs": 29.99564,
+              "authoritativeCommitMs": 0.024044599999979255,
+              "authoritativeViewsMs": 31.760937000000013,
+              "totalMs": 61.82064039999996
+            }
+          }
+        },
+        {
+          "totalOrders": 520,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.13820999999998093,
+              "optimisticViewsMs": 125.49864939999989,
+              "authoritativeCommitMs": 1.3428084000001035,
+              "authoritativeViewsMs": 128.82136119999996,
+              "totalMs": 255.80102899999991
+            },
+            "staple": {
+              "optimisticCommitMs": 0.13519440000009125,
+              "optimisticViewsMs": 128.29782219999979,
+              "authoritativeCommitMs": 0.11996380000018689,
+              "authoritativeViewsMs": 130.932259,
+              "totalMs": 259.48523940000007
+            },
+            "served": {
+              "optimisticCommitMs": 0.1376667999998972,
+              "optimisticViewsMs": 126.71365960000021,
+              "authoritativeCommitMs": 0.12194559999988996,
+              "authoritativeViewsMs": 129.59536179999995,
+              "totalMs": 256.56863379999993
+            }
+          }
+        },
+        {
+          "totalOrders": 1820,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.6284870000003139,
+              "optimisticViewsMs": 454.54167040000027,
+              "authoritativeCommitMs": 0.5086693999997806,
+              "authoritativeViewsMs": 458.70384459999985,
+              "totalMs": 914.3826714000003
+            },
+            "staple": {
+              "optimisticCommitMs": 0.6134872000005999,
+              "optimisticViewsMs": 443.5810373999997,
+              "authoritativeCommitMs": 0.49196019999981216,
+              "authoritativeViewsMs": 454.53742040000105,
+              "totalMs": 899.2239052000011
+            },
+            "served": {
+              "optimisticCommitMs": 0.6121263999993971,
+              "optimisticViewsMs": 447.7941648,
+              "authoritativeCommitMs": 0.5285126000002492,
+              "authoritativeViewsMs": 463.5441061999991,
+              "totalMs": 912.4789099999987
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "scenarios": [
+        {
+          "totalOrders": 130,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.05031819999998675,
+              "optimisticViewsMs": 31.227469200000012,
+              "authoritativeCommitMs": 0.05239980000000059,
+              "authoritativeViewsMs": 33.87382240000001,
+              "totalMs": 65.2040096
+            },
+            "staple": {
+              "optimisticCommitMs": 0.03090959999999541,
+              "optimisticViewsMs": 30.245490399999994,
+              "authoritativeCommitMs": 0.027924400000006244,
+              "authoritativeViewsMs": 32.51411840000001,
+              "totalMs": 62.8184428
+            },
+            "served": {
+              "optimisticCommitMs": 0.04096259999992071,
+              "optimisticViewsMs": 30.550405600000023,
+              "authoritativeCommitMs": 0.026200999999991835,
+              "authoritativeViewsMs": 32.06035740000002,
+              "totalMs": 62.67792659999996
+            }
+          }
+        },
+        {
+          "totalOrders": 520,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.14228360000006432,
+              "optimisticViewsMs": 127.73013060000002,
+              "authoritativeCommitMs": 1.3420865999999478,
+              "authoritativeViewsMs": 130.09185680000002,
+              "totalMs": 259.30635760000007
+            },
+            "staple": {
+              "optimisticCommitMs": 0.133824000000277,
+              "optimisticViewsMs": 128.04125919999979,
+              "authoritativeCommitMs": 0.6926930000001448,
+              "authoritativeViewsMs": 129.93873879999992,
+              "totalMs": 258.8065150000001
+            },
+            "served": {
+              "optimisticCommitMs": 0.13381939999981113,
+              "optimisticViewsMs": 128.01275219999988,
+              "authoritativeCommitMs": 0.11874360000001616,
+              "authoritativeViewsMs": 130.5408487999999,
+              "totalMs": 258.8061639999996
+            }
+          }
+        },
+        {
+          "totalOrders": 1820,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.639938600000096,
+              "optimisticViewsMs": 457.3845841999999,
+              "authoritativeCommitMs": 0.4954310000000987,
+              "authoritativeViewsMs": 466.8570936000004,
+              "totalMs": 925.3770474000005
+            },
+            "staple": {
+              "optimisticCommitMs": 0.6180774000000383,
+              "optimisticViewsMs": 448.3087692000005,
+              "authoritativeCommitMs": 0.5108553999991272,
+              "authoritativeViewsMs": 459.9830544000004,
+              "totalMs": 909.4207564000001
+            },
+            "served": {
+              "optimisticCommitMs": 0.5793954000000667,
+              "optimisticViewsMs": 448.3133400000006,
+              "authoritativeCommitMs": 0.493354599999293,
+              "authoritativeViewsMs": 457.4857111999998,
+              "totalMs": 906.8718011999997
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "scenarios": [
+        {
+          "totalOrders": 130,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.060348600000003215,
+              "optimisticViewsMs": 31.860556800000005,
+              "authoritativeCommitMs": 0.04999339999999393,
+              "authoritativeViewsMs": 34.284412799999984,
+              "totalMs": 66.25531159999998
+            },
+            "staple": {
+              "optimisticCommitMs": 0.037864799999988465,
+              "optimisticViewsMs": 30.168218000000024,
+              "authoritativeCommitMs": 0.03013619999999264,
+              "authoritativeViewsMs": 32.25465459999996,
+              "totalMs": 62.490873599999965
+            },
+            "served": {
+              "optimisticCommitMs": 0.04745439999996961,
+              "optimisticViewsMs": 30.32016980000003,
+              "authoritativeCommitMs": 0.028908199999978023,
+              "authoritativeViewsMs": 31.795076400000017,
+              "totalMs": 62.1916088
+            }
+          }
+        },
+        {
+          "totalOrders": 520,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.1561754000000292,
+              "optimisticViewsMs": 128.29769620000008,
+              "authoritativeCommitMs": 1.3266959999998107,
+              "authoritativeViewsMs": 131.14009920000007,
+              "totalMs": 260.9206668
+            },
+            "staple": {
+              "optimisticCommitMs": 0.16153339999973468,
+              "optimisticViewsMs": 127.87179900000001,
+              "authoritativeCommitMs": 0.6829368000000613,
+              "authoritativeViewsMs": 129.57722780000003,
+              "totalMs": 258.29349699999983
+            },
+            "served": {
+              "optimisticCommitMs": 0.1501803999997719,
+              "optimisticViewsMs": 125.95638000000017,
+              "authoritativeCommitMs": 0.1149888000001738,
+              "authoritativeViewsMs": 129.66420239999988,
+              "totalMs": 255.8857516
+            }
+          }
+        },
+        {
+          "totalOrders": 1820,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.6244354000002204,
+              "optimisticViewsMs": 460.38145780000013,
+              "authoritativeCommitMs": 0.49636239999999815,
+              "authoritativeViewsMs": 464.6835874,
+              "totalMs": 926.1858430000004
+            },
+            "staple": {
+              "optimisticCommitMs": 0.5967756000005465,
+              "optimisticViewsMs": 446.4933549999998,
+              "authoritativeCommitMs": 0.4973783999994339,
+              "authoritativeViewsMs": 456.7453192000001,
+              "totalMs": 904.3328281999999
+            },
+            "served": {
+              "optimisticCommitMs": 0.6008554000000004,
+              "optimisticViewsMs": 454.08875899999987,
+              "authoritativeCommitMs": 0.5076898000006622,
+              "authoritativeViewsMs": 471.07404420000023,
+              "totalMs": 926.2713484000008
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "scenarios": [
+        {
+          "totalOrders": 130,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.04853679999997666,
+              "optimisticViewsMs": 30.652087400000006,
+              "authoritativeCommitMs": 0.04777100000000019,
+              "authoritativeViewsMs": 33.640677200000006,
+              "totalMs": 64.38907239999999
+            },
+            "staple": {
+              "optimisticCommitMs": 0.04026539999999841,
+              "optimisticViewsMs": 29.399705600000015,
+              "authoritativeCommitMs": 0.02948499999999967,
+              "authoritativeViewsMs": 33.1531874,
+              "totalMs": 62.622643400000015
+            },
+            "served": {
+              "optimisticCommitMs": 0.039636000000018615,
+              "optimisticViewsMs": 30.135759800000006,
+              "authoritativeCommitMs": 0.02574179999996886,
+              "authoritativeViewsMs": 32.07247039999997,
+              "totalMs": 62.27360799999997
+            }
+          }
+        },
+        {
+          "totalOrders": 520,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.15527380000003177,
+              "optimisticViewsMs": 130.0668318000002,
+              "authoritativeCommitMs": 0.7243099999998777,
+              "authoritativeViewsMs": 131.79761419999994,
+              "totalMs": 262.7440298
+            },
+            "staple": {
+              "optimisticCommitMs": 0.14021560000001046,
+              "optimisticViewsMs": 129.20432580000016,
+              "authoritativeCommitMs": 0.13075619999981428,
+              "authoritativeViewsMs": 131.13420000000005,
+              "totalMs": 260.60949760000005
+            },
+            "served": {
+              "optimisticCommitMs": 0.1541617999999289,
+              "optimisticViewsMs": 127.94311600000019,
+              "authoritativeCommitMs": 0.9145087999999305,
+              "authoritativeViewsMs": 130.68394559999996,
+              "totalMs": 259.6957322
+            }
+          }
+        },
+        {
+          "totalOrders": 1820,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.5895464000001084,
+              "optimisticViewsMs": 448.4885427999998,
+              "authoritativeCommitMs": 0.510981399999946,
+              "authoritativeViewsMs": 461.3253736000006,
+              "totalMs": 910.9144442000004
+            },
+            "staple": {
+              "optimisticCommitMs": 0.5965313999997306,
+              "optimisticViewsMs": 443.50842180000075,
+              "authoritativeCommitMs": 0.5099720000005619,
+              "authoritativeViewsMs": 455.64047719999945,
+              "totalMs": 900.2554024000004
+            },
+            "served": {
+              "optimisticCommitMs": 0.6288840000001074,
+              "optimisticViewsMs": 450.4902707999987,
+              "authoritativeCommitMs": 0.5019088000008196,
+              "authoritativeViewsMs": 461.4856126000006,
+              "totalMs": 913.1066762000003
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "scenarios": [
+        {
+          "totalOrders": 130,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.04941420000001813,
+              "optimisticViewsMs": 31.7517354,
+              "authoritativeCommitMs": 0.0508047999999917,
+              "authoritativeViewsMs": 34.90944760000002,
+              "totalMs": 66.76140200000003
+            },
+            "staple": {
+              "optimisticCommitMs": 0.030829399999993255,
+              "optimisticViewsMs": 30.247889199999985,
+              "authoritativeCommitMs": 0.030406599999992068,
+              "authoritativeViewsMs": 33.757150600000045,
+              "totalMs": 64.06627580000001
+            },
+            "served": {
+              "optimisticCommitMs": 0.03592099999996208,
+              "optimisticViewsMs": 30.95483640000007,
+              "authoritativeCommitMs": 0.027407199999970544,
+              "authoritativeViewsMs": 32.47249499999998,
+              "totalMs": 63.49065959999998
+            }
+          }
+        },
+        {
+          "totalOrders": 520,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.13129519999993136,
+              "optimisticViewsMs": 129.22022180000013,
+              "authoritativeCommitMs": 1.3063240000000405,
+              "authoritativeViewsMs": 131.5867525999999,
+              "totalMs": 262.24459360000003
+            },
+            "staple": {
+              "optimisticCommitMs": 0.13371939999997268,
+              "optimisticViewsMs": 131.19695139999993,
+              "authoritativeCommitMs": 0.11885379999985161,
+              "authoritativeViewsMs": 132.5682724,
+              "totalMs": 264.0177969999998
+            },
+            "served": {
+              "optimisticCommitMs": 0.1316497999998319,
+              "optimisticViewsMs": 129.78269760000003,
+              "authoritativeCommitMs": 0.6710964000001696,
+              "authoritativeViewsMs": 131.5187117999996,
+              "totalMs": 262.1041555999997
+            }
+          }
+        },
+        {
+          "totalOrders": 1820,
+          "todayOrders": 130,
+          "metrics": {
+            "meat": {
+              "optimisticCommitMs": 0.6159193999996205,
+              "optimisticViewsMs": 462.32171320000015,
+              "authoritativeCommitMs": 0.508597400000508,
+              "authoritativeViewsMs": 473.81208059999915,
+              "totalMs": 937.2583105999995
+            },
+            "staple": {
+              "optimisticCommitMs": 0.6258340000007593,
+              "optimisticViewsMs": 450.7223837999994,
+              "authoritativeCommitMs": 0.5030030000001716,
+              "authoritativeViewsMs": 462.2984976000007,
+              "totalMs": 914.1497184000011
+            },
+            "served": {
+              "optimisticCommitMs": 0.5959726000000956,
+              "optimisticViewsMs": 452.0497651999998,
+              "authoritativeCommitMs": 0.4992577999997593,
+              "authoritativeViewsMs": 463.2065087999996,
+              "totalMs": 916.3515043999993
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "means": [
+    {
+      "totalOrders": 130,
+      "todayOrders": 130,
+      "metrics": {
+        "meat": {
+          "optimisticCommitMs": 0.051859279999994214,
+          "optimisticViewsMs": 31.191377400000004,
+          "authoritativeCommitMs": 0.04972355999999536,
+          "authoritativeViewsMs": 33.99723000000001,
+          "totalMs": 65.29019024
+        },
+        "staple": {
+          "optimisticCommitMs": 0.0346446399999968,
+          "optimisticViewsMs": 29.94202488,
+          "authoritativeCommitMs": 0.030321359999993545,
+          "authoritativeViewsMs": 32.84963604,
+          "totalMs": 62.85662692
+        },
+        "served": {
+          "optimisticCommitMs": 0.040798559999966524,
+          "optimisticViewsMs": 30.391362320000024,
+          "authoritativeCommitMs": 0.026460559999977706,
+          "authoritativeViewsMs": 32.032267239999996,
+          "totalMs": 62.49088867999997
+        }
+      }
+    },
+    {
+      "totalOrders": 520,
+      "todayOrders": 130,
+      "metrics": {
+        "meat": {
+          "optimisticCommitMs": 0.1446476000000075,
+          "optimisticViewsMs": 128.16270596000007,
+          "authoritativeCommitMs": 1.208444999999956,
+          "authoritativeViewsMs": 130.6875368,
+          "totalMs": 260.20333536
+        },
+        "staple": {
+          "optimisticCommitMs": 0.14089736000001724,
+          "optimisticViewsMs": 128.92243151999998,
+          "authoritativeCommitMs": 0.34904072000001174,
+          "authoritativeViewsMs": 130.83013960000002,
+          "totalMs": 260.2425092
+        },
+        "served": {
+          "optimisticCommitMs": 0.1414956399998482,
+          "optimisticViewsMs": 127.6817210800001,
+          "authoritativeCommitMs": 0.388256640000036,
+          "authoritativeViewsMs": 130.40061407999988,
+          "totalMs": 258.61208743999987
+        }
+      }
+    },
+    {
+      "totalOrders": 1820,
+      "todayOrders": 130,
+      "metrics": {
+        "meat": {
+          "optimisticCommitMs": 0.6196653600000718,
+          "optimisticViewsMs": 456.62359368000006,
+          "authoritativeCommitMs": 0.5040083200000662,
+          "authoritativeViewsMs": 465.07639596,
+          "totalMs": 922.8236633200002
+        },
+        "staple": {
+          "optimisticCommitMs": 0.6101411200003348,
+          "optimisticViewsMs": 446.5227934400001,
+          "authoritativeCommitMs": 0.5026337999998213,
+          "authoritativeViewsMs": 457.84095376000033,
+          "totalMs": 905.4765221200005
+        },
+        "served": {
+          "optimisticCommitMs": 0.6034467599999334,
+          "optimisticViewsMs": 450.5472599599998,
+          "authoritativeCommitMs": 0.5061447200001566,
+          "authoritativeViewsMs": 463.3591965999999,
+          "totalMs": 915.0160480399998
+        }
+      }
+    }
+  ],
+  "label": "baseline",
+  "source": {
+    "commit": "e314feee8267395fa8fb6c5b19656f2446678f94",
+    "branch": "codex/fix-order-toggle-performance",
+    "workingTreeStatus": "",
+    "sha256": {
+      "src/services/orderWorkspaceView.ts": "35a031a79d63d5f560981e9742b6ec8d46e94b79fc166457d126e2da1978925f",
+      "src/services/orderDomainUtils.ts": "c883395cdac158a14ee71916977f01d141c208900fdcccd5f220f141f31c33dc",
+      "src/services/orderStatus.ts": "db04539bd82648dcbd69900f10207c6d6e59b48ed56218674aa52b1c84726f3e",
+      "src/services/orderBenchmark.ts": "aba85a684911cdbb026443d903634124f0dcab0ec61fce9393045778f99a8aff",
+      "src/services/orderSorting.ts": "7a54df73ff573c8e54470dd81f6ff43d58323e3e5e6f762c507bb202b7a2a7c1",
+      "src/store/order.ts": "f48b1bee57cee9bba80684abe7b34e15d5301dcfe1df1d12ea07199535c8a14e",
+      "src/types/orderForm.ts": "e21008c0213031e8db48358127bb8e074b43642e8727a7562d165e41063a87f8",
+      "src/types/codes.ts": "c0d1229e2a9cd569c373a527733f1d2889c60f553811143f1d1973d921cc7202",
+      "benchmarks/order-workspace/workload.ts": "93f90d5854e49f31e19a9f333ad97cfbd22f287363b962048c2830456886622c",
+      "benchmarks/order-workspace/run.mjs": "02113b03ab61cb8daec8cbb8792306b679b03c40eeef8e5b196796ec5c673d35",
+      "pnpm-lock.yaml": "371eb50fe7cf42a908cb52ea2dd8290971c1f19e93d6fe19e2bda3276cb0a079"
+    }
+  }
+}
