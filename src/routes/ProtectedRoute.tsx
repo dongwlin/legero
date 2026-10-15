@@ -63,12 +63,20 @@ const ProtectedRouteState: React.FC<ProtectedRouteStateProps> = ({
               </Button.Root>
             ) : null}
             {showDiagnosticsLink ? (
-              <Link
-                to='/settings/diagnostics'
-                className='inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border/70 bg-background-secondary/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/40 hover:bg-background-secondary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto'
-              >
-                查看连接诊断
-              </Link>
+              <>
+                <Link
+                  to='/settings/diagnostics'
+                  className='inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border/70 bg-background-secondary/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/40 hover:bg-background-secondary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto'
+                >
+                  查看连接诊断
+                </Link>
+                <Link
+                  to='/settings/benchmark'
+                  className='inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border/70 bg-background-secondary/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/40 hover:bg-background-secondary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto'
+                >
+                  测试本机性能
+                </Link>
+              </>
             ) : null}
           </div>
         ) : null}

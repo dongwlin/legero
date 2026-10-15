@@ -20,6 +20,7 @@ const output = path.resolve(root, readArg('--output') ?? `benchmarks/order-works
 const comparePath = readArg('--compare')
 const git = (...args) => {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
+  if (result.error) throw result.error
   if (result.status !== 0) throw new Error(result.stderr)
   return result.stdout.trim()
 }
@@ -74,8 +75,10 @@ try {
       cwd: root,
       encoding: 'utf8',
       maxBuffer: 4 * 1024 * 1024,
+      timeout: 180_000,
       env: { ...process.env, TZ: 'UTC', NODE_ENV: 'production' },
     })
+    if (result.error) throw result.error
     if (result.status !== 0) throw new Error(result.stderr || result.stdout)
     trials.push(JSON.parse(result.stdout))
   }
@@ -83,8 +86,10 @@ try {
     cwd: root,
     encoding: 'utf8',
     input: JSON.stringify(trials),
+    timeout: 10_000,
     env: { ...process.env, TZ: 'UTC', NODE_ENV: 'production' },
   })
+  if (result.error) throw result.error
   if (result.status !== 0) throw new Error(result.stderr || result.stdout)
   summary = JSON.parse(result.stdout)
 } finally {
