@@ -3,7 +3,11 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { OrderBenchmarkProgress, OrderBenchmarkResult } from '@/services/orderBenchmark'
+import {
+  OrderBenchmarkError,
+  type OrderBenchmarkProgress,
+  type OrderBenchmarkResult,
+} from '@/services/orderBenchmark'
 
 const mocks = vi.hoisted(() => ({ runBenchmark: vi.fn() }))
 
@@ -19,7 +23,10 @@ vi.mock('@heroui/react', () => {
 })
 
 vi.mock('@/components/Header', () => ({ default: ({ title }: { title: string }) => <header>{title}</header> }))
-vi.mock('@/services/orderBenchmark', () => ({ runOrderBenchmark: mocks.runBenchmark }))
+vi.mock('@/services/orderBenchmark', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/orderBenchmark')>()
+  return { ...actual, runOrderBenchmark: mocks.runBenchmark }
+})
 
 import OrderBenchmark from '@/views/Settings/Benchmark'
 import { makeBenchmarkPreviewResult } from '@/views/Settings/Benchmark/previewData'
@@ -51,11 +58,20 @@ describe('OrderBenchmark', () => {
     expect(screen.getByRole('button', { name: '重新测试 5 轮' })).not.toBeNull()
   })
 
-  it('shows progress, cancels the signal, and discards a late completed result', async () => {
+  it('ignores late progress and completion from a cancelled run after a rerun starts', async () => {
     let finish: (result: OrderBenchmarkResult) => void = () => {}
+    let firstProgress: (value: OrderBenchmarkProgress) => void = () => {}
+    let callCount = 0
     mocks.runBenchmark.mockImplementation(({ onProgress }: { onProgress: (value: OrderBenchmarkProgress) => void }) => {
-      onProgress({ run: 2, totalRuns: 5, totalOrders: 520, action: 'meat' })
-      return new Promise<OrderBenchmarkResult>((resolve) => { finish = resolve })
+      callCount += 1
+      if (callCount === 1) {
+        firstProgress = onProgress
+        onProgress({ run: 2, totalRuns: 5, totalOrders: 520, action: 'meat' })
+        return new Promise<OrderBenchmarkResult>((resolve) => { finish = resolve })
+      }
+
+      onProgress({ run: 1, totalRuns: 5, totalOrders: 130, action: 'staple' })
+      return new Promise<OrderBenchmarkResult>(() => {})
     })
     render(<OrderBenchmark />)
     start()
@@ -63,8 +79,16 @@ describe('OrderBenchmark', () => {
     expect(screen.getByRole('button', { name: '测试进行中' }).hasAttribute('disabled')).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: '取消测试' }))
     expect(mocks.runBenchmark.mock.calls[0][0].signal.aborted).toBe(true)
-    await act(async () => { finish(makeBenchmarkPreviewResult()) })
     expect(screen.getByText(/测试已取消/)).not.toBeNull()
+
+    start()
+    expect(screen.getByText('第 1 / 5 轮 · 130 单 · 主食')).not.toBeNull()
+    act(() => { firstProgress({ run: 5, totalRuns: 5, totalOrders: 1820, action: 'served' }) })
+    expect(screen.getByText('第 1 / 5 轮 · 130 单 · 主食')).not.toBeNull()
+    expect(screen.queryByText('第 5 / 5 轮 · 1820 单 · 出餐')).toBeNull()
+
+    await act(async () => { finish(makeBenchmarkPreviewResult()) })
+    expect(screen.getByText('第 1 / 5 轮 · 130 单 · 主食')).not.toBeNull()
     expect(screen.queryByText('5 轮平均结果')).toBeNull()
   })
 
@@ -72,10 +96,9 @@ describe('OrderBenchmark', () => {
     mocks.runBenchmark.mockReturnValue(new Promise(() => {}))
     const view = render(<OrderBenchmark />)
     start()
-    const { signal, onProgress } = mocks.runBenchmark.mock.calls[0][0]
+    const { signal } = mocks.runBenchmark.mock.calls[0][0]
     view.unmount()
     expect(signal.aborted).toBe(true)
-    expect(() => onProgress({ run: 3, totalRuns: 5, totalOrders: 520, action: 'served' })).not.toThrow()
   })
 
   it('stops when the application is backgrounded', () => {
@@ -92,10 +115,26 @@ describe('OrderBenchmark', () => {
     mocks.runBenchmark.mockRejectedValueOnce(new Error('test failure')).mockResolvedValueOnce(makeBenchmarkPreviewResult())
     render(<OrderBenchmark />)
     await act(async () => { start() })
-    expect(screen.getByRole('alert').textContent).toContain('测试未完成')
+    expect(screen.getByRole('alert').textContent).toContain('UNEXPECTED_FAILURE')
+    expect(screen.getByRole('alert').textContent).not.toContain('test failure')
+    const diagnostic = screen.getByRole('textbox', { name: '订单基准测试诊断 JSON' }) as HTMLTextAreaElement
+    expect(JSON.parse(diagnostic.value)).toMatchObject({
+      kind: 'order-benchmark-failure',
+      code: 'UNEXPECTED_FAILURE',
+    })
     await act(async () => { start() })
     expect(screen.getByText('5 轮平均结果')).not.toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('shows a safe diagnostic code for known benchmark failures', async () => {
+    mocks.runBenchmark.mockRejectedValueOnce(new OrderBenchmarkError('INVALID_FIXTURE'))
+    render(<OrderBenchmark />)
+    await act(async () => { start() })
+
+    expect(screen.getByRole('alert').textContent).toContain('模拟订单数据校验失败')
+    expect(screen.getByRole('alert').textContent).toContain('INVALID_FIXTURE')
+    expect(screen.getByRole('alert').textContent).not.toContain('Order benchmark failed')
   })
 
   it('copies the complete report', async () => {

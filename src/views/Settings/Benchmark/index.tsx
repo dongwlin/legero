@@ -9,8 +9,12 @@ import {
 import {
   benchmarkActionLabel,
   benchmarkActions,
+  benchmarkFailureLabel,
   copyBenchmarkText,
+  formatBenchmarkFailureReport,
   formatBenchmarkMs,
+  getBenchmarkFailureCode,
+  type OrderBenchmarkFailure,
 } from '@/views/Settings/Benchmark/formatters'
 
 interface OrderBenchmarkProps {
@@ -21,9 +25,11 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'cancelled' | 'error'>('idle')
   const [progress, setProgress] = useState<OrderBenchmarkProgress | null>(null)
   const [result, setResult] = useState<OrderBenchmarkResult | null>(null)
+  const [failure, setFailure] = useState<OrderBenchmarkFailure | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'manual'>('idle')
   const controllerRef = useRef<AbortController | null>(null)
   const resultJson = result ? JSON.stringify(result, null, 2) : ''
+  const failureJson = failure ? formatBenchmarkFailureReport(failure) : ''
   const running = status === 'running'
 
   useEffect(() => {
@@ -49,6 +55,7 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
     setStatus('running')
     setProgress(null)
     setResult(null)
+    setFailure(null)
     setCopyState('idle')
 
     try {
@@ -64,9 +71,14 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
         setResult(nextResult)
         setStatus('done')
       }
-    } catch {
+    } catch (error) {
       if (controllerRef.current === controller) {
-        setStatus(controller.signal.aborted ? 'cancelled' : 'error')
+        if (controller.signal.aborted) {
+          setStatus('cancelled')
+        } else {
+          setFailure({ code: getBenchmarkFailureCode(error), occurredAt: new Date().toISOString() })
+          setStatus('error')
+        }
       }
     } finally {
       if (controllerRef.current === controller) {
@@ -82,7 +94,7 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
   }
 
   const handleCopy = async () => {
-    const copied = await copyBenchmarkText(resultJson)
+    const copied = await copyBenchmarkText(result ? resultJson : failureJson)
     setCopyState(copied ? 'copied' : 'manual')
   }
 
@@ -137,7 +149,9 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
                 ) : status === 'cancelled' ? (
                   <p className='text-foreground/75'>测试已取消，未生成平均值。可重新开始。</p>
                 ) : status === 'error' ? (
-                  <p role='alert' className='text-foreground font-medium'>测试未完成，请重新运行。如仍失败，请重启应用后重试。</p>
+                  <p role='alert' className='text-foreground font-medium'>
+                    测试未完成：{benchmarkFailureLabel[failure?.code ?? 'UNEXPECTED_FAILURE']}（{failure?.code ?? 'UNEXPECTED_FAILURE'}）。可复制安全诊断信息后反馈，再重新运行测试。
+                  </p>
                 ) : status === 'done' ? (
                   <p>已完成 5 轮，以下为每次模拟操作的平均耗时，数值越低越快。</p>
                 ) : (
@@ -235,6 +249,31 @@ const OrderBenchmark = ({ runBenchmark = runOrderBenchmark }: OrderBenchmarkProp
                 </details>
               </section>
             </>
+          ) : null}
+          {failure ? (
+            <section className='space-y-3' aria-label='导出诊断信息'>
+              <Button.Root className='min-h-11 w-full sm:w-auto' variant='outline' onPress={() => { void handleCopy() }}>
+                {copyState === 'copied' ? '已复制诊断信息' : '复制诊断信息'}
+              </Button.Root>
+              <p aria-live='polite' className='text-sm leading-6 text-foreground/75'>
+                {copyState === 'copied'
+                  ? '已复制错误类别和发生时间；不会包含原始错误消息或堆栈。'
+                  : copyState === 'manual'
+                    ? '当前环境无法自动复制。请长按下方文本，选择全部后复制。'
+                    : '诊断信息仅包含安全错误代码和发生时间，不包含原始错误消息或堆栈。'}
+              </p>
+              <details open={copyState === 'manual'} className='rounded-2xl border border-border/70 bg-background-secondary/35 px-4'>
+                <summary className='min-h-11 cursor-pointer py-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'>诊断数据（JSON）</summary>
+                <textarea
+                  aria-label='订单基准测试诊断 JSON'
+                  readOnly
+                  value={failureJson}
+                  rows={8}
+                  onFocus={(event) => event.currentTarget.select()}
+                  className='mb-4 block w-full resize-y rounded-lg border border-border bg-background p-3 font-mono text-xs leading-5 text-foreground caret-accent selection:bg-accent/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                />
+              </details>
+            </section>
           ) : null}
         </div>
       </main>

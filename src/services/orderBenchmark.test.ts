@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   ORDER_BENCHMARK_PROTOCOL,
+  OrderBenchmarkError,
   runOrderBenchmark,
   runOrderBenchmarkTrial,
   summarizeOrderBenchmark,
@@ -12,13 +13,6 @@ import { useOrderStore } from '@/store/order'
 
 const { getAppInfo } = vi.hoisted(() => ({ getAppInfo: vi.fn() }))
 vi.mock('@capacitor/app', () => ({ App: { getInfo: getAppInfo } }))
-
-// These tests verify orchestration and isolation; production selector correctness
-// is covered by orderWorkspaceView.test.ts, rather than timing wall-clock work here.
-vi.mock('@/services/orderWorkspaceView', () => ({
-  countTodayOrders: () => ({ todayCompletedCount: 44, uncompletedCount: 86 }),
-  selectTodayOrderIds: () => Array.from({ length: 130 }, (_, index) => String(index)),
-}))
 
 const timing = (value: number): OrderBenchmarkTimings => ({
   optimisticCommitMs: value,
@@ -53,10 +47,25 @@ describe('order benchmark', () => {
   })
 
   it('requires exactly five trials and rejects invalid timings', () => {
-    expect(() => summarizeOrderBenchmark([1, 2, 3, 4].map(trial))).toThrow('exactly five')
+    let trialCountError: unknown
+    try {
+      summarizeOrderBenchmark([1, 2, 3, 4].map(trial))
+    } catch (error) {
+      trialCountError = error
+    }
+    expect(trialCountError).toBeInstanceOf(OrderBenchmarkError)
+    expect(trialCountError).toMatchObject({ code: 'INVALID_TRIAL_COUNT' })
+
     const invalid = [1, 2, 3, 4, 5].map(trial)
     invalid[2].scenarios[0].metrics.meat.totalMs = Number.NaN
-    expect(() => summarizeOrderBenchmark(invalid)).toThrow('invalid timing')
+    let timingError: unknown
+    try {
+      summarizeOrderBenchmark(invalid)
+    } catch (error) {
+      timingError = error
+    }
+    expect(timingError).toBeInstanceOf(OrderBenchmarkError)
+    expect(timingError).toMatchObject({ code: 'INVALID_TIMING' })
   })
 
   it('cancels before work starts without mutating the live store', async () => {

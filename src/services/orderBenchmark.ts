@@ -12,6 +12,19 @@ dayjs.extend(timezone)
 
 export type OrderBenchmarkAction = 'meat' | 'staple' | 'served'
 
+export type OrderBenchmarkErrorCode =
+  | 'INVALID_FIXTURE'
+  | 'INVALID_ACTION_TARGET'
+  | 'INVALID_TRIAL_COUNT'
+  | 'INVALID_TIMING'
+
+export class OrderBenchmarkError extends Error {
+  constructor(readonly code: OrderBenchmarkErrorCode) {
+    super('Order benchmark failed')
+    this.name = 'OrderBenchmarkError'
+  }
+}
+
 export type OrderBenchmarkTimings = {
   optimisticCommitMs: number
   optimisticViewsMs: number
@@ -185,7 +198,7 @@ export const runOrderBenchmarkTrial = async (
     const ids = selectTodayOrderIds(state.ordersById, state.orderDisplayIds, filter, referenceTime)
 
     if (counts.todayCompletedCount + counts.uncompletedCount !== ORDERS_PER_DAY || ids.length !== ORDERS_PER_DAY) {
-      throw new Error('Benchmark fixture does not match daily-view semantics')
+      throw new OrderBenchmarkError('INVALID_FIXTURE')
     }
   }
 
@@ -195,7 +208,7 @@ export const runOrderBenchmarkTrial = async (
     const next = action === 'served'
       ? toggleOrderServed(current, referenceTime)
       : toggleOrderStepStatus(current, action)
-    if (next === current) throw new Error(`Invalid benchmark ${action} target`)
+    if (next === current) throw new OrderBenchmarkError('INVALID_ACTION_TARGET')
     store.getState().upsertOrder(next)
     const optimisticCommitted = performance.now()
     deriveViews()
@@ -253,7 +266,7 @@ export const runOrderBenchmarkTrial = async (
 }
 
 export const summarizeOrderBenchmark = (trials: OrderBenchmarkTrial[]): OrderBenchmarkResult => {
-  if (trials.length !== ORDER_BENCHMARK_PROTOCOL.runs) throw new Error('Benchmark requires exactly five trials')
+  if (trials.length !== ORDER_BENCHMARK_PROTOCOL.runs) throw new OrderBenchmarkError('INVALID_TRIAL_COUNT')
 
   const means = trials[0].scenarios.map((scenario, index) => ({
     totalOrders: scenario.totalOrders,
@@ -269,7 +282,7 @@ export const summarizeOrderBenchmark = (trials: OrderBenchmarkTrial[]): OrderBen
     for (const scenario of trial.scenarios) {
       for (const action of ACTIONS) {
         if (TIMING_STAGES.some((stage) => !Number.isFinite(scenario.metrics[action][stage]) || scenario.metrics[action][stage] < 0)) {
-          throw new Error('Benchmark produced an invalid timing')
+          throw new OrderBenchmarkError('INVALID_TIMING')
         }
       }
     }
