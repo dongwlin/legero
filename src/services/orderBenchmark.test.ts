@@ -48,13 +48,13 @@ const fixture = async () => {
 
 afterEach(() => { vi.useRealTimers() })
 
-describe('order benchmark V2', () => {
+describe('order benchmark protocol V3', () => {
   it('uses five equally weighted round means and preserves individual samples and distinct statistics', () => {
     const trials = [1, 2, 3, 4, 5].map((run) => trial(run))
     const result = summarizeOrderBenchmark(trials)
     expect(result.trials).toBe(trials)
     expect(result.schemaVersion).toBe(2)
-    expect(result.protocol.protocolVersion).toBe(2)
+    expect(result.protocol.protocolVersion).toBe(3)
     expect(result.means.map((scenario) => scenario.totalOrders)).toEqual([130, 520, 1820])
     expect(result.means[0].metrics.meat.totalMs).toBe(50)
     expect(result.trials[0].scenarios[0].cases[0].samples).toHaveLength(5)
@@ -111,6 +111,18 @@ describe('order benchmark V2', () => {
     expect(useOrderStore.getState()).toBe(before)
     expect(orderOptimistic.hasPending('live-pending-order')).toBe(true)
     orderOptimistic.endMutation('live-pending-order', sentinel)
+  })
+
+  it('reorders an already completed order without changing valid completion state or counts', async () => {
+    const orders = await fixture()
+    const store = createBenchmarkStore()
+    const completedBefore = orders.filter((order) => order.completedAt !== null).length
+    performBenchmarkCase(benchmarkCaseDefinitions([1]).find((item) => item.id === 'completion')!, store, orders, 0)
+    const records = Object.values(store.getState().ordersById)
+    expect(records.filter((order) => order.completedAt !== null)).toHaveLength(completedBefore)
+    expect(store.getState().ordersById[orders[0].id].completedAt).not.toBe(orders[0].completedAt)
+    expect(store.getState().ordersById[orders[1].id].completedAt).toBeNull()
+    expect(store.getState().ordersById[orders[0].id].meatStepStatusCode).toBe(orders[0].meatStepStatusCode)
   })
 
   it('fails correctness when the actual batch method drops an update', async () => {

@@ -19,7 +19,7 @@ const readArg = (name) => {
   if (!value || value.startsWith('--')) throw new Error(`Missing value for ${name}`)
   return value
 }
-const label = readArg('--label') ?? 'current-v2'
+const label = readArg('--label') ?? 'current-v3'
 const profile = readArg('--profile') ?? 'default'
 if (!['default', 'history', 'today', 'batch'].includes(profile)) throw new Error('Profile must be default, history, today or batch')
 const output = path.resolve(root, readArg('--output') ?? `benchmarks/order-workspace/results/${label}.json`)
@@ -98,7 +98,7 @@ const runChild = (args, input, run) => new Promise((resolve, reject) => {
     activeTrial = false
     if (run && (timedOut || cancelled || !result || code !== 0)) {
       const partial = result ?? checkpoint ?? { run, profile, scenarios: [], incompleteScenario: null }
-      partial.status = cancelled ? 'cancelled' : 'failed'
+      partial.status = timedOut ? 'failed' : cancelled ? 'cancelled' : 'failed'
       partial.failure = { code: timedOut ? 'TIMEOUT' : cancelled ? 'ABORTED' : 'CHILD_FAILED', message: timedOut ? 'Trial exceeded timeout' : cancelled ? 'Benchmark cancelled' : 'Workload process failed' }
       resolve(partial)
     } else if (!result || code !== 0) reject(new Error(stderr || 'Could not summarize workload'))

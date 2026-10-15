@@ -76,7 +76,7 @@ export const performBenchmarkCase = (
   validateResult(store, orders, deriveViews(store))
   const journal = createOrderOptimistic()
   const action = definition.id as OrderBenchmarkAction
-  const target = orders[action === 'served' ? 4 : 1]
+  const target = orders[action === 'served' ? 4 : definition.id === 'completion' ? 0 : 1]
   let expected = orders
   let inputEvents = 1
   let distinctIds = 1

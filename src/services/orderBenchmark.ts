@@ -14,7 +14,7 @@ export class OrderBenchmarkError extends Error {
 }
 
 export const ORDER_BENCHMARK_PROTOCOL = {
-  protocolVersion: 2,
+  protocolVersion: 3,
   runs: 5,
   scenarioTotalOrders: [130, 520, 1820],
   todayOrders: 130,

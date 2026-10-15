@@ -2,14 +2,14 @@
 
 共享工作负载调用生产 Zustand store、状态函数、列表／计数派生，以及独立的乐观操作 journal。所有计算夹具使用独立 store 和内存 storage，不操作真实订单。Node ≥24，pnpm 11；主机全局版本不符时可使用 `corepack pnpm@11`。
 
-## C01–C05：计算协议 v2
+## C01–C05：计算协议 v3
 
 ```sh
-pnpm benchmark:orders --label baseline-v2 --output benchmarks/order-workspace/results/baseline-v2.json
-pnpm benchmark:orders --label candidate-v2 --output benchmarks/order-workspace/results/candidate-v2.json --compare benchmarks/order-workspace/results/baseline-v2.json
-pnpm benchmark:orders --profile today --output /tmp/today-v2.json
-pnpm benchmark:orders --profile batch --output /tmp/batch-v2.json
-pnpm benchmark:orders --profile history --output /tmp/history-v2.json
+pnpm benchmark:orders --label baseline-v3 --output benchmarks/order-workspace/results/baseline-v3.json
+pnpm benchmark:orders --label candidate-v3 --output benchmarks/order-workspace/results/candidate-v3.json --compare benchmarks/order-workspace/results/baseline-v3.json
+pnpm benchmark:orders --profile today --output /tmp/today-v3.json
+pnpm benchmark:orders --profile batch --output /tmp/batch-v3.json
+pnpm benchmark:orders --profile history --output /tmp/history-v3.json
 ```
 
 CLI 顺序启动五个独立 Node 进程；应用的“设置 → 订单基准测试”运行相同场景，在同一浏览器进程中使用五个独立 store。默认轻量配置；扩展历史规模请在设备空闲时分批选择。
@@ -37,7 +37,7 @@ CLI 顺序启动五个独立 Node 进程；应用的“设置 → 订单基准�
 
 CLI 路径保护回归可用 `pnpm test:benchmark-cli` 验证，输出与基线指向相同文件（包括软／硬链接）时会在运行前拒绝。CLI 可 Ctrl+C；`--timeout-ms` 控制每轮超时。取消／超时保存已收到的逐用例 checkpoint，缺失样本明确保留为部分结果，`means` 为空；阻塞子进程有强制终止兜底。应用退后台或离页中止隔离基准。取消后的已完成样本仍可保存；旧运行的晚到结果不能覆盖新运行。
 
-比较要求协议、配置、设备、运行时和构建模式相同，性能采集时不要同时运行构建、测试或其他基准。结果中的源码摘要、提交及未提交状态用于核对来源；结果本身不设未经验证的毫秒门槛。V1 归档结果继续保留，**不能直接与 V2 比较**：计时断言位置、场景和数据分布均有调整。本轮只扩大测量覆盖，未优化生产排序或工作台数据范围。
+比较要求协议、配置、设备、运行时和构建模式相同，性能采集时不要同时运行构建、测试或其他基准。结果中的源码摘要、提交及未提交状态用于核对来源；结果本身不设未经验证的毫秒门槛。V1 归档及本次协议 V2 探索记录继续保留，V2 的完成顺序夹具曾使用未完成订单，V3 修正为已完成订单的合法重排；**不能直接与 V3 比较**：计时断言位置、场景和数据分布均有调整。本轮只扩大测量覆盖，未优化生产排序或工作台数据范围。
 
 ## E01：保存完整 JSON
 
