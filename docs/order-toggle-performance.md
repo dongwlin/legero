@@ -38,7 +38,17 @@ pnpm benchmark:orders --label fixed --output benchmarks/order-workspace/results/
 
 每个结果 JSON 保留五轮原始值和分阶段均值。命令行比较会拒绝不一致的基准协议、CPU 或 Node 版本。不要与测试、构建或另一轮基准并行运行。详细说明见 [benchmark README](../benchmarks/order-workspace/README.md)。
 
-结果与对比在基准完成后补充。
+### 优化前基线
+
+已在提交 `e314fee` 上顺序完成 5 个独立进程的基线，原始结果见 [baseline.json](../benchmarks/order-workspace/results/baseline.json)。每项数值均为五轮算术平均，每次操作合计包含本地乐观更新与模拟服务器确认后的两次工作台重算。
+
+| 历史总单量（今日均 130 单） | 肉（ms） | 主食（ms） | 出餐（ms） |
+| --- | ---: | ---: | ---: |
+| 130 | 65.290 | 62.857 | 62.491 |
+| 520 | 260.203 | 260.243 | 258.612 |
+| 1820 | 922.824 | 905.477 | 915.016 |
+
+该基线复现了数据增长带来的本地同步计算开销；不是门店设备的实测。优化后的对比将在同一开发电脑上、保持基准协议不变的情况下补充。
 
 ## 修复范围
 
